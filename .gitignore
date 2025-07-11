@@ -147,6 +147,7 @@ release.bat
 compiled/
 *_compiled.html
 reDashboard_compiled.html
+src/reDashboard_compiled.html
 
 # Don't commit build files in src
 src/*.bat
