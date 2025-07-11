@@ -1,0 +1,61 @@
+name: Prepare Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.2.1)'
+        required: true
+        default: '1.2.0'
+      release_notes:
+        description: 'Release notes'
+        required: false
+        default: 'Bug fixes and improvements'
+
+jobs:
+  prepare-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+        
+    - name: Create Release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ github.event.inputs.version }}
+        release_name: reDashboard v${{ github.event.inputs.version }}
+        body: |
+          ## reDashboard v${{ github.event.inputs.version }}
+          
+          ### 📥 Download
+          Download the `reDashboard.html` file from the assets below and open it in your browser.
+          
+          ### 🆕 What's New
+          ${{ github.event.inputs.release_notes }}
+          
+          ### 🚀 Quick Start
+          1. Download `reDashboard.html` from the assets below
+          2. Open in any modern browser (Chrome, Firefox, Safari, Edge)
+          3. Enter your FC2 license key and check "Remember me"
+          4. Start managing your scripts and configurations!
+          
+          ### ✨ Features
+          - **Single file** - no installation, no dependencies
+          - **Works offline** - all functionality built-in
+          - **Cross-platform** - Windows, Mac, Linux, mobile
+          - **Live Omega integration** - real-time config updates
+          
+          ---
+          *The compiled HTML file will be uploaded shortly after this release is created.*
+          
+        draft: true
+        prerelease: false
+        
+    - name: Output release info
+      run: |
+        echo "Release created: ${{ steps.create_release.outputs.html_url }}"
+        echo "Upload URL: ${{ steps.create_release.outputs.upload_url }}"
