@@ -642,12 +642,39 @@ const app = {
 
         const fallbackInitial = memberData.username ? memberData.username.charAt(0).toUpperCase() : '?';
 
-        // Clear existing content and use fallback (CORS prevents forum avatars)
+        // Clear existing content
         avatarElement.innerHTML = '';
-        const fallback = document.createElement('div');
-        fallback.className = 'avatar-fallback';
-        fallback.textContent = fallbackInitial;
-        avatarElement.appendChild(fallback);
+
+        // Try to use the avatar from API if available
+        if (memberData.avatar && typeof memberData.avatar === 'string' && memberData.avatar.trim() !== '') {
+            const avatarImg = document.createElement('img');
+            avatarImg.src = memberData.avatar;
+            avatarImg.alt = `${memberData.username}'s avatar`;
+            
+            // Handle successful image load
+            avatarImg.onload = () => {
+                console.log('✅ Avatar loaded successfully:', memberData.avatar);
+            };
+            
+            // Handle image load errors - fall back to letter
+            avatarImg.onerror = () => {
+                console.warn('❌ Failed to load avatar, falling back to letter:', memberData.avatar);
+                avatarElement.innerHTML = '';
+                const fallback = document.createElement('div');
+                fallback.className = 'avatar-fallback';
+                fallback.textContent = fallbackInitial;
+                avatarElement.appendChild(fallback);
+            };
+            
+            avatarElement.appendChild(avatarImg);
+        } else {
+            // No avatar available, use fallback letter
+            console.log('📝 No avatar available, using fallback letter for:', memberData.username);
+            const fallback = document.createElement('div');
+            fallback.className = 'avatar-fallback';
+            fallback.textContent = fallbackInitial;
+            avatarElement.appendChild(fallback);
+        }
     },
 
     handleConnectionError(error) {
