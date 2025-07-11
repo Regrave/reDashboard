@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      <title>reDashboard</title>
+      <link rel="stylesheet" href="reDashboard.css">
+      
+      <!-- FC2 Dashboard JavaScript Modules -->
+      <script src="js/core.js"></script>        <!-- Foundation & API -->
+      <script src="js/modules.js"></script>     <!-- Feature modules -->
+      <script src="js/components.js"></script>  <!-- UI components -->
+      <script src="js/utils.js"></script>       <!-- Utilities & advanced features -->
+      <script src="js/main.js"></script>        <!-- Initialization & orchestration -->
+  </head>
+  <body>
+    <div class="container">
+      <!-- Header -->
+      <div class="header">
+        <!-- Header buttons in top-right corner -->
+        <div class="header-buttons">
+          <div style="position: relative;">
+            <button class="omega-button" id="omegaButton" onclick="app.showOmegaModal()"> 💾 Download Omega </button>
+            <div class="omega-info" id="omegaInfo"> Latest Version • Last Updated: Recently </div>
+          </div>
+          <button class="roll-button" id="rollButton" onclick="app.rollLoot()"> 🎲 Roll Loot </button>
+          <button class="settings-button" id="settingsButton" onclick="app.showSettingsModal()"> ⚙️ Settings </button>
+        </div>
+        <h1> reDashboard <span class="version-badge">v1.2.5</span>
+        </h1>
+        <div class="login-section" id="loginSection" style="display: none;">
+          <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your FC2 license key...">
+          <button class="btn" onclick="app.connect()">🚀 Connect</button>
+          <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
+            <input type="checkbox" id="rememberMe" style="width: 18px; height: 18px;">
+            <label for="rememberMe" style="color: #ccc; font-size: 14px; cursor: pointer;">Remember me</label>
+          </div>
+          <button class="btn btn-small" onclick="app.toggleAdvanced()" style="margin-left: 10px; background: linear-gradient(135deg, #666, #555);">⚙️ Advanced</button>
+        </div>
+        <!-- Advanced Login Section -->
+        <div class="advanced-login" id="advancedLogin" style="display: none; margin-top: 15px; padding: 20px; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px;">
+          <h3 style="color: #4a9eff; margin-bottom: 15px; font-size: 16px;">🔧 Advanced Login</h3>
+          <p style="color: #aaa; font-size: 14px; margin-bottom: 15px;"> If you already have a handshake token, you can enter it directly below to skip the authorization step. </p>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="password" class="api-key-input" id="handshakeToken" placeholder="Enter handshake token directly..." style="flex: 1;">
+            <button class="btn" onclick="app.connectWithHandshake()">🔑 Connect with Token</button>
+          </div>
+          <div style="margin-top: 10px; font-size: 12px; color: #888;"> ⚠️ <strong>Note:</strong> Handshake tokens are browser and IP-locked. Only use tokens generated on this device. </div>
+          <!-- Add handshake management section -->
+          <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+            <h4 style="color: #ff8c00; margin-bottom: 10px; font-size: 14px;">🗑️ Session Management</h4>
+            <p style="color: #aaa; font-size: 13px; margin-bottom: 15px; line-height: 1.4;"> If you're having session issues or want to force logout from all devices, you can wipe your handshake token. <strong>This requires your license key and will log you out from all devices.</strong>
+            </p>
+            <div style="display: flex; gap: 10px; align-items: center;">
+              <input type="password" class="api-key-input" id="wipeHandshakeKey" placeholder="Enter license key to wipe handshake..." style="flex: 1;">
+              <button class="btn btn-danger" onclick="app.wipeHandshake()" style="background: linear-gradient(135deg, #ff4444, #cc0000); white-space: nowrap;"> 🗑️ Wipe Handshake </button>
+            </div>
+            <div style="margin-top: 8px; font-size: 11px; color: #ff8c00;"> ⚠️ This will destroy your session token and log you out from all devices immediately. </div>
+          </div>
+        </div>
+        <div class="connected-info" id="connectedInfo">
+          <div class="user-avatar" id="userAvatar">?</div>
+          <div>
+            <div style="font-weight: 600; color: #fff;" id="connectedUsername">Connected</div>
+            <div style="font-size: 14px; color: #aaa;">Level <span id="userLevel">0</span> • <span id="userXP">0</span> XP </div>
+          </div>
+          <button class="btn btn-danger btn-small" onclick="app.disconnect()">Disconnect</button>
+        </div>
+      </div>
+      <!-- Navigation -->
+      <div class="nav-tabs" id="navTabs">
+        <button class="nav-tab active" onclick="app.switchTab('overview')">📊 Overview</button>
+        <button class="nav-tab" onclick="app.switchTab('scripts')">📜 Scripts</button>
+        <button class="nav-tab" onclick="app.switchTab('teams')">👥 Teams</button>
+        <button class="nav-tab" onclick="app.switchTab('builds')">🏗️ Builds</button>
+        <button class="nav-tab" onclick="app.switchTab('perks')">✨ Perks</button>
+        <button class="nav-tab" onclick="app.switchTab('config')">⚙️ Configuration</button>
+      </div>
+      <!-- Content Area -->
+      <div class="content-area" id="contentArea">
+        <!-- Overview Section -->
+        <div class="content-section active" id="overview-section">
+          <div class="card">
+            <h2>👤 Member Information</h2>
+            <div class="stats-grid" id="memberStats">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>💻 Member's Panel Terminal</h2>
+            <div class="terminal-container">
+              <div class="terminal-header">
+                <div class="terminal-controls">
+                  <div class="terminal-dot" style="background: #ff5f57;"></div>
+                  <div class="terminal-dot" style="background: #ffbd2e;"></div>
+                  <div class="terminal-dot" style="background: #28ca42;"></div>
+                </div>
+                <div class="terminal-title">FC2 Terminal</div>
+              </div>
+              <div class="terminal-body">
+                <div class="terminal-output" id="terminalOutput">
+                  <div class="terminal-welcome">
+                    <div style="color: #4a9eff; font-weight: bold;">FC2 Member's Panel Terminal</div>
+                    <div style="color: #888; font-size: 14px;">Type 'help' for available commands</div>
+                  </div>
+                </div>
+                <div class="terminal-input-line">
+                  <span class="terminal-prompt">fc2@constelia:~$</span>
+                  <input type="text" class="terminal-input" id="terminalInput" placeholder="Enter command..." autocomplete="off">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- Scripts Section -->
+        <div class="content-section" id="scripts-section">
+          <div class="card">
+            <h2>🚀 My Active Scripts</h2>
+            <div class="filter-controls">
+              <label style="color: #aaa; font-size: 14px;">Sort by:</label>
+              <select class="form-select" id="myScriptSort" style="width: 175px;" onchange="app.sortMyScripts()">
+                <option value="name">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
+                <option value="author">Author</option>
+                <option value="updated" selected>Recently Updated</option>
+                <option value="software">Software</option>
+              </select>
+              <button class="btn btn-small" onclick="app.refreshScripts()">🔄 Refresh</button>
+            </div>
+            <div class="scripts-grid" id="myScriptsGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>📚 Available Scripts</h2>
+            <div class="filter-controls">
+              <input type="text" class="form-input" id="scriptSearch" placeholder="Search scripts..." onkeyup="app.filterScripts()" style="width: 300px;">
+              <label style="color: #aaa; font-size: 14px;">Sort by:</label>
+              <select class="form-select" id="availableScriptSort" style="width: 175px;" onchange="app.handleAvailableSortChange()">
+                <option value="name">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
+                <option value="author">Author</option>
+                <option value="updated" selected>Recently Updated</option>
+                <option value="software">Software</option>
+                <option value="categories">Categories</option>
+              </select>
+              <button class="btn btn-small" onclick="app.clearAvailableFilters()">🗑️ Clear Filters</button>
+            </div>
+            <!-- Filter Panels -->
+            <div id="availableAuthorFilter" class="filter-panel">
+              <h4 style="color: #4a9eff; margin-bottom: 15px;">Filter by Author:</h4>
+              <div id="authorFilters"></div>
+            </div>
+            <div id="availableSoftwareFilter" class="filter-panel">
+              <h4 style="color: #4a9eff; margin-bottom: 15px;">Filter by Software:</h4>
+              <div id="softwareFilters"></div>
+            </div>
+            <div id="availableCategoryFilter" class="filter-panel">
+              <h4 style="color: #4a9eff; margin-bottom: 15px;">Filter by Category:</h4>
+              <div id="categoryFilters"></div>
+            </div>
+            <div class="scripts-grid" id="availableScriptsGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Teams Section -->
+        <div class="content-section" id="teams-section">
+          <div class="card">
+            <h2>🚀 My Active Projects</h2>
+            <div class="filter-controls">
+              <label style="color: #aaa; font-size: 14px;">Sort by:</label>
+              <select class="form-select" id="myProjectSort" style="width: 175px;" onchange="app.sortMyProjects()">
+                <option value="name">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
+                <option value="author">Author</option>
+                <option value="updated" selected>Recently Updated</option>
+              </select>
+              <button class="btn btn-small" onclick="app.refreshProjects()">🔄 Refresh</button>
+            </div>
+            <div class="scripts-grid" id="myProjectsGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>📦 Available Projects</h2>
+            <div class="filter-controls">
+              <input type="text" class="form-input" id="projectSearch" placeholder="Search projects..." onkeyup="app.filterProjects()" style="width: 300px;">
+              <label style="color: #aaa; font-size: 14px;">Sort by:</label>
+              <select class="form-select" id="availableProjectSort" style="width: 175px;" onchange="app.handleAvailableProjectSortChange()">
+                <option value="name">Name (A-Z)</option>
+                <option value="name_desc">Name (Z-A)</option>
+                <option value="author">Author</option>
+                <option value="updated" selected>Recently Updated</option>
+              </select>
+              <button class="btn btn-small" onclick="app.clearAvailableProjectFilters()">🗑️ Clear Filters</button>
+            </div>
+            <!-- Filter Panels for Projects -->
+            <div id="availableProjectAuthorFilter" class="filter-panel">
+              <h4 style="color: #4a9eff; margin-bottom: 15px;">Filter by Author:</h4>
+              <div id="projectAuthorFilters"></div>
+            </div>
+            <div class="scripts-grid" id="availableProjectsGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Builds Section -->
+        <div class="content-section" id="builds-section">
+          <div class="card">
+            <h2>🚀 My Builds</h2>
+            <div class="filter-controls">
+              <label style="color: #aaa; font-size: 14px;">Sort by:</label>
+              <select class="form-select" id="myBuildSort" style="width: 175px;" onchange="app.sortMyBuilds()">
+                <option value="tag">Tag (A-Z)</option>
+                <option value="tag_desc">Tag (Z-A)</option>
+                <option value="popularity" selected>Popularity</option>
+              </select>
+              <button class="btn" onclick="app.createBuild()">🏗️ Create New Build</button>
+              <button class="btn btn-small" onclick="app.refreshBuilds()">🔄 Refresh</button>
+            </div>
+            <div class="scripts-grid" id="myBuildsGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>📦 Available Builds</h2>
+            <div class="filter-controls">
+              <input type="text" class="form-input" id="buildSearch" placeholder="Search builds..." onkeyup="app.filterBuilds()" style="width: 300px;">
+              <label style="color: #aaa; font-size: 14px;">Sort by:</label>
+              <select class="form-select" id="availableBuildSort" style="width: 175px;" onchange="app.handleAvailableBuildSortChange()">
+                <option value="tag">Tag (A-Z)</option>
+                <option value="tag_desc">Tag (Z-A)</option>
+                <option value="author">Author</option>
+                <option value="popularity" selected>Popularity</option>
+              </select>
+              <button class="btn btn-small" onclick="app.clearAvailableBuildFilters()">🗑️ Clear Filters</button>
+            </div>
+            <!-- Filter Panels for Builds -->
+            <div id="availableBuildAuthorFilter" class="filter-panel">
+              <h4 style="color: #4a9eff; margin-bottom: 15px;">Filter by Author:</h4>
+              <div id="buildAuthorFilters"></div>
+            </div>
+            <div class="scripts-grid" id="availableBuildsGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Perks Section -->
+        <div class="content-section" id="perks-section">
+          <div class="card">
+            <h2>✨ Perk Management</h2>
+            <div class="stats-grid" style="margin-bottom: 30px;">
+              <div class="stat-box">
+                <div class="stat-label">Available Perk Points</div>
+                <div class="stat-value" id="perkPoints">0</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-label">Total XP</div>
+                <div class="stat-value" id="totalXP">0</div>
+              </div>
+              <div class="stat-box">
+                <div class="stat-label">Active Perks</div>
+                <div class="stat-value" id="activePerks">0</div>
+              </div>
+            </div>
+            <div style="display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap;">
+              <button class="btn" onclick="app.refreshPerks()">🔄 Refresh Perks</button>
+              <button class="btn btn-danger" onclick="app.respecPerks()" title="Costs 3000 XP"> 💀 Respec All Perks (-3000 XP) </button>
+            </div>
+          </div>
+          <div class="card" id="venusCard" style="display: none;">
+            <h2>💕 Venus Perk - Partnership System</h2>
+            <div id="venusStatus" style="margin-bottom: 20px;">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>🛒 Available Perks</h2>
+            <div class="filter-controls">
+              <input type="text" class="form-input" id="perkSearch" placeholder="Search perks..." onkeyup="app.filterPerks()" style="width: 300px;">
+              <label style="color: #aaa; font-size: 14px;">Show:</label>
+              <select class="form-select" id="perkFilter" style="width: 150px;" onchange="app.filterPerks()">
+                <option value="all">All Perks</option>
+                <option value="available">Available</option>
+                <option value="owned">Owned</option>
+                <option value="affordable">Affordable</option>
+              </select>
+            </div>
+            <div class="scripts-grid" id="perksGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Configuration Section -->
+        <div class="content-section" id="config-section">
+          <div class="card">
+            <h2>📝 Script Configuration</h2>
+            <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 20px;">
+              <select class="form-select" id="scriptConfigSelect" onchange="app.loadScriptConfig()" style="flex: 1;">
+                <option value="">Select a software first...</option>
+              </select>
+              <select class="form-select" id="softwareSelect" onchange="app.onSoftwareChange()" style="width: 200px;">
+                <option value="">Select software...</option>
+              </select>
+              <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
+                <div class="toggle-switch" id="autoSaveToggle" onclick="app.toggleAutoSave()" title="Auto-save changes">
+                  <div class="toggle-slider"></div>
+                </div>
+                <label style="color: #ccc; font-size: 14px; cursor: pointer; white-space: nowrap;" onclick="app.toggleAutoSave()">Auto-save</label>
+              </div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-left: 15px;" id="liveOmegaContainer">
+                <div class="toggle-switch live-omega" id="liveOmegaToggle" onclick="app.toggleLiveOmega()" title="Live Omega updates">
+                  <div class="toggle-slider"></div>
+                </div>
+                <label style="color: #ccc; font-size: 14px; cursor: pointer; white-space: nowrap;" onclick="app.toggleLiveOmega()">🚀 Live Omega</label>
+              </div>
+            </div>
+            <div id="scriptConfigEditor" style="display: none;">
+              <div class="script-config-form" id="scriptConfigForm">
+                <!-- Dynamic form fields will be inserted here -->
+              </div>
+              <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn" onclick="app.saveScriptConfig()">💾 Save Config</button>
+                <button class="btn" onclick="app.saveScriptConfig(false, true)" style="background: linear-gradient(135deg, #4aff4a, #357abd);">🚀 Save & Push to Omega</button>
+                <button class="btn btn-danger" onclick="app.resetScriptConfig()">🗑️ Reset to Default</button>
+              </div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>🎛️ Configuration Management</h2>
+            <div class="config-editor">
+              <h3>Current Configuration (Raw JSON)</h3>
+              <div class="json-editor" id="configDisplay" contenteditable="true">{}</div>
+              <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button class="btn" onclick="app.saveConfiguration()">💾 Save Configuration</button>
+                <button class="btn" onclick="app.saveConfiguration(true)" style="background: linear-gradient(135deg, #4aff4a, #357abd);">🚀 Save & Push to Omega</button>
+                <button class="btn" onclick="app.loadConfiguration()">🔄 Reload</button>
+                <button class="btn" onclick="app.formatJSON()">🎨 Format JSON</button>
+                <button class="btn btn-danger" onclick="app.resetConfiguration()">🗑️ Reset</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Cute Attribution Footer -->
+    <div style="text-align: center; padding: 20px; color: #666; font-size: 12px; border-top: 1px solid rgba(255, 255, 255, 0.05); margin-top: 30px;">
+      <span style="opacity: 0.7;">✨ Lovingly crafted with</span>
+      <span style="color: #ff6b6b; font-size: 14px; margin: 0 3px;">♡</span>
+      <span style="opacity: 0.7;">by</span>
+      <span style="color: #4a9eff; font-weight: 600; margin-left: 4px;">Rucka</span>
+      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.2.5</span>
+    </div>
+    <!-- Bottom-Right Notification Container -->
+    <div class="notification-container" id="notificationContainer">
+      <!-- Dynamic notifications will be inserted here -->
+    </div>
+    <!-- Roll Result Modal -->
+    <div class="roll-result-modal" id="rollResultModal">
+      <div class="roll-result-content">
+        <div class="roll-result-title">🎲 Loot Roll Result</div>
+        <div id="rollResultContent">
+          <!-- Dynamic content will be inserted here -->
+        </div>
+        <button class="roll-close-btn" onclick="app.closeRollModal()">Got it!</button>
+      </div>
+    </div>
+    <!-- Omega Download Modal -->
+    <div class="omega-modal" id="omegaModal">
+      <div class="omega-modal-content">
+        <div class="omega-modal-title">💾 Download Omega</div>
+        <div class="omega-modal-subtitle"> Choose your operating system to download the latest version of Omega. </div>
+        <div class="omega-download-buttons">
+          <button class="omega-download-btn windows" onclick="app.downloadOmega('windows')"> 🪟 Windows <span style="font-size: 12px; opacity: 0.8;">(.bat file)</span>
+          </button>
+          <button class="omega-download-btn linux" onclick="app.downloadOmega('linux')"> 🐧 Linux <span style="font-size: 12px; opacity: 0.8;">(.sh file)</span>
+          </button>
+        </div>
+        <button class="omega-close-btn" onclick="app.closeOmegaModal()">Cancel</button>
+      </div>
+    </div>
+    <!-- Settings Modal -->
+    <div class="settings-modal" id="settingsModal">
+      <div class="settings-modal-content">
+        <div class="settings-modal-header">
+          <div class="settings-modal-title">⚙️ System Settings</div>
+          <button class="settings-modal-close" onclick="app.closeSettingsModal()">✕</button>
+        </div>
+        <div class="settings-modal-body">
+          <!-- Protection Mode Section -->
+          <div class="settings-section">
+            <h3>🛡️ Protection Mode</h3>
+            <div class="settings-field">
+              <label class="settings-label">
+                FC2 Protection Method 
+                <code class="settings-tag">System</code>
+              </label>
+              <select class="form-select" id="settingsProtectionModeSelect" onchange="app.setProtectionMode()" style="width: 250px;">
+                <option value="">Loading...</option>
+              </select>
+            </div>
+            <p class="settings-description">
+              Changes the FC2 protection method. Higher protection modes provide better security but may impact performance.
+            </p>
+          </div>
+
+          <!-- Language Settings Section -->
+          <div class="settings-section">
+            <h3>🌐 Language Settings</h3>
+            <div class="settings-field">
+              <label class="settings-label">
+                Select Language 
+                <code class="settings-tag">FL2</code>
+              </label>
+              <div style="display: flex; gap: 10px; align-items: center;">
+                <select class="form-select" id="settingsLanguageSelect" onchange="app.setLanguage()" style="width: 200px;">
+                  <option value="">Loading languages...</option>
+                </select>
+                <button class="btn btn-small" onclick="app.loadLanguages()" style="background: linear-gradient(135deg, #666, #555);">🔄 Refresh</button>
+              </div>
+            </div>
+            <p class="settings-description">
+              Changes the interface language for fantasy.language2 (FL2) supported applications. 
+              <span id="settingsLanguageCount">Loading...</span> languages available. 
+              Current: <span id="settingsCurrentLanguageDisplay">English</span>
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Build Application Modal -->
+    <div class="omega-modal" id="buildPreviewModal">
+      <div class="omega-modal-content" style="max-width: 800px;">
+        <div class="omega-modal-title">🏗️ Apply Build</div>
+        <div class="omega-modal-subtitle" id="buildPreviewTitle"> Applying build will overwrite your current configuration and scripts </div>
+        <div id="buildPreviewContent" style="max-height: 400px; overflow-y: auto; margin: 20px 0;">
+          <!-- Dynamic content will be inserted here -->
+        </div>
+        <div style="display: flex; gap: 15px; justify-content: center; margin-top: 30px;">
+          <button class="btn" onclick="app.confirmApplyBuild()" id="confirmApplyBtn"> 🚀 Apply Build </button>
+          <button class="omega-close-btn" onclick="app.closeBuildPreview()">Cancel</button>
+        </div>
+      </div>
+    </div>
+    <!-- Build Details Modal -->
+    <div class="script-editor-modal" id="buildDetailsModal">
+      <div class="script-editor-content">
+        <div class="script-editor-header">
+          <div class="script-editor-title"> 🔍 Build Details <span id="buildDetailsTitle">Loading...</span>
+          </div>
+          <div class="script-editor-actions">
+            <button class="btn" onclick="app.applyBuildFromDetails()" id="applyFromDetailsBtn"> 🚀 Apply Build </button>
+            <button class="script-editor-close" onclick="app.closeBuildDetails()"> ✕ Close </button>
+          </div>
+        </div>
+        <div class="script-editor-body">
+          <div class="script-editor-main" style="padding: 25px; overflow-y: auto;">
+            <div id="buildDetailsContent">
+              <!-- Dynamic content will be inserted here -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <!-- Script Editor Modal -->
+    <div class="script-editor-modal" id="scriptEditorModal">
+      <div class="script-editor-content">
+        <div class="script-editor-loading" id="scriptEditorLoading">
+          <div class="spinner"></div>
+        </div>
+        <div class="script-editor-header">
+          <div class="script-editor-title"> ✏️ Script Editor <div class="draft-indicator" id="draftIndicator">Draft saved</div>
+          </div>
+          <div class="script-editor-actions">
+            <div class="save-indicator" id="saveIndicator"> 💾 Saved </div>
+            <button class="btn" onclick="app.saveScript()" id="saveScriptBtn"> 💾 Save Script </button>
+            <button class="script-editor-close" onclick="app.closeScriptEditor()"> ✕ Close </button>
+          </div>
+        </div>
+        <div class="script-editor-body">
+          <div class="script-editor-main">
+            <div class="code-editor-container">
+              <div class="code-editor-toolbar">
+                <label style="color: #aaa; font-size: 14px;">Script Content:</label>
+                <div style="flex: 1;"></div>
+                <span style="color: #888; font-size: 12px;">Language: Lua</span>
+              </div>
+              <textarea class="code-editor" id="scriptCodeEditor" placeholder="-- Enter your Lua script code here...
+-- Example:
+function onUpdate()
+    -- Your code here
+end"></textarea>
+            </div>
+          </div>
+          <div class="script-editor-sidebar">
+            <!-- Script Info -->
+            <div class="sidebar-section">
+              <div class="script-info-display" id="scriptInfoDisplay">
+                <h4>📋 Script Information</h4>
+                <div class="script-info-item">
+                  <span class="script-info-label">Name:</span>
+                  <span class="script-info-value" id="scriptInfoName">Loading...</span>
+                </div>
+                <div class="script-info-item">
+                  <span class="script-info-label">ID:</span>
+                  <span class="script-info-value" id="scriptInfoId">-</span>
+                </div>
+                <div class="script-info-item">
+                  <span class="script-info-label">Author:</span>
+                  <span class="script-info-value" id="scriptInfoAuthor">-</span>
+                </div>
+                <div class="script-info-item">
+                  <span class="script-info-label">Software:</span>
+                  <span class="script-info-value" id="scriptInfoSoftware">-</span>
+                </div>
+                <div class="script-info-item">
+                  <span class="script-info-label">Last Updated:</span>
+                  <span class="script-info-value" id="scriptInfoUpdated">-</span>
+                </div>
+              </div>
+            </div>
+            <!-- Update Notes -->
+            <div class="sidebar-section">
+              <h3>📝 Update Notes</h3>
+              <div class="form-group">
+                <label for="updateNotes">Describe your changes (required):</label>
+                <textarea id="updateNotes" placeholder="Please describe what you changed in this update. Be specific about new features, bug fixes, or improvements. This helps users understand what's new.
+
+Examples:
+- Fixed aim smoothing calculation
+- Added new ESP options for better visibility
+- Improved performance in crowded servers
+- Updated for latest game version"></textarea>
+                <div class="char-counter" id="notesCharCounter">0 / 5 minimum</div>
+              </div>
+            </div>
+            <!-- Categories -->
+            <div class="sidebar-section">
+              <h3>🏷️ Categories</h3>
+              <div class="categories-grid" id="categoriesGrid">
+                <!-- Dynamic category checkboxes will be inserted here -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>
