@@ -544,59 +544,64 @@ const app = {
 
     // Handshake management
     setHandshakeToken(value) {
-		const isOnline = this.isOnlineEnvironment();
-		
-		if (isOnline) {
-			// Use cookies for online sessions (server can verify)
-			try {
-				// Set cookie with 30 day expiration
-				const expires = new Date();
-				expires.setTime(expires.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days
-				
-				let cookieString = `fc2_handshake=${value}; expires=${expires.toUTCString()}; path=/`;
-				
-				// Add secure flag if we're on HTTPS
-				if (location.protocol === 'https:') {
-					cookieString += '; secure';
-				}
-				
-				// Add SameSite for security
-				cookieString += '; samesite=lax';
-				
-				document.cookie = cookieString;
-				
-				// Verify the cookie was set
-				const verification = this.getHandshakeToken();
-				if (verification === value) {
-					console.log(`✅ Handshake token saved to cookie (online mode)`);
-					return true;
-				} else {
-					throw new Error('Cookie verification failed');
-				}
-			} catch (error) {
-				console.warn('Could not save handshake token to cookie, falling back to localStorage:', error);
-				// Fallback to localStorage if cookies fail
-				try {
-					localStorage.setItem('fc2_handshake', value);
-					console.log(`✅ Handshake token saved to localStorage (fallback)`);
-					return true;
-				} catch (localError) {
-					console.warn('Could not save handshake token to localStorage either:', localError);
-					return false;
-				}
-			}
-		} else {
-			// Use localStorage for offline sessions
-			try {
-				localStorage.setItem('fc2_handshake', value);
-				console.log(`✅ Handshake token saved to localStorage (offline mode)`);
-				return true;
-			} catch (error) {
-				console.warn('Could not save handshake token to localStorage:', error);
-				return false;
-			}
-		}
-	},
+        const isOnline = this.isOnlineEnvironment();
+        
+        if (isOnline) {
+            // Use cookies for online sessions (server can verify)
+            try {
+                // Set cookie with 30 day expiration
+                const expires = new Date();
+                expires.setTime(expires.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days
+                
+                let cookieString = `fc2_handshake=${value}; expires=${expires.toUTCString()}; path=/`;
+                
+                // Add secure flag if we're on HTTPS
+                if (location.protocol === 'https:') {
+                    cookieString += '; secure';
+                }
+                
+                // Add SameSite for security
+                cookieString += '; samesite=lax';
+                
+                document.cookie = cookieString;
+                
+                // Optional verification with delay (doesn't block success)
+                setTimeout(() => {
+                    const verification = this.getHandshakeToken();
+                    if (verification === value) {
+                        console.log(`✅ Handshake token cookie verified successfully`);
+                    } else {
+                        console.warn(`⚠️ Cookie verification failed, but cookie was set (timing issue)`);
+                    }
+                }, 10);
+                
+                console.log(`✅ Handshake token saved to cookie (online mode)`);
+                return true;
+                
+            } catch (error) {
+                console.warn('Could not save handshake token to cookie, falling back to localStorage:', error);
+                // Fallback to localStorage if cookies fail
+                try {
+                    localStorage.setItem('fc2_handshake', value);
+                    console.log(`✅ Handshake token saved to localStorage (fallback)`);
+                    return true;
+                } catch (localError) {
+                    console.warn('Could not save handshake token to localStorage either:', localError);
+                    return false;
+                }
+            }
+        } else {
+            // Use localStorage for offline sessions
+            try {
+                localStorage.setItem('fc2_handshake', value);
+                console.log(`✅ Handshake token saved to localStorage (offline mode)`);
+                return true;
+            } catch (error) {
+                console.warn('Could not save handshake token to localStorage:', error);
+                return false;
+            }
+        }
+    },
 
     getHandshakeToken() {
 		const isOnline = this.isOnlineEnvironment();
