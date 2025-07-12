@@ -462,6 +462,74 @@ class ColorPicker {
 }
 
 // ========================
+// BUILT-IN SCRIPT CONFIGURATIONS
+// ========================
+const BUILTIN_SCRIPT_CONFIGS = {
+    omega: {
+        'constellation.lua': {
+            esp: true,
+            esp_surround: true,
+            esp_sonar: true,
+            esp_fov: 16.0,
+            humanizer: true,
+            humanizer_debug: true,
+            humanizer_smart_smooth: false,
+            humanizer_smart_smooth_scale: 0.3,
+            humanizer_smart_smooth_compensation_scale: 1.0,
+            humanizer_mouse_threshold: 20,
+            humanizer_range_min: 0.1,
+            humanizer_range_max: 7.0,
+            humanizer_dynamic_fov_percentage: 100
+        },
+        'aurora.lua': {
+            enabled: false,
+            hint: true,
+            triggerbot: true,
+            humanizer: true,
+            key_hint: 18,
+            key_triggerbot: 20,
+            sens_hint: 35,
+            sens_triggerbot: 3.5,
+            hint_perpetual: true,
+            hint_speed: 1,
+            triggerbot_hitchance_min: 0,
+            triggerbot_delay: 0,
+            triggerbot_magnet: true,
+            triggerbot_magnet_smoothness: 1.0,
+            triggerbot_hitchance: true,
+            triggerbot_automatic_scope: true,
+            triggerbot_automatic_scope_delay: 100,
+            humanizer_smart_smooth: true,
+            humanizer_smart_smooth_scale: 0.3,
+            humanizer_smart_smooth_compensation_scale: 1.0,
+            humanizer_mouse_threshold: 20,
+            humanizer_range_min: 0.1,
+            humanizer_range_max: 7.0,
+            standalone_rcs: false,
+            standalone_rcs_block_humanizer: false,
+            standalone_rcs_only_near_target: true,
+            standalone_rcs_key_toggle: 0,
+            standalone_rcs_sensitivity_x: 2,
+            standalone_rcs_sensitivity_y: 2,
+            standalone_rcs_smoothness: 0.5,
+            standalone_rcs_threshold: 250,
+            crosshair_esp: false,
+            crosshair_esp_fov: 6.0,
+            friendly_fire: false,
+            team_safe_targeting: false,
+            manual_calibration: false,
+            fov: 16
+        },
+        'constelia.lua': {
+            launch_voice: true
+        },
+        'who.lua': {
+            enabled: false
+        }
+    }
+};
+
+// ========================
 // EXTEND APP WITH COMPONENTS
 // ========================
 Object.assign(app, {
@@ -1393,7 +1461,7 @@ Object.assign(app, {
             output.appendChild(errorDiv);
         }
 
-        output.scrollTop = output.scrollHeight;
+        output.scrollTop = 0;
     },
 
     showTerminalHelp() {
@@ -1531,27 +1599,30 @@ Object.assign(app, {
     populateScriptDropdownForSoftware(software) {
         const scriptSelect = document.getElementById('scriptConfigSelect');
 
-        if (!this.currentConfig[software]) {
-            scriptSelect.innerHTML = '<option value="">No configuration found for this software</option>';
-            scriptSelect.disabled = true;
-            this.showMessage(`No configuration found for ${software}`, 'error');
-            return;
-        }
-
         const configuredScripts = Object.keys(this.currentConfig[software] || {});
+        const builtInScripts = Object.keys(BUILTIN_SCRIPT_CONFIGS[software] || {});
+        
+        // Combine configured and built-in scripts, removing duplicates
+        const allAvailableScripts = [...new Set([...configuredScripts, ...builtInScripts])];
 
-        console.log(`Found ${configuredScripts.length} configured scripts for ${software}:`, configuredScripts);
+        console.log(`Found ${allAvailableScripts.length} available scripts for ${software}:`, allAvailableScripts);
+        console.log(`- ${configuredScripts.length} configured scripts:`, configuredScripts);
+        console.log(`- ${builtInScripts.length} built-in scripts:`, builtInScripts);
 
-        if (configuredScripts.length === 0) {
-            scriptSelect.innerHTML = '<option value="">No script configurations found</option>';
+        if (allAvailableScripts.length === 0) {
+            scriptSelect.innerHTML = '<option value="">No script configurations available</option>';
             scriptSelect.disabled = true;
             return;
         }
 
         let optionsHTML = '<option value="">Select a script...</option>';
 
-        configuredScripts.sort().forEach(scriptKey => {
-            const matchedScript = this.memberScripts.find(script => {
+        allAvailableScripts.sort().forEach(scriptKey => {
+            const isConfigured = configuredScripts.includes(scriptKey);
+            const isBuiltIn = builtInScripts.includes(scriptKey);
+            
+            // Try to match with active scripts
+            const matchedScript = this.memberScripts?.find(script => {
                 const scriptName = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
                 const scriptBaseName = script.name.replace('.lua', '');
                 return scriptKey === scriptName ||
@@ -1560,9 +1631,18 @@ Object.assign(app, {
                     script.name.toLowerCase().includes(scriptKey.toLowerCase().replace('.lua', ''));
             });
 
-            const displayName = scriptKey;
-            const statusInfo = matchedScript ? ` (ID: ${matchedScript.id}, Active)` : ' (Configured)';
+            let statusInfo = '';
+            if (matchedScript) {
+                statusInfo = ` (ID: ${matchedScript.id}, Active)`;
+            } else if (isBuiltIn && !isConfigured) {
+                statusInfo = ' (Built-in, Available)';
+            } else if (isBuiltIn && isConfigured) {
+                statusInfo = ' (Built-in, Configured)';
+            } else {
+                statusInfo = ' (Configured)';
+            }
 
+            const displayName = scriptKey;
             optionsHTML += `<option value="${scriptKey}">${displayName}${statusInfo}</option>`;
         });
 
@@ -1610,14 +1690,36 @@ Object.assign(app, {
         const scriptKey = scriptSelection;
         console.log(`Loading config for script key: "${scriptKey}" in software: "${software}"`);
 
-        const scriptConfig = this.currentConfig[software][scriptKey];
+        let scriptConfig = this.currentConfig[software][scriptKey];
+
+        // If no config exists but it's a built-in script, create it from the built-in defaults
+        if (!scriptConfig && BUILTIN_SCRIPT_CONFIGS[software] && BUILTIN_SCRIPT_CONFIGS[software][scriptKey]) {
+            console.log(`Creating built-in config for ${scriptKey}`);
+            scriptConfig = { ...BUILTIN_SCRIPT_CONFIGS[software][scriptKey] };
+            
+            // Add it to current config
+            if (!this.currentConfig[software]) {
+                this.currentConfig[software] = {};
+            }
+            this.currentConfig[software][scriptKey] = scriptConfig;
+            
+            // Auto-save the new built-in config
+            try {
+                this.apiPost('setConfiguration', {}, {
+                    value: JSON.stringify(this.currentConfig)
+                });
+                console.log(`Auto-saved built-in config for ${scriptKey}`);
+            } catch (error) {
+                console.warn(`Could not auto-save built-in config for ${scriptKey}:`, error);
+            }
+        }
 
         if (!scriptConfig) {
             const formContainer = document.getElementById('scriptConfigForm');
             formContainer.innerHTML = `
                 <p style="text-align: center; color: #888; padding: 40px;">
                     Configuration not found for "${scriptKey}" in ${software}<br>
-                    <small style="color: #666;">Available keys: ${Object.keys(this.currentConfig[software]).join(', ')}</small>
+                    <small style="color: #666;">Available keys: ${Object.keys(this.currentConfig[software] || {}).join(', ')}</small>
                 </p>
             `;
             return;
@@ -1750,8 +1852,11 @@ Object.assign(app, {
 
     async generateDefaultConfigs() {
         if (!this.memberScripts || this.memberScripts.length === 0) {
-            this.showMessage('No active scripts found to generate configurations for', 'error');
-            return;
+            // Even if no cloud scripts, we can still generate built-in configs
+            if (Object.keys(BUILTIN_SCRIPT_CONFIGS).length === 0) {
+                this.showMessage('No active scripts found to generate configurations for', 'error');
+                return;
+            }
         }
 
         const generateButton = document.querySelector('button[onclick="app.generateDefaultConfigs()"]');
@@ -1764,93 +1869,114 @@ Object.assign(app, {
             this.showMessage('Analyzing enabled scripts and generating default configurations...', 'success');
 
             let generatedCount = 0;
-            let totalScripts = this.memberScripts.length;
+            let totalScripts = (this.memberScripts?.length || 0);
             let errors = [];
 
-            // Group scripts by software
-            const scriptsBySoftware = {};
-            this.memberScripts.forEach(script => {
-                const softwareName = this.getSoftwareNameFromId(script.software);
-                if (!scriptsBySoftware[softwareName]) {
-                    scriptsBySoftware[softwareName] = [];
-                }
-                scriptsBySoftware[softwareName].push(script);
-            });
-
-            // Generate configs for each software
-            for (const [softwareName, scripts] of Object.entries(scriptsBySoftware)) {
-                console.log(`Processing ${scripts.length} scripts for ${softwareName}`);
-                
+            // First, add built-in script configurations
+            for (const [softwareName, scripts] of Object.entries(BUILTIN_SCRIPT_CONFIGS)) {
                 if (!this.currentConfig[softwareName]) {
                     this.currentConfig[softwareName] = {};
                 }
 
-                for (const script of scripts) {
-                    try {
-                        console.log(`Generating config for script: ${script.name} (ID: ${script.id})`);
-                        
-                        // Fetch script source
-                        const apiResponse = await this.apiCall('getScript', {
-                            id: script.id,
-                            beautify: ''
-                        });
+                for (const [scriptKey, defaultConfig] of Object.entries(scripts)) {
+                    // Check if config already exists
+                    if (!this.currentConfig[softwareName][scriptKey]) {
+                        this.currentConfig[softwareName][scriptKey] = { ...defaultConfig };
+                        generatedCount++;
+                        console.log(`Generated built-in config for ${scriptKey}:`, defaultConfig);
+                    } else {
+                        console.log(`Built-in config already exists for ${scriptKey}, skipping`);
+                    }
+                }
+            }
 
-                        let scriptData;
-                        if (apiResponse && apiResponse.response && apiResponse.response._raw_response) {
-                            try {
-                                scriptData = JSON.parse(apiResponse.response._raw_response);
-                            } catch (e) {
-                                scriptData = apiResponse;
-                            }
-                        } else if (typeof apiResponse === 'object' && apiResponse.id) {
-                            scriptData = apiResponse;
-                        } else {
-                            throw new Error('Invalid API response structure');
-                        }
+            // Then process cloud scripts (existing logic)
+            if (this.memberScripts && this.memberScripts.length > 0) {
+                // Group scripts by software
+                const scriptsBySoftware = {};
+                this.memberScripts.forEach(script => {
+                    const softwareName = this.getSoftwareNameFromId(script.software);
+                    if (!scriptsBySoftware[softwareName]) {
+                        scriptsBySoftware[softwareName] = [];
+                    }
+                    scriptsBySoftware[softwareName].push(script);
+                });
 
-                        // Get script source
-                        let sourceCode = '';
-                        if (scriptData.script) {
-                            sourceCode = scriptData.script;
-                        } else if (scriptData.source) {
-                            sourceCode = scriptData.source;
-                        } else {
-                            throw new Error('No source code found');
-                        }
+                // Generate configs for each software
+                for (const [softwareName, scripts] of Object.entries(scriptsBySoftware)) {
+                    console.log(`Processing ${scripts.length} cloud scripts for ${softwareName}`);
+                    
+                    if (!this.currentConfig[softwareName]) {
+                        this.currentConfig[softwareName] = {};
+                    }
 
-                        // Decode escaped characters
-                        if (sourceCode && typeof sourceCode === 'string') {
-                            sourceCode = sourceCode
-                                .replace(/\\n/g, '\n')
-                                .replace(/\\t/g, '\t')
-                                .replace(/\\"/g, '"')
-                                .replace(/\\'/g, "'")
-                                .replace(/\\\\/g, '\\');
-                        }
-
-                        // Parse the source code for default values
-                        const defaultConfig = this.parseScriptForDefaults(sourceCode, script.name);
-                        
-                        if (defaultConfig && Object.keys(defaultConfig).length > 0) {
-                            // Use script name as key (try both with and without .lua extension)
-                            const scriptKey = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
-                            const scriptKeyNoExt = script.name.replace('.lua', '');
+                    for (const script of scripts) {
+                        try {
+                            console.log(`Generating config for script: ${script.name} (ID: ${script.id})`);
                             
-                            // Check if config already exists under either name
-                            if (!this.currentConfig[softwareName][scriptKey] && !this.currentConfig[softwareName][scriptKeyNoExt]) {
-                                this.currentConfig[softwareName][scriptKey] = defaultConfig;
-                                generatedCount++;
-                                console.log(`Generated config for ${scriptKey}:`, defaultConfig);
-                            } else {
-                                console.log(`Config already exists for ${script.name}, skipping`);
-                            }
-                        } else {
-                            console.log(`No configurable settings found in ${script.name}`);
-                        }
+                            // Fetch script source
+                            const apiResponse = await this.apiCall('getScript', {
+                                id: script.id,
+                                beautify: ''
+                            });
 
-                    } catch (error) {
-                        console.error(`Error processing script ${script.name}:`, error);
-                        errors.push(`${script.name}: ${error.message}`);
+                            let scriptData;
+                            if (apiResponse && apiResponse.response && apiResponse.response._raw_response) {
+                                try {
+                                    scriptData = JSON.parse(apiResponse.response._raw_response);
+                                } catch (e) {
+                                    scriptData = apiResponse;
+                                }
+                            } else if (typeof apiResponse === 'object' && apiResponse.id) {
+                                scriptData = apiResponse;
+                            } else {
+                                throw new Error('Invalid API response structure');
+                            }
+
+                            // Get script source
+                            let sourceCode = '';
+                            if (scriptData.script) {
+                                sourceCode = scriptData.script;
+                            } else if (scriptData.source) {
+                                sourceCode = scriptData.source;
+                            } else {
+                                throw new Error('No source code found');
+                            }
+
+                            // Decode escaped characters
+                            if (sourceCode && typeof sourceCode === 'string') {
+                                sourceCode = sourceCode
+                                    .replace(/\\n/g, '\n')
+                                    .replace(/\\t/g, '\t')
+                                    .replace(/\\"/g, '"')
+                                    .replace(/\\'/g, "'")
+                                    .replace(/\\\\/g, '\\');
+                            }
+
+                            // Parse the source code for default values
+                            const defaultConfig = this.parseScriptForDefaults(sourceCode, script.name);
+                            
+                            if (defaultConfig && Object.keys(defaultConfig).length > 0) {
+                                // Use script name as key (try both with and without .lua extension)
+                                const scriptKey = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
+                                const scriptKeyNoExt = script.name.replace('.lua', '');
+                                
+                                // Check if config already exists under either name
+                                if (!this.currentConfig[softwareName][scriptKey] && !this.currentConfig[softwareName][scriptKeyNoExt]) {
+                                    this.currentConfig[softwareName][scriptKey] = defaultConfig;
+                                    generatedCount++;
+                                    console.log(`Generated config for ${scriptKey}:`, defaultConfig);
+                                } else {
+                                    console.log(`Config already exists for ${script.name}, skipping`);
+                                }
+                            } else {
+                                console.log(`No configurable settings found in ${script.name}`);
+                            }
+
+                        } catch (error) {
+                            console.error(`Error processing script ${script.name}:`, error);
+                            errors.push(`${script.name}: ${error.message}`);
+                        }
                     }
                 }
             }
@@ -1865,11 +1991,21 @@ Object.assign(app, {
                 document.getElementById('configDisplay').textContent = JSON.stringify(this.currentConfig, null, 2);
                 this.populateSoftwareDropdown();
 
-                this.showMessage(`✅ Generated ${generatedCount} default configurations out of ${totalScripts} scripts!`, 'success');
+                const builtInCount = Object.values(BUILTIN_SCRIPT_CONFIGS).reduce((total, scripts) => total + Object.keys(scripts).length, 0);
+                const cloudCount = generatedCount - Math.min(generatedCount, builtInCount);
+                
+                let message = `✅ Generated ${generatedCount} configurations!`;
+                if (builtInCount > 0 && cloudCount > 0) {
+                    message += ` (${Math.min(generatedCount, builtInCount)} built-in + ${cloudCount} cloud scripts)`;
+                } else if (builtInCount > 0) {
+                    message += ` (${Math.min(generatedCount, builtInCount)} built-in scripts)`;
+                }
+                
+                this.showMessage(message, 'success');
                 
                 if (errors.length > 0) {
                     console.warn('Some scripts had errors:', errors);
-                    this.showMessage(`⚠️ ${errors.length} scripts had parsing errors (check console for details)`, 'error');
+                    this.showMessage(`⚠️ ${errors.length} cloud scripts had parsing errors (check console for details)`, 'error');
                 }
             } else {
                 this.showMessage('No new configurations were generated (configs may already exist)', 'error');
