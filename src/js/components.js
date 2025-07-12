@@ -547,9 +547,9 @@ Object.assign(app, {
         }
 
         const softwareNames = {
-            4: 'FC2 Global',
+            4: 'Omega', // FC2 Global is pretty much just Omega at this point
             5: 'Universe4',
-            6: 'Constellation4',
+            6: 'Omega', // Constellation4 no longer exists
             7: 'Parallax2'
         };
 
@@ -941,9 +941,9 @@ Object.assign(app, {
 
     populateFilterOptions() {
         const softwareNames = {
-            4: 'FC2 Global',
+            4: 'Omega', // FC2 Global is pretty much just Omega at this point
             5: 'Universe4',
-            6: 'Constellation4',
+            6: 'Omega', // Constellation4 no longer exists
             7: 'Parallax2'
         };
 
