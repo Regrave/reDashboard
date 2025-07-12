@@ -1864,13 +1864,17 @@ Object.assign(app, {
         
         try {
             generateButton.disabled = true;
-            generateButton.textContent = '🔄 Generating...';
+            generateButton.textContent = '🔄 Scanning for missing configs...';
 
-            this.showMessage('Analyzing enabled scripts and generating default configurations...', 'success');
+            // Track what we're doing for better user feedback
+            const report = {
+                newBuiltInConfigs: [],
+                newCloudConfigs: [],
+                existingConfigs: [],
+                errors: []
+            };
 
-            let generatedCount = 0;
-            let totalScripts = (this.memberScripts?.length || 0);
-            let errors = [];
+            this.showMessage('Scanning for missing script configurations...', 'success');
 
             // First, add built-in script configurations
             for (const [softwareName, scripts] of Object.entries(BUILTIN_SCRIPT_CONFIGS)) {
@@ -1882,17 +1886,20 @@ Object.assign(app, {
                     // Check if config already exists
                     if (!this.currentConfig[softwareName][scriptKey]) {
                         this.currentConfig[softwareName][scriptKey] = { ...defaultConfig };
-                        generatedCount++;
+                        report.newBuiltInConfigs.push({ software: softwareName, script: scriptKey });
                         console.log(`Generated built-in config for ${scriptKey}:`, defaultConfig);
                     } else {
+                        report.existingConfigs.push({ software: softwareName, script: scriptKey, type: 'built-in' });
                         console.log(`Built-in config already exists for ${scriptKey}, skipping`);
                     }
                 }
             }
 
-            // Then process cloud scripts (existing logic)
+            // Then process cloud scripts
             if (this.memberScripts && this.memberScripts.length > 0) {
-                // Group scripts by software
+                generateButton.textContent = '🔄 Processing cloud scripts...';
+
+                // Group scripts by software for better organization
                 const scriptsBySoftware = {};
                 this.memberScripts.forEach(script => {
                     const softwareName = this.getSoftwareNameFromId(script.software);
@@ -1912,7 +1919,33 @@ Object.assign(app, {
 
                     for (const script of scripts) {
                         try {
-                            console.log(`Generating config for script: ${script.name} (ID: ${script.id})`);
+                            console.log(`Checking config for script: ${script.name} (ID: ${script.id})`);
+                            
+                            // More robust script key matching
+                            const possibleKeys = [
+                                script.name,
+                                script.name.endsWith('.lua') ? script.name : script.name + '.lua',
+                                script.name.replace('.lua', ''),
+                                script.name.toLowerCase(),
+                                script.name.toLowerCase().endsWith('.lua') ? script.name.toLowerCase() : script.name.toLowerCase() + '.lua'
+                            ];
+
+                            // Check if ANY of these keys already exist
+                            const existingKey = possibleKeys.find(key => this.currentConfig[softwareName][key]);
+                            
+                            if (existingKey) {
+                                report.existingConfigs.push({ 
+                                    software: softwareName, 
+                                    script: script.name, 
+                                    type: 'cloud',
+                                    existingKey: existingKey 
+                                });
+                                console.log(`Config already exists for ${script.name} under key "${existingKey}", skipping`);
+                                continue;
+                            }
+
+                            // No existing config found, try to generate one
+                            console.log(`No existing config found for ${script.name}, generating...`);
                             
                             // Fetch script source
                             const apiResponse = await this.apiCall('getScript', {
@@ -1957,32 +1990,43 @@ Object.assign(app, {
                             const defaultConfig = this.parseScriptForDefaults(sourceCode, script.name);
                             
                             if (defaultConfig && Object.keys(defaultConfig).length > 0) {
-                                // Use script name as key (try both with and without .lua extension)
+                                // Use the primary script key (with .lua extension if not present)
                                 const scriptKey = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
-                                const scriptKeyNoExt = script.name.replace('.lua', '');
                                 
-                                // Check if config already exists under either name
-                                if (!this.currentConfig[softwareName][scriptKey] && !this.currentConfig[softwareName][scriptKeyNoExt]) {
-                                    this.currentConfig[softwareName][scriptKey] = defaultConfig;
-                                    generatedCount++;
-                                    console.log(`Generated config for ${scriptKey}:`, defaultConfig);
-                                } else {
-                                    console.log(`Config already exists for ${script.name}, skipping`);
-                                }
+                                this.currentConfig[softwareName][scriptKey] = defaultConfig;
+                                report.newCloudConfigs.push({ 
+                                    software: softwareName, 
+                                    script: script.name, 
+                                    scriptKey: scriptKey,
+                                    settingsCount: Object.keys(defaultConfig).length
+                                });
+                                console.log(`Generated config for ${scriptKey}:`, defaultConfig);
                             } else {
                                 console.log(`No configurable settings found in ${script.name}`);
+                                report.existingConfigs.push({ 
+                                    software: softwareName, 
+                                    script: script.name, 
+                                    type: 'no-settings' 
+                                });
                             }
 
                         } catch (error) {
                             console.error(`Error processing script ${script.name}:`, error);
-                            errors.push(`${script.name}: ${error.message}`);
+                            report.errors.push({
+                                script: script.name,
+                                error: error.message
+                            });
                         }
                     }
                 }
             }
 
-            // Save the updated configuration
-            if (generatedCount > 0) {
+            // Save the updated configuration if we have new configs
+            const totalNewConfigs = report.newBuiltInConfigs.length + report.newCloudConfigs.length;
+            
+            if (totalNewConfigs > 0) {
+                generateButton.textContent = '🔄 Saving configuration...';
+                
                 await this.apiPost('setConfiguration', {}, {
                     value: JSON.stringify(this.currentConfig)
                 });
@@ -1991,25 +2035,57 @@ Object.assign(app, {
                 document.getElementById('configDisplay').textContent = JSON.stringify(this.currentConfig, null, 2);
                 this.populateSoftwareDropdown();
 
-                const builtInCount = Object.values(BUILTIN_SCRIPT_CONFIGS).reduce((total, scripts) => total + Object.keys(scripts).length, 0);
-                const cloudCount = generatedCount - Math.min(generatedCount, builtInCount);
+                // Create detailed success message
+                let successMessage = `✅ Added ${totalNewConfigs} new configurations!\n`;
                 
-                let message = `✅ Generated ${generatedCount} configurations!`;
-                if (builtInCount > 0 && cloudCount > 0) {
-                    message += ` (${Math.min(generatedCount, builtInCount)} built-in + ${cloudCount} cloud scripts)`;
-                } else if (builtInCount > 0) {
-                    message += ` (${Math.min(generatedCount, builtInCount)} built-in scripts)`;
+                if (report.newBuiltInConfigs.length > 0) {
+                    successMessage += `📦 Built-in: ${report.newBuiltInConfigs.length} scripts\n`;
                 }
                 
-                this.showMessage(message, 'success');
-                
-                if (errors.length > 0) {
-                    console.warn('Some scripts had errors:', errors);
-                    this.showMessage(`⚠️ ${errors.length} cloud scripts had parsing errors (check console for details)`, 'error');
+                if (report.newCloudConfigs.length > 0) {
+                    successMessage += `☁️ Cloud: ${report.newCloudConfigs.length} scripts\n`;
                 }
+                
+                if (report.existingConfigs.length > 0) {
+                    successMessage += `⚡ Skipped ${report.existingConfigs.length} existing configs`;
+                }
+                
+                this.showMessage(successMessage, 'success');
+                
+                if (report.errors.length > 0) {
+                    console.warn('Some scripts had errors:', report.errors);
+                    this.showMessage(`⚠️ ${report.errors.length} scripts had parsing errors (check console for details)`, 'error');
+                }
+                
             } else {
-                this.showMessage('No new configurations were generated (configs may already exist)', 'error');
+                // No new configs generated - provide better feedback
+                let statusMessage = '✅ Configuration scan complete!\n';
+                
+                if (report.existingConfigs.length > 0) {
+                    const builtInCount = report.existingConfigs.filter(c => c.type === 'built-in').length;
+                    const cloudCount = report.existingConfigs.filter(c => c.type === 'cloud').length;
+                    const noSettingsCount = report.existingConfigs.filter(c => c.type === 'no-settings').length;
+                    
+                    statusMessage += `📋 Found ${report.existingConfigs.length} scripts already configured:\n`;
+                    if (builtInCount > 0) statusMessage += `  📦 ${builtInCount} built-in configs\n`;
+                    if (cloudCount > 0) statusMessage += `  ☁️ ${cloudCount} cloud script configs\n`;
+                    if (noSettingsCount > 0) statusMessage += `  🔧 ${noSettingsCount} scripts with no configurable settings\n`;
+                    statusMessage += 'All your active scripts already have configurations! 🎉';
+                } else {
+                    statusMessage += 'No configurable scripts found.';
+                }
+                
+                this.showMessage(statusMessage, 'success');
             }
+
+            // Log detailed report for debugging
+            console.log('Configuration Generation Report:', {
+                newBuiltInConfigs: report.newBuiltInConfigs,
+                newCloudConfigs: report.newCloudConfigs,
+                existingConfigs: report.existingConfigs,
+                errors: report.errors,
+                totalScripts: this.memberScripts?.length || 0
+            });
 
         } catch (error) {
             console.error('Error generating default configs:', error);
@@ -2029,89 +2105,19 @@ Object.assign(app, {
 
         // Extract the base name without .lua extension
         const baseName = scriptName.replace('.lua', '').toLowerCase();
-        
-        // Find the start of our config object
-        const objectPattern = new RegExp(`^\\s*(local\\s+)?${baseName}\\s*=\\s*\\{`, 'im');
         const lines = sourceCode.split('\n');
         
-        let startLine = -1;
-        for (let i = 0; i < lines.length; i++) {
-            if (objectPattern.test(lines[i])) {
-                startLine = i;
-                break;
-            }
-        }
-
-        if (startLine === -1) {
-            console.log(`No config object found for ${scriptName}`);
-            return {};
-        }
-
-        const defaults = {};
-        let mainBraceLevel = 1; // We start inside the main object
-        let skipUntilBraceLevel = null; // When we're skipping a nested object
-
-        for (let i = startLine + 1; i < lines.length; i++) {
-            let line = lines[i].trim();
-
-            // Skip empty lines and comments
-            if (!line || line.startsWith('--')) {
-                continue;
-            }
-
-            // Remove inline comments
-            const commentIndex = line.indexOf('--');
-            if (commentIndex !== -1) {
-                line = line.substring(0, commentIndex).trim();
-                if (!line) continue;
-            }
-
-            // Count braces
-            const openBraces = (line.match(/\{/g) || []).length;
-            const closeBraces = (line.match(/\}/g) || []).length;
-            
-            // Update main brace level
-            mainBraceLevel += openBraces - closeBraces;
-
-            // If we've exited the main object, stop
-            if (mainBraceLevel <= 0) {
-                console.log(`Exited main object at line ${i}`);
-                break;
-            }
-
-            // If we're currently skipping a nested object
-            if (skipUntilBraceLevel !== null) {
-                skipUntilBraceLevel += openBraces - closeBraces;
-                if (skipUntilBraceLevel <= 1) { // Back to main level
-                    skipUntilBraceLevel = null;
-                    console.log(`Finished skipping nested object at line ${i}`);
-                }
-                continue;
-            }
-
-            // Check if this line starts a nested object
-            if (line.includes('=') && line.includes('{')) {
-                console.log(`Starting to skip nested object at line ${i}: ${line}`);
-                skipUntilBraceLevel = mainBraceLevel + openBraces - closeBraces;
-                continue;
-            }
-
-            // Only parse simple assignments with NO braces
-            if (!line.includes('{') && !line.includes('}') && line.includes('=')) {
-                const settingMatch = line.match(/^(\w+)\s*=\s*(.+?)(?:,\s*)?$/);
-                if (settingMatch) {
-                    const [, settingName, settingValue] = settingMatch;
-                    
-                    const parsedValue = this.parseSettingValue(settingValue.trim().replace(/,$/, ''));
-                    if (parsedValue !== null) {
-                        defaults[settingName] = parsedValue;
-                        console.log(`Found setting: ${settingName} = ${parsedValue}`);
-                    }
-                }
-            }
-        }
-
+        // Try both parsing approaches and merge results
+        const tableDefaults = this.parseTableDefaults(lines, baseName, scriptName);
+        const propertyDefaults = this.parsePropertyDefaults(lines, baseName, scriptName);
+        
+        // Merge both approaches (property assignments take precedence over table defaults)
+        const defaults = { ...tableDefaults, ...propertyDefaults };
+        
         console.log(`Parsed ${Object.keys(defaults).length} settings from ${scriptName}`);
+        console.log(`  - Table pattern: ${Object.keys(tableDefaults).length} settings`);
+        console.log(`  - Property pattern: ${Object.keys(propertyDefaults).length} settings`);
+        
         return defaults;
     },
 
@@ -2135,13 +2141,12 @@ Object.assign(app, {
             return stringMatch[2]; // Return the content inside quotes
         }
         
-        // Unquoted strings that are clearly meant to be strings (like "ALT", "F6", etc.)
-        // These are common in Lua for key names and similar values
-        if (/^[A-Z][A-Z0-9_]*$/i.test(trimmed) && trimmed.length <= 10) {
+        // Unquoted strings that are clearly meant to be strings (like "TAB", "END", etc.)
+        if (/^[A-Z][A-Z0-9_]*$/i.test(trimmed) && trimmed.length <= 20) {
             return trimmed;
         }
         
-        // Hex color values (common pattern in configs)
+        // Hex color values (6 or 8 character hex strings)
         if (/^[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(trimmed)) {
             return trimmed;
         }
@@ -2162,6 +2167,187 @@ Object.assign(app, {
         return null;
     },
 
+    parseTableDefaults(lines, baseName, scriptName) {
+        // This is the existing approach for: local config = { ... }
+        const defaults = {};
+        
+        let startLine = -1;
+        
+        // Find the table declaration
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Look for: local baseName = or baseName =
+            const declarationPattern = new RegExp(`^\\s*(local\\s+)?${baseName}\\s*=\\s*$`, 'i');
+            const sameLinePattern = new RegExp(`^\\s*(local\\s+)?${baseName}\\s*=\\s*\\{`, 'i');
+            
+            if (declarationPattern.test(line)) {
+                // Found declaration, look for opening brace on next lines
+                for (let j = i + 1; j < Math.min(i + 5, lines.length); j++) {
+                    if (lines[j].trim().startsWith('{')) {
+                        startLine = j;
+                        break;
+                    }
+                }
+                break;
+            } else if (sameLinePattern.test(line)) {
+                // Found same-line declaration
+                startLine = i;
+                break;
+            }
+        }
+
+        if (startLine === -1) {
+            console.log(`No table pattern found for ${scriptName}`);
+            return {};
+        }
+
+        console.log(`Found table pattern starting at line ${startLine}`);
+
+        let braceLevel = 1; // We start inside the main object
+        let skipUntilBraceLevel = null;
+        let inFunction = false;
+        let functionBraceLevel = 0;
+
+        for (let i = startLine + 1; i < lines.length; i++) {
+            let line = lines[i].trim();
+
+            // Skip empty lines and comments
+            if (!line || line.startsWith('--')) {
+                continue;
+            }
+
+            // Remove inline comments
+            const commentIndex = line.indexOf('--');
+            if (commentIndex !== -1) {
+                line = line.substring(0, commentIndex).trim();
+                if (!line) continue;
+            }
+
+            // Count braces for overall structure
+            const openBraces = (line.match(/\{/g) || []).length;
+            const closeBraces = (line.match(/\}/g) || []).length;
+            
+            // Update main brace level
+            braceLevel += openBraces - closeBraces;
+
+            // If we've exited the main object, stop
+            if (braceLevel <= 0) {
+                console.log(`Exited main table at line ${i}`);
+                break;
+            }
+
+            // Handle function detection
+            if (line.includes('function') && (line.includes('=') || line.includes(':'))) {
+                console.log(`Found function at line ${i}: ${line}`);
+                inFunction = true;
+                functionBraceLevel = braceLevel;
+                continue;
+            }
+
+            // If we're in a function, skip until we exit it
+            if (inFunction) {
+                if (braceLevel <= functionBraceLevel - 1) {
+                    console.log(`Exited function at line ${i}`);
+                    inFunction = false;
+                    functionBraceLevel = 0;
+                }
+                continue;
+            }
+
+            // If we're currently skipping a nested object
+            if (skipUntilBraceLevel !== null) {
+                if (braceLevel <= skipUntilBraceLevel) {
+                    console.log(`Finished skipping nested object at line ${i}`);
+                    skipUntilBraceLevel = null;
+                }
+                continue;
+            }
+
+            // Check if this line starts a nested object (like cache = {})
+            if (line.includes('=') && (line.includes('{') || (i + 1 < lines.length && lines[i + 1].trim().startsWith('{')))) {
+                console.log(`Starting to skip nested object at line ${i}: ${line}`);
+                skipUntilBraceLevel = braceLevel - 1; // Skip until we're back at this level
+                continue;
+            }
+
+            // Only parse simple assignments with NO braces and NOT functions
+            if (!line.includes('{') && !line.includes('}') && line.includes('=') && !line.includes('function')) {
+                // Handle both regular assignments and trailing commas
+                const settingMatch = line.match(/^(\w+)\s*=\s*(.+?)(?:,\s*)?$/);
+                if (settingMatch) {
+                    const [, settingName, settingValue] = settingMatch;
+                    
+                    const parsedValue = this.parseSettingValue(settingValue.trim().replace(/,$/, ''));
+                    if (parsedValue !== null) {
+                        defaults[settingName] = parsedValue;
+                        console.log(`Found table setting: ${settingName} = ${parsedValue}`);
+                    }
+                }
+            }
+        }
+
+        return defaults;
+    },
+
+    parsePropertyDefaults(lines, baseName, scriptName) {
+        // This handles: local config = {} followed by config.property = value
+        const defaults = {};
+        
+        let foundEmptyTable = false;
+        
+        // First, look for empty table declaration
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Look for: local baseName = {} or baseName = {}
+            const emptyTablePattern = new RegExp(`^\\s*(local\\s+)?${baseName}\\s*=\\s*\\{\\s*\\}`, 'i');
+            
+            if (emptyTablePattern.test(line)) {
+                console.log(`Found empty table declaration at line ${i}: ${line}`);
+                foundEmptyTable = true;
+                break;
+            }
+        }
+        
+        if (!foundEmptyTable) {
+            console.log(`No empty table pattern found for ${scriptName}`);
+            return {};
+        }
+        
+        // Now look for property assignments: baseName.property = value
+        const propertyPattern = new RegExp(`^\\s*${baseName}\\.(\\w+)\\s*=\\s*(.+?)\\s*$`, 'i');
+        
+        for (let i = 0; i < lines.length; i++) {
+            let line = lines[i].trim();
+            
+            // Skip empty lines and comments
+            if (!line || line.startsWith('--')) {
+                continue;
+            }
+
+            // Remove inline comments
+            const commentIndex = line.indexOf('--');
+            if (commentIndex !== -1) {
+                line = line.substring(0, commentIndex).trim();
+                if (!line) continue;
+            }
+            
+            const match = line.match(propertyPattern);
+            if (match) {
+                const [, propertyName, propertyValue] = match;
+                
+                const parsedValue = this.parseSettingValue(propertyValue.trim());
+                if (parsedValue !== null) {
+                    defaults[propertyName] = parsedValue;
+                    console.log(`Found property setting: ${propertyName} = ${parsedValue}`);
+                }
+            }
+        }
+        
+        return defaults;
+    },
+
     getSoftwareNameFromId(softwareId) {
         const softwareMap = {
             4: 'omega',      // FC2 Global -> omega
@@ -2170,5 +2356,5 @@ Object.assign(app, {
             7: 'parallax2'
         };
         return softwareMap[softwareId] || `software_${softwareId}`;
-    }
+    },
 });
