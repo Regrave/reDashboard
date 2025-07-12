@@ -896,13 +896,15 @@ body {
 }
 
 .color-picker-popup {
-	position: fixed; /* Changed from absolute to fixed */
+	position: fixed;
+	/* Changed from absolute to fixed */
 	background: rgba(26, 26, 26, 0.98);
 	border: 1px solid rgba(255, 255, 255, 0.2);
 	border-radius: 12px;
 	padding: 20px;
 	box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
-	z-index: 999999999999999; /* Increased z-index significantly */
+	z-index: 999999999999999;
+	/* Increased z-index significantly */
 	display: none;
 	min-width: 320px;
 	backdrop-filter: blur(10px);
@@ -2103,153 +2105,154 @@ body {
 
 /* Settings Button */
 .settings-button {
-  padding: 12px 20px;
-  color: white;
-  border: none;
-  border-radius: 12px;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 600;
-  transition: all 0.3s;
-  display: none;
-  background: linear-gradient(135deg, #666, #888);
-  box-shadow: 0 4px 15px rgba(102, 102, 102, 0.3);
+	padding: 12px 20px;
+	color: white;
+	border: none;
+	border-radius: 12px;
+	cursor: pointer;
+	font-size: 16px;
+	font-weight: 600;
+	transition: all 0.3s;
+	display: none;
+	background: linear-gradient(135deg, #666, #888);
+	box-shadow: 0 4px 15px rgba(102, 102, 102, 0.3);
 }
 
 .settings-button.active {
-  display: block;
+	display: block;
 }
 
 .settings-button:hover:not(:disabled) {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 20px rgba(102, 102, 102, 0.4);
+	transform: translateY(-2px);
+	box-shadow: 0 6px 20px rgba(102, 102, 102, 0.4);
 }
 
 /* Settings Modal */
 .settings-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
-  background: rgba(0, 0, 0, 0.8);
-  display: none;
-  align-items: center;
-  justify-content: center;
-  z-index: 10000;
-  backdrop-filter: blur(5px);
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100vw;
+	height: 100vh;
+	background: rgba(0, 0, 0, 0.8);
+	display: none;
+	align-items: center;
+	justify-content: center;
+	z-index: 10000;
+	backdrop-filter: blur(5px);
 }
 
 .settings-modal.active {
-  display: flex;
+	display: flex;
 }
 
 .settings-modal-content {
-  background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
-  padding: 0;
-  text-align: left;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
-  max-width: 600px;
-  width: 90%;
-  max-height: 80vh;
-  overflow-y: auto;
-  animation: settingsModalSlideIn 0.5s ease-out;
+	background: linear-gradient(135deg, rgba(26, 26, 46, 0.95) 0%, rgba(22, 33, 62, 0.95) 100%);
+	border: 1px solid rgba(255, 255, 255, 0.2);
+	border-radius: 20px;
+	padding: 0;
+	text-align: left;
+	box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+	max-width: 600px;
+	width: 90%;
+	max-height: 80vh;
+	overflow-y: auto;
+	animation: settingsModalSlideIn 0.5s ease-out;
 }
 
 @keyframes settingsModalSlideIn {
-  from {
-    transform: translateY(-50px) scale(0.9);
-    opacity: 0;
-  }
-  to {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
+	from {
+		transform: translateY(-50px) scale(0.9);
+		opacity: 0;
+	}
+
+	to {
+		transform: translateY(0) scale(1);
+		opacity: 1;
+	}
 }
 
 .settings-modal-header {
-  background: rgba(26, 26, 46, 0.9);
-  padding: 20px 30px;
-  border-bottom: 2px solid rgba(74, 158, 255, 0.3);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  border-radius: 20px 20px 0 0;
+	background: rgba(26, 26, 46, 0.9);
+	padding: 20px 30px;
+	border-bottom: 2px solid rgba(74, 158, 255, 0.3);
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	border-radius: 20px 20px 0 0;
 }
 
 .settings-modal-title {
-  color: #4a9eff;
-  font-size: 1.5em;
-  font-weight: 600;
+	color: #4a9eff;
+	font-size: 1.5em;
+	font-weight: 600;
 }
 
 .settings-modal-close {
-  background: linear-gradient(135deg, #ff4444, #cc0000);
-  color: white;
-  border: none;
-  border-radius: 8px;
-  padding: 8px 16px;
-  cursor: pointer;
-  font-size: 16px;
-  font-weight: 600;
-  transition: all 0.3s;
+	background: linear-gradient(135deg, #ff4444, #cc0000);
+	color: white;
+	border: none;
+	border-radius: 8px;
+	padding: 8px 16px;
+	cursor: pointer;
+	font-size: 16px;
+	font-weight: 600;
+	transition: all 0.3s;
 }
 
 .settings-modal-close:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 15px rgba(255, 68, 68, 0.4);
+	transform: translateY(-2px);
+	box-shadow: 0 4px 15px rgba(255, 68, 68, 0.4);
 }
 
 .settings-modal-body {
-  padding: 30px;
+	padding: 30px;
 }
 
 .settings-section {
-  margin-bottom: 30px;
-  padding-bottom: 25px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+	margin-bottom: 30px;
+	padding-bottom: 25px;
+	border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .settings-section:last-child {
-  border-bottom: none;
-  margin-bottom: 0;
+	border-bottom: none;
+	margin-bottom: 0;
 }
 
 .settings-section h3 {
-  color: #4a9eff;
-  margin-bottom: 20px;
-  font-size: 1.2em;
+	color: #4a9eff;
+	margin-bottom: 20px;
+	font-size: 1.2em;
 }
 
 .settings-field {
-  margin-bottom: 15px;
+	margin-bottom: 15px;
 }
 
 .settings-label {
-  display: block;
-  color: #e0e0e0;
-  margin-bottom: 8px;
-  font-weight: 500;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+	display: block;
+	color: #e0e0e0;
+	margin-bottom: 8px;
+	font-weight: 500;
+	display: flex;
+	align-items: center;
+	gap: 8px;
 }
 
 .settings-tag {
-  background: rgba(74, 158, 255, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-  font-size: 12px;
-  color: #4a9eff;
+	background: rgba(74, 158, 255, 0.1);
+	padding: 2px 6px;
+	border-radius: 4px;
+	font-size: 12px;
+	color: #4a9eff;
 }
 
 .settings-description {
-  color: #aaa;
-  font-size: 13px;
-  margin-top: 10px;
-  line-height: 1.4;
+	color: #aaa;
+	font-size: 13px;
+	margin-top: 10px;
+	line-height: 1.4;
 }
 
 /* Loading */
@@ -2829,6 +2832,434 @@ body {
 		.script-editor-main {
 			order: 1;
 			flex: 1;
+		}
+	}
+
+	/* Divinity Tab Styling */
+	.nav-tab.divinity-tab {
+		background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2));
+		color: #dda0dd;
+		border: 1px solid rgba(138, 43, 226, 0.3);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.nav-tab.divinity-tab::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: -100%;
+		width: 100%;
+		height: 100%;
+		background: linear-gradient(90deg, transparent, rgba(221, 160, 221, 0.3), transparent);
+		transition: left 0.6s;
+	}
+
+	.nav-tab.divinity-tab:hover::before {
+		left: 100%;
+	}
+
+	.nav-tab.divinity-tab.active {
+		background: linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3));
+		box-shadow: 0 4px 20px rgba(138, 43, 226, 0.4);
+		color: #e6e6fa;
+	}
+
+	/* Divinity Cards */
+	.divinity-card {
+		background: linear-gradient(135deg, rgba(25, 25, 35, 0.95), rgba(30, 20, 40, 0.95));
+		border: 1px solid rgba(138, 43, 226, 0.3);
+		position: relative;
+		overflow: hidden;
+	}
+
+	.divinity-card::before {
+		content: '';
+		position: absolute;
+		top: 0;
+		left: 0;
+		right: 0;
+		height: 2px;
+		background: linear-gradient(90deg, transparent, #dda0dd, transparent);
+		animation: cosmicPulse 3s ease-in-out infinite;
+	}
+
+	@keyframes cosmicPulse {
+
+		0%,
+		100% {
+			opacity: 0.3;
+		}
+
+		50% {
+			opacity: 1;
+		}
+	}
+
+	.divinity-card h2 {
+		color: #dda0dd;
+		text-shadow: 0 0 10px rgba(221, 160, 221, 0.5);
+	}
+
+	/* Cosmic Stats Grid */
+	.cosmic-stats-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+		gap: 20px;
+	}
+
+	.cosmic-stat-box {
+		background: linear-gradient(135deg, rgba(138, 43, 226, 0.1), rgba(75, 0, 130, 0.1));
+		border: 1px solid rgba(138, 43, 226, 0.3);
+		border-radius: 12px;
+		padding: 20px;
+		text-align: center;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.cosmic-stat-box::before {
+		content: '';
+		position: absolute;
+		top: -50%;
+		left: -50%;
+		width: 200%;
+		height: 200%;
+		background: radial-gradient(circle, rgba(221, 160, 221, 0.1) 0%, transparent 70%);
+		animation: cosmicRotate 8s linear infinite;
+	}
+
+	@keyframes cosmicRotate {
+		from {
+			transform: rotate(0deg);
+		}
+
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.cosmic-stat-label {
+		color: #b19cd9;
+		font-size: 13px;
+		text-transform: uppercase;
+		letter-spacing: 1px;
+		margin-bottom: 8px;
+		position: relative;
+		z-index: 1;
+	}
+
+	.cosmic-stat-value {
+		color: #e6e6fa;
+		font-size: 28px;
+		font-weight: 600;
+		text-shadow: 0 0 10px rgba(221, 160, 221, 0.3);
+		position: relative;
+		z-index: 1;
+	}
+
+	/* Divinity Controls */
+	.divinity-controls {
+		display: flex;
+		justify-content: space-between;
+		align-items: center;
+		margin-bottom: 20px;
+		flex-wrap: wrap;
+		gap: 15px;
+	}
+
+	.cosmic-btn {
+		background: linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3));
+		border: 1px solid rgba(138, 43, 226, 0.5);
+		color: #dda0dd;
+		box-shadow: 0 4px 15px rgba(138, 43, 226, 0.2);
+	}
+
+	.cosmic-btn:hover {
+		background: linear-gradient(135deg, rgba(138, 43, 226, 0.4), rgba(75, 0, 130, 0.4));
+		box-shadow: 0 6px 20px rgba(138, 43, 226, 0.3);
+		transform: translateY(-2px);
+	}
+
+	.cosmic-info {
+		color: #b19cd9;
+		font-style: italic;
+		font-size: 14px;
+	}
+
+	/* Divinity Leaderboard */
+	.divinity-leaderboard {
+		background: rgba(0, 0, 0, 0.2);
+		border-radius: 12px;
+		padding: 20px;
+		border: 1px solid rgba(138, 43, 226, 0.2);
+	}
+
+	.leaderboard-entry {
+		display: flex;
+		align-items: center;
+		padding: 15px;
+		margin-bottom: 10px;
+		background: linear-gradient(135deg, rgba(138, 43, 226, 0.1), rgba(75, 0, 130, 0.1));
+		border-radius: 8px;
+		border: 1px solid rgba(138, 43, 226, 0.2);
+		transition: all 0.3s;
+	}
+
+	.leaderboard-entry:hover {
+		background: linear-gradient(135deg, rgba(138, 43, 226, 0.2), rgba(75, 0, 130, 0.2));
+		border-color: rgba(138, 43, 226, 0.4);
+		transform: translateX(5px);
+	}
+
+	.leaderboard-rank {
+		font-size: 24px;
+		font-weight: bold;
+		margin-right: 15px;
+		min-width: 50px;
+		text-align: center;
+	}
+
+	.leaderboard-rank.first {
+		color: #ffd700;
+		text-shadow: 0 0 10px #ffd700;
+	}
+
+	.leaderboard-rank.second {
+		color: #c0c0c0;
+		text-shadow: 0 0 10px #c0c0c0;
+	}
+
+	.leaderboard-rank.third {
+		color: #cd7f32;
+		text-shadow: 0 0 10px #cd7f32;
+	}
+
+	.leaderboard-rank.other {
+		color: #dda0dd;
+	}
+
+	.leaderboard-info {
+		flex: 1;
+	}
+
+	.leaderboard-name {
+		font-weight: 600;
+		color: #e6e6fa;
+		font-size: 16px;
+	}
+
+	.leaderboard-stats {
+		color: #b19cd9;
+		font-size: 14px;
+	}
+
+	.leaderboard-xp {
+		color: #dda0dd;
+		font-weight: bold;
+		font-size: 18px;
+		text-shadow: 0 0 5px rgba(221, 160, 221, 0.3);
+	}
+
+	/* XP Constellation */
+	.xp-constellation {
+		position: relative;
+		background: radial-gradient(ellipse at center, rgba(25, 25, 35, 0.8) 0%, rgba(0, 0, 0, 0.9) 100%);
+		border-radius: 12px;
+		overflow: hidden;
+		border: 1px solid rgba(138, 43, 226, 0.2);
+	}
+
+	.constellation-canvas {
+		position: relative;
+		width: 100%;
+		height: 300px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+	}
+
+	#cosmicCanvas {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
+	}
+
+	.constellation-overlay {
+		position: absolute;
+		top: 50%;
+		left: 50%;
+		transform: translate(-50%, -50%);
+		text-align: center;
+		z-index: 2;
+	}
+
+	.cosmic-level {
+		font-size: 32px;
+		font-weight: bold;
+		color: #e6e6fa;
+		text-shadow: 0 0 20px rgba(221, 160, 221, 0.8);
+		margin-bottom: 10px;
+	}
+
+	.cosmic-xp {
+		font-size: 18px;
+		color: #dda0dd;
+		margin-bottom: 15px;
+	}
+
+	.cosmic-progress {
+		width: 300px;
+		margin: 0 auto;
+	}
+
+	.cosmic-bar {
+		height: 8px;
+		background: rgba(0, 0, 0, 0.5);
+		border-radius: 4px;
+		overflow: hidden;
+		position: relative;
+		border: 1px solid rgba(138, 43, 226, 0.3);
+	}
+
+	.cosmic-fill {
+		height: 100%;
+		background: linear-gradient(90deg, #8a2be2, #dda0dd, #8a2be2);
+		border-radius: 4px;
+		transition: width 1s ease;
+		position: relative;
+	}
+
+	.cosmic-glow {
+		position: absolute;
+		top: -2px;
+		left: 0;
+		right: 0;
+		bottom: -2px;
+		background: linear-gradient(90deg, transparent, rgba(221, 160, 221, 0.5), transparent);
+		border-radius: 6px;
+		animation: cosmicGlow 2s ease-in-out infinite;
+	}
+
+	@keyframes cosmicGlow {
+
+		0%,
+		100% {
+			opacity: 0;
+		}
+
+		50% {
+			opacity: 1;
+		}
+	}
+
+	/* Divine Achievements */
+	.achievement-grid {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+		gap: 20px;
+	}
+
+	.achievement-card {
+		background: linear-gradient(135deg, rgba(138, 43, 226, 0.1), rgba(75, 0, 130, 0.1));
+		border: 1px solid rgba(138, 43, 226, 0.3);
+		border-radius: 12px;
+		padding: 20px;
+		text-align: center;
+		transition: all 0.3s;
+		position: relative;
+		overflow: hidden;
+	}
+
+	.achievement-card.unlocked {
+		background: linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(75, 0, 130, 0.3));
+		border-color: rgba(138, 43, 226, 0.6);
+		box-shadow: 0 0 20px rgba(138, 43, 226, 0.3);
+	}
+
+	.achievement-card.locked {
+		opacity: 0.6;
+		filter: grayscale(50%);
+	}
+
+	.achievement-card:hover {
+		transform: translateY(-5px);
+		box-shadow: 0 10px 30px rgba(138, 43, 226, 0.2);
+	}
+
+	.achievement-icon {
+		font-size: 48px;
+		margin-bottom: 15px;
+		filter: drop-shadow(0 0 10px rgba(221, 160, 221, 0.5));
+	}
+
+	.achievement-name {
+		color: #e6e6fa;
+		font-weight: 600;
+		font-size: 16px;
+		margin-bottom: 8px;
+	}
+
+	.achievement-desc {
+		color: #b19cd9;
+		font-size: 14px;
+		line-height: 1.4;
+	}
+
+	/* Mobile responsiveness for divinity */
+	@media (max-width: 768px) {
+		.cosmic-stats-grid {
+			grid-template-columns: repeat(2, 1fr);
+			gap: 15px;
+		}
+
+		.cosmic-progress {
+			width: 250px;
+		}
+
+		.divinity-controls {
+			flex-direction: column;
+			align-items: stretch;
+			text-align: center;
+		}
+
+		.achievement-grid {
+			grid-template-columns: 1fr;
+			gap: 15px;
+		}
+
+		.constellation-canvas {
+			height: 250px;
+		}
+
+		.cosmic-level {
+			font-size: 24px;
+		}
+
+		/* Zodiac Sign Colors */
+		.cosmic-stat-value {
+			background: linear-gradient(45deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+			-webkit-background-clip: text;
+			background-clip: text;
+		}
+
+		/* Element-based colors for leaderboard entries */
+		.leaderboard-entry[data-element="fire"] {
+			border-left: 3px solid #ff6600;
+		}
+
+		.leaderboard-entry[data-element="earth"] {
+			border-left: 3px solid #44ff44;
+		}
+
+		.leaderboard-entry[data-element="air"] {
+			border-left: 3px solid #4444ff;
+		}
+
+		.leaderboard-entry[data-element="water"] {
+			border-left: 3px solid #44ffff;
 		}
 	}
 }
