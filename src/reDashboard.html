@@ -295,7 +295,10 @@
         <!-- Configuration Section -->
         <div class="content-section" id="config-section">
           <div class="card">
-            <h2>📝 Script Configuration</h2>
+            <h2 style="display: flex; justify-content: space-between; align-items: center;">
+              📝 Script Configuration
+              <button class="btn btn-small" onclick="app.generateDefaultConfigs()" title="Generate default configurations for enabled scripts" style="background: linear-gradient(135deg, #4aff4a, #357abd);">🎛️ Generate Defaults</button>
+            </h2>
             <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 20px;">
               <select class="form-select" id="scriptConfigSelect" onchange="app.loadScriptConfig()" style="flex: 1;">
                 <option value="">Select a software first...</option>

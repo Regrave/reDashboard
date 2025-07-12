@@ -348,14 +348,40 @@ Object.assign(app, {
 
     async loadConfiguration() {
         try {
+            console.log('Loading configuration from API...');
             const configText = await this.apiCall('getConfiguration');
+            
+            console.log('Raw config response:', configText);
 
-            try {
-                this.currentConfig = typeof configText === 'string' ? JSON.parse(configText) : configText;
-            } catch (e) {
-                this.currentConfig = this.memberData.configuration || {};
+            // Handle different types of empty/reset configurations
+            let parsedConfig = {};
+            
+            if (!configText || configText === '' || configText === 'null' || configText === 'undefined') {
+                // Configuration is truly empty/reset
+                console.log('Configuration is empty/reset, using empty object');
+                parsedConfig = {};
+            } else if (typeof configText === 'string') {
+                try {
+                    parsedConfig = JSON.parse(configText);
+                    console.log('Successfully parsed configuration JSON');
+                } catch (parseError) {
+                    console.error('Failed to parse configuration JSON:', parseError);
+                    console.log('Using empty object due to parse error');
+                    parsedConfig = {};
+                }
+            } else if (typeof configText === 'object' && configText !== null) {
+                // Already an object
+                parsedConfig = configText;
+                console.log('Configuration is already an object');
+            } else {
+                console.log('Unknown configuration format, using empty object');
+                parsedConfig = {};
             }
 
+            // Update the current config (don't fall back to cached member data)
+            this.currentConfig = parsedConfig;
+            
+            // Update the display
             document.getElementById('configDisplay').textContent = JSON.stringify(this.currentConfig, null, 2);
 
             // Update software dropdown after loading configuration
@@ -364,12 +390,22 @@ Object.assign(app, {
             // Load auto-save preference to update toggle state
             this.loadAutoSavePreference();
 
+            console.log('Configuration loaded successfully:', this.currentConfig);
+
         } catch (error) {
             console.error('Error loading configuration:', error);
-            this.currentConfig = this.memberData.configuration || {};
+            
+            // On API error, still use empty config instead of stale cache
+            console.log('API error occurred, using empty configuration');
+            this.currentConfig = {};
+            
+            // Update display with empty config
             document.getElementById('configDisplay').textContent = JSON.stringify(this.currentConfig, null, 2);
             this.populateSoftwareDropdown();
             this.loadAutoSavePreference();
+            
+            // Show user-friendly error message
+            this.showMessage('Failed to load configuration. Using empty configuration.', 'error');
         }
     },
 
@@ -995,5 +1031,5 @@ Object.assign(app, {
             wipeButton.disabled = false;
             wipeButton.textContent = originalText;
         }
-    }
+    },
 });

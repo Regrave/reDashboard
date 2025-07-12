@@ -1746,5 +1746,293 @@ Object.assign(app, {
         this.showMessage(`Removed bone ID ${boneId}`, 'success');
 
         this.triggerAutoSave();
+    },
+
+    async generateDefaultConfigs() {
+        if (!this.memberScripts || this.memberScripts.length === 0) {
+            this.showMessage('No active scripts found to generate configurations for', 'error');
+            return;
+        }
+
+        const generateButton = document.querySelector('button[onclick="app.generateDefaultConfigs()"]');
+        const originalText = generateButton.textContent;
+        
+        try {
+            generateButton.disabled = true;
+            generateButton.textContent = '🔄 Generating...';
+
+            this.showMessage('Analyzing enabled scripts and generating default configurations...', 'success');
+
+            let generatedCount = 0;
+            let totalScripts = this.memberScripts.length;
+            let errors = [];
+
+            // Group scripts by software
+            const scriptsBySoftware = {};
+            this.memberScripts.forEach(script => {
+                const softwareName = this.getSoftwareNameFromId(script.software);
+                if (!scriptsBySoftware[softwareName]) {
+                    scriptsBySoftware[softwareName] = [];
+                }
+                scriptsBySoftware[softwareName].push(script);
+            });
+
+            // Generate configs for each software
+            for (const [softwareName, scripts] of Object.entries(scriptsBySoftware)) {
+                console.log(`Processing ${scripts.length} scripts for ${softwareName}`);
+                
+                if (!this.currentConfig[softwareName]) {
+                    this.currentConfig[softwareName] = {};
+                }
+
+                for (const script of scripts) {
+                    try {
+                        console.log(`Generating config for script: ${script.name} (ID: ${script.id})`);
+                        
+                        // Fetch script source
+                        const apiResponse = await this.apiCall('getScript', {
+                            id: script.id,
+                            beautify: ''
+                        });
+
+                        let scriptData;
+                        if (apiResponse && apiResponse.response && apiResponse.response._raw_response) {
+                            try {
+                                scriptData = JSON.parse(apiResponse.response._raw_response);
+                            } catch (e) {
+                                scriptData = apiResponse;
+                            }
+                        } else if (typeof apiResponse === 'object' && apiResponse.id) {
+                            scriptData = apiResponse;
+                        } else {
+                            throw new Error('Invalid API response structure');
+                        }
+
+                        // Get script source
+                        let sourceCode = '';
+                        if (scriptData.script) {
+                            sourceCode = scriptData.script;
+                        } else if (scriptData.source) {
+                            sourceCode = scriptData.source;
+                        } else {
+                            throw new Error('No source code found');
+                        }
+
+                        // Decode escaped characters
+                        if (sourceCode && typeof sourceCode === 'string') {
+                            sourceCode = sourceCode
+                                .replace(/\\n/g, '\n')
+                                .replace(/\\t/g, '\t')
+                                .replace(/\\"/g, '"')
+                                .replace(/\\'/g, "'")
+                                .replace(/\\\\/g, '\\');
+                        }
+
+                        // Parse the source code for default values
+                        const defaultConfig = this.parseScriptForDefaults(sourceCode, script.name);
+                        
+                        if (defaultConfig && Object.keys(defaultConfig).length > 0) {
+                            // Use script name as key (try both with and without .lua extension)
+                            const scriptKey = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
+                            const scriptKeyNoExt = script.name.replace('.lua', '');
+                            
+                            // Check if config already exists under either name
+                            if (!this.currentConfig[softwareName][scriptKey] && !this.currentConfig[softwareName][scriptKeyNoExt]) {
+                                this.currentConfig[softwareName][scriptKey] = defaultConfig;
+                                generatedCount++;
+                                console.log(`Generated config for ${scriptKey}:`, defaultConfig);
+                            } else {
+                                console.log(`Config already exists for ${script.name}, skipping`);
+                            }
+                        } else {
+                            console.log(`No configurable settings found in ${script.name}`);
+                        }
+
+                    } catch (error) {
+                        console.error(`Error processing script ${script.name}:`, error);
+                        errors.push(`${script.name}: ${error.message}`);
+                    }
+                }
+            }
+
+            // Save the updated configuration
+            if (generatedCount > 0) {
+                await this.apiPost('setConfiguration', {}, {
+                    value: JSON.stringify(this.currentConfig)
+                });
+
+                // Update the display
+                document.getElementById('configDisplay').textContent = JSON.stringify(this.currentConfig, null, 2);
+                this.populateSoftwareDropdown();
+
+                this.showMessage(`✅ Generated ${generatedCount} default configurations out of ${totalScripts} scripts!`, 'success');
+                
+                if (errors.length > 0) {
+                    console.warn('Some scripts had errors:', errors);
+                    this.showMessage(`⚠️ ${errors.length} scripts had parsing errors (check console for details)`, 'error');
+                }
+            } else {
+                this.showMessage('No new configurations were generated (configs may already exist)', 'error');
+            }
+
+        } catch (error) {
+            console.error('Error generating default configs:', error);
+            this.showMessage(`Failed to generate configurations: ${error.message}`, 'error');
+        } finally {
+            generateButton.disabled = false;
+            generateButton.textContent = originalText;
+        }
+    },
+
+    parseScriptForDefaults(sourceCode, scriptName) {
+        if (!sourceCode || typeof sourceCode !== 'string') {
+            return {};
+        }
+
+        console.log(`Parsing script source for ${scriptName}`);
+
+        // Extract the base name without .lua extension
+        const baseName = scriptName.replace('.lua', '').toLowerCase();
+        
+        // Find the start of our config object
+        const objectPattern = new RegExp(`^\\s*(local\\s+)?${baseName}\\s*=\\s*\\{`, 'im');
+        const lines = sourceCode.split('\n');
+        
+        let startLine = -1;
+        for (let i = 0; i < lines.length; i++) {
+            if (objectPattern.test(lines[i])) {
+                startLine = i;
+                break;
+            }
+        }
+
+        if (startLine === -1) {
+            console.log(`No config object found for ${scriptName}`);
+            return {};
+        }
+
+        const defaults = {};
+        let mainBraceLevel = 1; // We start inside the main object
+        let skipUntilBraceLevel = null; // When we're skipping a nested object
+
+        for (let i = startLine + 1; i < lines.length; i++) {
+            let line = lines[i].trim();
+
+            // Skip empty lines and comments
+            if (!line || line.startsWith('--')) {
+                continue;
+            }
+
+            // Remove inline comments
+            const commentIndex = line.indexOf('--');
+            if (commentIndex !== -1) {
+                line = line.substring(0, commentIndex).trim();
+                if (!line) continue;
+            }
+
+            // Count braces
+            const openBraces = (line.match(/\{/g) || []).length;
+            const closeBraces = (line.match(/\}/g) || []).length;
+            
+            // Update main brace level
+            mainBraceLevel += openBraces - closeBraces;
+
+            // If we've exited the main object, stop
+            if (mainBraceLevel <= 0) {
+                console.log(`Exited main object at line ${i}`);
+                break;
+            }
+
+            // If we're currently skipping a nested object
+            if (skipUntilBraceLevel !== null) {
+                skipUntilBraceLevel += openBraces - closeBraces;
+                if (skipUntilBraceLevel <= 1) { // Back to main level
+                    skipUntilBraceLevel = null;
+                    console.log(`Finished skipping nested object at line ${i}`);
+                }
+                continue;
+            }
+
+            // Check if this line starts a nested object
+            if (line.includes('=') && line.includes('{')) {
+                console.log(`Starting to skip nested object at line ${i}: ${line}`);
+                skipUntilBraceLevel = mainBraceLevel + openBraces - closeBraces;
+                continue;
+            }
+
+            // Only parse simple assignments with NO braces
+            if (!line.includes('{') && !line.includes('}') && line.includes('=')) {
+                const settingMatch = line.match(/^(\w+)\s*=\s*(.+?)(?:,\s*)?$/);
+                if (settingMatch) {
+                    const [, settingName, settingValue] = settingMatch;
+                    
+                    const parsedValue = this.parseSettingValue(settingValue.trim().replace(/,$/, ''));
+                    if (parsedValue !== null) {
+                        defaults[settingName] = parsedValue;
+                        console.log(`Found setting: ${settingName} = ${parsedValue}`);
+                    }
+                }
+            }
+        }
+
+        console.log(`Parsed ${Object.keys(defaults).length} settings from ${scriptName}`);
+        return defaults;
+    },
+
+    parseSettingValue(valueString) {
+        const trimmed = valueString.trim();
+        
+        // Boolean values
+        if (trimmed === 'true') return true;
+        if (trimmed === 'false') return false;
+        
+        // Numbers (including decimals and scientific notation)
+        const numberMatch = trimmed.match(/^-?(\d+\.?\d*([eE][+-]?\d+)?|\d*\.\d+([eE][+-]?\d+)?)$/);
+        if (numberMatch) {
+            const num = parseFloat(trimmed);
+            return isNaN(num) ? null : num;
+        }
+        
+        // Strings (quoted with single or double quotes)
+        const stringMatch = trimmed.match(/^(["'])((?:\\.|(?!\1)[^\\])*)\1$/);
+        if (stringMatch) {
+            return stringMatch[2]; // Return the content inside quotes
+        }
+        
+        // Unquoted strings that are clearly meant to be strings (like "ALT", "F6", etc.)
+        // These are common in Lua for key names and similar values
+        if (/^[A-Z][A-Z0-9_]*$/i.test(trimmed) && trimmed.length <= 10) {
+            return trimmed;
+        }
+        
+        // Hex color values (common pattern in configs)
+        if (/^[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(trimmed)) {
+            return trimmed;
+        }
+        
+        // Reject anything that looks like it contains braces, brackets, or function calls
+        if (trimmed.includes('{') || trimmed.includes('}') || 
+            trimmed.includes('[') || trimmed.includes(']') || 
+            trimmed.includes('(') || trimmed.includes(')')) {
+            return null;
+        }
+        
+        // Reject anything that looks like a variable reference or expression
+        if (trimmed.includes('.') && !numberMatch) {
+            return null;
+        }
+        
+        // Return null for anything else we don't recognize
+        return null;
+    },
+
+    getSoftwareNameFromId(softwareId) {
+        const softwareMap = {
+            4: 'omega',      // FC2 Global -> omega
+            5: 'universe4',
+            6: 'omega', // Also we're just getting rid of Conestellation4. Idk why this returns it still
+            7: 'parallax2'
+        };
+        return softwareMap[softwareId] || `software_${softwareId}`;
     }
 });
