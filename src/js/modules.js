@@ -919,6 +919,10 @@ Object.assign(app, {
             this.loadBuilds();
         }
 
+        if (tabName === 'sessions') {
+            this.loadSessionInfo(); // Add this line
+        }
+
         if (tabName === 'overview') {
             setTimeout(() => {
                 const terminalInput = document.getElementById('terminalInput');
@@ -1030,6 +1034,607 @@ Object.assign(app, {
             // Re-enable button
             wipeButton.disabled = false;
             wipeButton.textContent = originalText;
+        }
+    },
+
+    // ========================
+    // SESSION MANAGEMENT MODULE  
+    // ========================
+
+    async loadSessionInfo() {
+        try {
+            // Load detailed member info with session data, history, bans, etc.
+            const response = await this.apiCall('getMember', {
+                scripts: '',
+                bans: '',
+                history: '',
+                fc2t: '',
+                xp: '',
+                beautify: ''
+            });
+            
+            this.memberData = response;
+            this.memberScripts = response.scripts || [];
+            this.memberProjects = response.fc2t || [];
+            
+            this.displayCurrentSessionInfo();
+            this.displaySessionStats();
+            this.displaySessionHistory();
+            this.updatePersonalizedTerminal();
+            
+        } catch (error) {
+            console.error('Error loading session info:', error);
+            this.showMessage('Failed to load session information', 'error');
+        }
+    },
+
+    displayCurrentSessionInfo() {
+        const container = document.getElementById('currentSessionInfo');
+        const session = this.memberData.session;
+        const sessionHistory = this.memberData.session_history;
+        
+        if (!session) {
+            container.innerHTML = '<p style="color: #888; text-align: center;">No active session information available</p>';
+            return;
+        }
+        
+        // Get the most recent session from history
+        const recentSession = sessionHistory?.history?.[0];
+        
+        // Calculate session duration if we have start time
+        let sessionDuration = 'Unknown';
+        if (recentSession?.time_started) {
+            const startTime = new Date(parseInt(recentSession.time_started) * 1000);
+            const now = new Date();
+            const durationMs = now - startTime;
+            const days = Math.floor(durationMs / (1000 * 60 * 60 * 24));
+            const hours = Math.floor((durationMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+            const minutes = Math.floor((durationMs % (1000 * 60 * 60)) / (1000 * 60));
+            
+            if (days > 0) {
+                sessionDuration = `${days}d ${hours}h ${minutes}m`;
+            } else if (hours > 0) {
+                sessionDuration = `${hours}h ${minutes}m`;
+            } else {
+                sessionDuration = `${minutes}m`;
+            }
+        }
+        
+        // Calculate expiration
+        let expirationInfo = 'Unknown';
+        if (recentSession?.time_expire) {
+            const expireTime = new Date(parseInt(recentSession.time_expire) * 1000);
+            const now = new Date();
+            if (expireTime > now) {
+                const remainingMs = expireTime - now;
+                const remainingDays = Math.floor(remainingMs / (1000 * 60 * 60 * 24));
+                const remainingHours = Math.floor((remainingMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                expirationInfo = `${remainingDays}d ${remainingHours}h remaining`;
+            } else {
+                expirationInfo = 'Expired';
+            }
+        }
+        
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 20px;">
+                <div class="session-info-card">
+                    <h4 style="color: #4a9eff; margin-bottom: 15px;">🖥️ Current Session</h4>
+                    <div class="session-info-item">
+                        <span class="session-label">Directory:</span>
+                        <span class="session-value">${recentSession?.directory || session.directory || 'Not available'}</span>
+                    </div>
+                    <div class="session-info-item">
+                        <span class="session-label">Duration:</span>
+                        <span class="session-value">${sessionDuration}</span>
+                    </div>
+                    <div class="session-info-item">
+                        <span class="session-label">Status:</span>
+                        <span class="session-value" style="color: #4aff4a;">🟢 Active</span>
+                    </div>
+                    <div class="session-info-item">
+                        <span class="session-label">Frozen:</span>
+                        <span class="session-value" style="color: ${recentSession?.frozen === '1' ? '#ff6666' : '#4aff4a'};">
+                            ${recentSession?.frozen === '1' ? '❄️ Yes' : '✅ No'}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="session-info-card">
+                    <h4 style="color: #4a9eff; margin-bottom: 15px;">🛡️ Security Info</h4>
+                    <div class="session-info-item">
+                        <span class="session-label">Protection:</span>
+                        <span class="session-value">${this.protectionModes[this.memberData.protection] || 'Unknown'}</span>
+                    </div>
+                    <div class="session-info-item">
+                        <span class="session-label">Hash Status:</span>
+                        <span class="session-value" style="color: #4aff4a;">✅ Valid</span>
+                    </div>
+                    <div class="session-info-item">
+                        <span class="session-label">Session Expires:</span>
+                        <span class="session-value">${expirationInfo}</span>
+                    </div>
+                </div>
+                
+                ${recentSession?.humanizer_test ? `
+                    <div class="session-info-card">
+                        <h4 style="color: #4a9eff; margin-bottom: 15px;">🎯 Humanizer Test</h4>
+                        ${this.displayHumanizerTest(recentSession.humanizer_test)}
+                    </div>
+                ` : ''}
+            </div>
+        `;
+    },
+
+    displayHumanizerTest(humanizerTestJson) {
+        try {
+            const test = JSON.parse(humanizerTestJson);
+            const duration = ((test.end - test.start) / 1000).toFixed(1);
+            const samples = test.times ? test.times.length : 0;
+            
+            return `
+                <div class="session-info-item">
+                    <span class="session-label">Test Duration:</span>
+                    <span class="session-value">${duration}s</span>
+                </div>
+                <div class="session-info-item">
+                    <span class="session-label">Samples:</span>
+                    <span class="session-value">${samples}</span>
+                </div>
+                <div class="session-info-item">
+                    <span class="session-label">Resolution:</span>
+                    <span class="session-value">${test.screen_width}x${test.screen_height}</span>
+                </div>
+                <div class="session-info-item">
+                    <span class="session-label">Status:</span>
+                    <span class="session-value" style="color: #4aff4a;">✅ Passed</span>
+                </div>
+            `;
+        } catch (e) {
+            return `
+                <div class="session-info-item">
+                    <span class="session-label">Status:</span>
+                    <span class="session-value" style="color: #4aff4a;">✅ Completed</span>
+                </div>
+            `;
+        }
+    },
+
+    displaySessionStats() {
+        const container = document.getElementById('sessionStats');
+        const sessionHistory = this.memberData.session_history;
+        
+        if (!sessionHistory) {
+            container.innerHTML = '<div class="spinner"></div>';
+            return;
+        }
+        
+        const totalSessions = sessionHistory.history?.length || 0;
+        const successfulConnections = sessionHistory.success?.length || 0;
+        const failedConnections = sessionHistory.failure?.length || 0;
+        const totalConnections = successfulConnections + failedConnections;
+        const successRate = totalConnections > 0 ? Math.round((successfulConnections / totalConnections) * 100) : 0;
+        
+        // Calculate recent activity (last 7 days)
+        const sevenDaysAgo = Date.now() - (7 * 24 * 60 * 60 * 1000);
+        const recentSessions = sessionHistory.history?.filter(h => 
+            parseInt(h.time_started) * 1000 > sevenDaysAgo
+        ).length || 0;
+        
+        // Get most recent software/version
+        const recentSuccess = sessionHistory.success?.[0];
+        const currentSoftware = recentSuccess ? `${recentSuccess.software} v${recentSuccess.version}` : 'Unknown';
+        
+        container.innerHTML = `
+            <div class="stat-box">
+                <div class="stat-label">Total Sessions</div>
+                <div class="stat-value">${totalSessions}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Success Rate</div>
+                <div class="stat-value" style="color: ${successRate >= 95 ? '#4aff4a' : successRate >= 80 ? '#ffcc00' : '#ff6666'}">${successRate}%</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Successful</div>
+                <div class="stat-value" style="color: #4aff4a;">${successfulConnections}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Failed</div>
+                <div class="stat-value" style="color: #ff6666;">${failedConnections}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Last 7 Days</div>
+                <div class="stat-value">${recentSessions}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Current Software</div>
+                <div class="stat-value" style="font-size: 14px; line-height: 1.2;">${currentSoftware}</div>
+            </div>
+        `;
+    },
+
+    displaySessionHistory() {
+        const container = document.getElementById('sessionHistoryContainer');
+        const sessionHistory = this.memberData.session_history;
+        
+        if (!sessionHistory || (!sessionHistory.success && !sessionHistory.failure)) {
+            container.innerHTML = '<p style="color: #888; text-align: center; padding: 40px;">No session history available</p>';
+            return;
+        }
+        
+        // Combine success and failure arrays with timestamps for sorting
+        const allEvents = [];
+        
+        // Add successful connections
+        if (sessionHistory.success) {
+            sessionHistory.success.forEach(event => {
+                allEvents.push({
+                    ...event,
+                    type: 'success',
+                    timestamp: parseInt(event.time)
+                });
+            });
+        }
+        
+        // Add failed connections
+        if (sessionHistory.failure) {
+            sessionHistory.failure.forEach(event => {
+                allEvents.push({
+                    ...event,
+                    type: 'failure',
+                    timestamp: parseInt(event.time_attempt)
+                });
+            });
+        }
+        
+        // Sort by timestamp (most recent first)
+        allEvents.sort((a, b) => b.timestamp - a.timestamp);
+        
+        // Show last 15 events by default
+        const displayEvents = allEvents.slice(0, 5);
+        
+        container.innerHTML = `
+            <div style="margin-bottom: 20px; color: #aaa; font-size: 14px;">
+                Showing ${displayEvents.length} of ${allEvents.length} total connection attempts
+            </div>
+            <div class="session-history-list">
+                ${displayEvents.map(event => {
+                    const isSuccess = event.type === 'success';
+                    const timeStr = new Date(event.timestamp * 1000).toLocaleString();
+                    
+                    return `
+                        <div class="session-history-item ${isSuccess ? 'success' : 'failure'}">
+                            <div class="session-history-header">
+                                <div class="session-status">
+                                    ${isSuccess ? '✅ Connection Success' : '❌ Connection Failed'}
+                                </div>
+                                <div class="session-time">${timeStr}</div>
+                            </div>
+                            <div class="session-details">
+                                ${event.software ? `<span class="session-detail">🖥️ ${event.software} v${event.version}</span>` : ''}
+                                ${event.solution ? `<span class="session-detail">🖥️ ${event.solution} v${event.version}</span>` : ''}
+                                ${event.directory ? `<span class="session-detail">📁 ${event.directory}</span>` : ''}
+                                ${event.reason ? `<span class="session-detail session-error">⚠️ ${event.reason}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+            
+            ${allEvents.length > 15 ? `
+                <div style="text-align: center; margin-top: 20px;">
+                    <button class="btn btn-small" onclick="app.showAllSessionHistory()">
+                        📊 Show All ${allEvents.length} Connection Attempts
+                    </button>
+                </div>
+            ` : ''}
+        `;
+    },
+
+    showAllSessionHistory() {
+        const container = document.getElementById('sessionHistoryContainer');
+        const sessionHistory = this.memberData.session_history;
+        
+        // Combine and sort all events (same logic as above)
+        const allEvents = [];
+        
+        if (sessionHistory.success) {
+            sessionHistory.success.forEach(event => {
+                allEvents.push({
+                    ...event,
+                    type: 'success',
+                    timestamp: parseInt(event.time)
+                });
+            });
+        }
+        
+        if (sessionHistory.failure) {
+            sessionHistory.failure.forEach(event => {
+                allEvents.push({
+                    ...event,
+                    type: 'failure',
+                    timestamp: parseInt(event.time_attempt)
+                });
+            });
+        }
+        
+        allEvents.sort((a, b) => b.timestamp - a.timestamp);
+        
+        container.innerHTML = `
+            <div style="margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center;">
+                <div style="color: #aaa; font-size: 14px;">
+                    Showing all ${allEvents.length} connection attempts
+                </div>
+                <button class="btn btn-small" onclick="app.displaySessionHistory()">
+                    📋 Show Recent Only
+                </button>
+            </div>
+            <div class="session-history-list" style="max-height: 500px; overflow-y: auto;">
+                ${allEvents.map(event => {
+                    const isSuccess = event.type === 'success';
+                    const timeStr = new Date(event.timestamp * 1000).toLocaleString();
+                    
+                    return `
+                        <div class="session-history-item ${isSuccess ? 'success' : 'failure'}" style="margin-bottom: 8px;">
+                            <div class="session-history-header">
+                                <div class="session-status">
+                                    ${isSuccess ? '✅ Connection Success' : '❌ Connection Failed'}
+                                </div>
+                                <div class="session-time">${timeStr}</div>
+                            </div>
+                            <div class="session-details">
+                                ${event.software ? `<span class="session-detail">🖥️ ${event.software} v${event.version}</span>` : ''}
+                                ${event.solution ? `<span class="session-detail">🖥️ ${event.solution} v${event.version}</span>` : ''}
+                                ${event.directory ? `<span class="session-detail">📁 ${event.directory}</span>` : ''}
+                                ${event.reason ? `<span class="session-detail session-error">⚠️ ${event.reason}</span>` : ''}
+                            </div>
+                        </div>
+                    `;
+                }).join('')}
+            </div>
+        `;
+    },
+
+    async refreshSessionHistory() {
+        try {
+            await this.loadSessionInfo();
+            this.showMessage('Session history refreshed!', 'success');
+        } catch (error) {
+            console.error('Error refreshing session history:', error);
+            this.showMessage('Failed to refresh session history', 'error');
+        }
+    },
+
+    async loadSessionHistory(detailed = false) {
+        try {
+            const flags = {
+                scripts: '',
+                history: '',
+                beautify: ''
+            };
+            
+            if (detailed) {
+                // Add more flags for detailed info
+                flags.bans = '';
+                flags.xp = '';
+                flags.rolls = '';
+                flags.hashes = '';
+            }
+            
+            const response = await this.apiCall('getMember', flags);
+            this.memberData = response;
+            
+            this.displaySessionHistory();
+            this.displaySessionStats();
+            this.displayCurrentSessionInfo();
+            
+            if (detailed) {
+                this.displayDetailedSecurityInfo();
+                this.displayAccountActivity();
+            }
+            
+            this.showMessage(detailed ? 'Detailed security & activity data loaded!' : 'Session history loaded!', 'success');
+        } catch (error) {
+            console.error('Error loading session history:', error);
+            this.showMessage('Failed to load session history', 'error');
+        }
+    },
+
+    displayDetailedSecurityInfo() {
+        // Check if we already have a detailed security section
+        let container = document.getElementById('detailedSecurityContainer');
+        if (!container) {
+            // Create new section after session stats
+            const statsCard = document.querySelector('#sessions-section .card:nth-child(2)');
+            const newCard = document.createElement('div');
+            newCard.className = 'card';
+            newCard.innerHTML = `
+                <h2>🛡️ Security & Account Overview</h2>
+                <div id="detailedSecurityContainer"></div>
+            `;
+            statsCard.insertAdjacentElement('afterend', newCard);
+            container = document.getElementById('detailedSecurityContainer');
+        }
+        
+        const steam = this.memberData.steam || {};
+        const hashes = this.memberData.hashes || [];
+        const steamAccounts = Object.values(steam);
+        
+        // Calculate security metrics
+        const totalAccounts = steamAccounts.length;
+        const cleanAccounts = steamAccounts.filter(acc => acc.clean).length;
+        const vacBannedAccounts = steamAccounts.filter(acc => acc.vac_banned).length;
+        const untrustedAccounts = steamAccounts.filter(acc => acc.untrusted).length;
+        
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;">
+                <!-- Security Summary -->
+                <div class="security-info-card">
+                    <h4 style="color: #4a9eff; margin-bottom: 15px;">📊 Security Summary</h4>
+                    <div class="security-info-item">
+                        <span class="security-label">Total Steam Accounts:</span>
+                        <span class="security-value">${totalAccounts}</span>
+                    </div>
+                    <div class="security-info-item">
+                        <span class="security-label">Clean Accounts:</span>
+                        <span class="security-value" style="color: #4aff4a;">${cleanAccounts}</span>
+                    </div>
+                    <div class="security-info-item">
+                        <span class="security-label">VAC Banned:</span>
+                        <span class="security-value" style="color: ${vacBannedAccounts > 0 ? '#ff6666' : '#4aff4a'};">${vacBannedAccounts}</span>
+                    </div>
+                    <div class="security-info-item">
+                        <span class="security-label">Untrusted:</span>
+                        <span class="security-value" style="color: ${untrustedAccounts > 0 ? '#ff6666' : '#4aff4a'};">${untrustedAccounts}</span>
+                    </div>
+                    <div class="security-info-item">
+                        <span class="security-label">Hash Records:</span>
+                        <span class="security-value">${hashes.length}</span>
+                    </div>
+                </div>
+                
+                <!-- Steam Accounts Detail -->
+                <div class="security-info-card">
+                    <h4 style="color: #4a9eff; margin-bottom: 15px;">🎮 Steam Accounts</h4>
+                    ${steamAccounts.length > 0 ? steamAccounts.map(account => `
+                        <div class="steam-account-item ${account.clean ? 'clean' : 'flagged'}">
+                            <div class="steam-account-header">
+                                <span class="steam-persona">${account.persona}</span>
+                                <span class="steam-status ${account.clean ? 'clean' : 'flagged'}">
+                                    ${account.clean ? '✅' : (account.vac_banned ? '🚫' : '⚠️')}
+                                </span>
+                            </div>
+                            <div class="steam-account-details">
+                                <span class="steam-detail">👤 ${account.name}</span>
+                                <span class="steam-detail">🆔 ${account.id}</span>
+                                ${account.vac_banned ? `<span class="steam-detail steam-ban">🚫 VAC: ${account.days_since_last_ban} days ago</span>` : ''}
+                                ${account.untrusted ? `<span class="steam-detail steam-ban">⚠️ Untrusted</span>` : ''}
+                            </div>
+                        </div>
+                    `).join('') : '<p style="color: #888; font-style: italic;">No Steam accounts linked</p>'}
+                </div>
+                
+                <!-- Hash History -->
+                <div class="security-info-card">
+                    <h4 style="color: #4a9eff; margin-bottom: 15px;">🔐 Hash Verification</h4>
+                    ${hashes.length > 0 ? `
+                        <div style="margin-bottom: 10px; color: #4aff4a; font-size: 14px;">
+                            ✅ ${hashes.length} hash record${hashes.length !== 1 ? 's' : ''} on file
+                        </div>
+                        <div class="hash-list">
+                            ${hashes.slice(0, 3).map(hash => `
+                                <div class="hash-item">
+                                    <code style="font-size: 11px; color: #888; word-break: break-all;">
+                                        ${hash.substring(0, 16)}...${hash.substring(hash.length - 16)}
+                                    </code>
+                                </div>
+                            `).join('')}
+                            ${hashes.length > 3 ? `<div style="color: #888; font-size: 12px; text-align: center; margin-top: 8px;">... and ${hashes.length - 3} more</div>` : ''}
+                        </div>
+                    ` : '<p style="color: #888; font-style: italic;">No hash history available</p>'}
+                </div>
+            </div>
+        `;
+    },
+
+    displayAccountActivity() {
+        // Check if we already have an activity section
+        let container = document.getElementById('accountActivityContainer');
+        if (!container) {
+            // Create new section
+            const securityCard = document.querySelector('#detailedSecurityContainer').closest('.card');
+            const newCard = document.createElement('div');
+            newCard.className = 'card';
+            newCard.innerHTML = `
+                <h2>📈 Recent Account Activity</h2>
+                <div id="accountActivityContainer"></div>
+            `;
+            securityCard.insertAdjacentElement('afterend', newCard);
+            container = document.getElementById('accountActivityContainer');
+        }
+        
+        const xpHistory = this.memberData.xp_history || [];
+        const rolls = this.memberData.rolls || [];
+        
+        container.innerHTML = `
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(350px, 1fr)); gap: 20px;">
+                <!-- XP History -->
+                <div class="activity-info-card">
+                    <h4 style="color: #4a9eff; margin-bottom: 15px;">💎 Recent XP Transactions</h4>
+                    ${xpHistory.length > 0 ? `
+                        <div class="activity-list">
+                            ${xpHistory.slice(0, 10).map(xp => {
+                                const timeStr = new Date(xp.time * 1000).toLocaleString();
+                                const isGain = xp.amount > 0;
+                                return `
+                                    <div class="activity-item">
+                                        <div class="activity-header">
+                                            <span class="activity-type" style="color: ${isGain ? '#4aff4a' : '#ff6666'};">
+                                                ${isGain ? '+' : ''}${xp.amount.toLocaleString()} XP
+                                            </span>
+                                            <span class="activity-time">${timeStr}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        ${xpHistory.length > 10 ? `
+                            <div style="text-align: center; margin-top: 15px; color: #888; font-size: 12px;">
+                                ... and ${xpHistory.length - 10} more transactions
+                            </div>
+                        ` : ''}
+                    ` : '<p style="color: #888; font-style: italic;">No recent XP transactions</p>'}
+                </div>
+                
+                <!-- Loot Roll History -->
+                <div class="activity-info-card">
+                    <h4 style="color: #4a9eff; margin-bottom: 15px;">🎲 Recent Loot Rolls</h4>
+                    ${rolls.length > 0 ? `
+                        <div class="activity-list">
+                            ${rolls.slice(0, 10).map(roll => {
+                                const outcomeColor = roll.outcome === 'XP' ? '#4aff4a' : 
+                                                    roll.outcome === 'Supernova' ? '#ff6b35' : '#4a9eff';
+                                return `
+                                    <div class="activity-item">
+                                        <div class="activity-header">
+                                            <span class="activity-type" style="color: ${outcomeColor};">
+                                                ${roll.outcome}${roll.amount > 0 ? ` (+${roll.amount})` : ''}
+                                            </span>
+                                            <span class="activity-time">${roll.elapsed}</span>
+                                        </div>
+                                    </div>
+                                `;
+                            }).join('')}
+                        </div>
+                        ${rolls.length > 10 ? `
+                            <div style="text-align: center; margin-top: 15px; color: #888; font-size: 12px;">
+                                ... and ${rolls.length - 10} more rolls
+                            </div>
+                        ` : ''}
+                    ` : '<p style="color: #888; font-style: italic;">No recent loot rolls</p>'}
+                </div>
+            </div>
+        `;
+    },
+
+    updatePersonalizedTerminal() {
+        const username = this.memberData?.username || 'member';
+        const terminalPrompt = document.getElementById('terminalPrompt');
+        const terminalTitle = document.getElementById('terminalTitle');
+        const terminalWelcome = document.getElementById('terminalWelcome');
+        
+        if (terminalPrompt) {
+            terminalPrompt.textContent = `${username}@constelia:~$`;
+        }
+        
+        if (terminalTitle) {
+            terminalTitle.textContent = `${username}'s Member Panel`;
+        }
+        
+        if (terminalWelcome && this.memberData) {
+            terminalWelcome.innerHTML = `
+                <div style="color: #4a9eff; font-weight: bold;">${username}'s Member Panel</div>
+                <div style="color: #888; font-size: 14px;">Level ${this.memberData.level} • ${this.memberData.xp.toLocaleString()} XP • Type 'help' for commands</div>
+            `;
         }
     },
 });

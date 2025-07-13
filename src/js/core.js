@@ -883,6 +883,7 @@ const app = {
         await this.loadPerks();
         await this.loadLanguages();
         await this.loadBuilds();
+        await this.loadSessionInfo();
 
         // Load preferences
         this.loadAutoSavePreference();
