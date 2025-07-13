@@ -1666,7 +1666,7 @@ Object.assign(app, {
         const formContainer = document.getElementById('scriptConfigForm');
 
         // Try to get configuration categories from script metadata
-        let configCategories = {};
+        let configMetadata = { categories: {}, dropdowns: {} };
 
         // Get the current script being edited
         const currentScript = this.memberScripts.find(script => {
@@ -1680,22 +1680,22 @@ Object.assign(app, {
 
         if (currentScript) {
             try {
-                configCategories = await this.parseConfigurationMetadata(currentScript.id);
+                configMetadata = await this.parseConfigurationMetadata(currentScript.id);
             } catch (error) {
-                console.error('Error loading config categories:', error);
-                configCategories = {};
+                console.error('Error loading config metadata:', error);
+                configMetadata = { categories: {}, dropdowns: {} };
             }
         }
 
         // If no categories found, fall back to automatic grouping
-        if (Object.keys(configCategories).length === 0) {
-            configCategories = this.autoGroupSettings();
+        if (Object.keys(configMetadata.categories).length === 0) {
+            configMetadata.categories = this.autoGroupSettings();
         }
 
         // Render categorized form
         let formHTML = '';
 
-        Object.entries(configCategories).forEach(([categoryName, settingNames]) => {
+        Object.entries(configMetadata.categories).forEach(([categoryName, settingNames]) => {
             // Filter settings that actually exist in current config
             const existingSettings = settingNames.filter(settingName =>
                 this.currentScriptConfig.hasOwnProperty(settingName)
@@ -1714,7 +1714,8 @@ Object.assign(app, {
 
             existingSettings.forEach(settingName => {
                 const value = this.currentScriptConfig[settingName];
-                formHTML += this.createConfigField(settingName, value);
+                const dropdownOptions = configMetadata.dropdowns[settingName] || null;
+                formHTML += this.createConfigField(settingName, value, dropdownOptions);
             });
 
             formHTML += '</div></div>';
@@ -1807,7 +1808,7 @@ Object.assign(app, {
         }
     },
 
-    createConfigField(key, value) {
+    createConfigField(key, value, dropdownOptions = null) {
         const fieldType = this.getFieldType(value);
         const fieldId = `config_${key}`.replace(/\./g, '_');
 
@@ -1815,53 +1816,48 @@ Object.assign(app, {
 
         fieldHTML += `<div class="config-label">
             ${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            ${fieldType === 'key' ? '<code style="background: rgba(74, 158, 255, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #4a9eff;">Key</code>' : ''}
             ${fieldType === 'color' ? '<code style="background: rgba(74, 158, 255, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #4a9eff;">Color</code>' : ''}
+            ${dropdownOptions ? '<code style="background: rgba(255, 140, 0, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #ff8c00;">Dropdown</code>' : ''}
         </div>`;
 
         fieldHTML += `<div class="config-control">`;
 
-        switch (fieldType) {
-            case 'boolean':
-                fieldHTML += `
-                    <div class="toggle-switch ${value ? 'active' : ''}" 
-                        data-config-key="${key}" 
-                        onclick="app.handleToggleClick(this, '${key}');">
-                        <div class="toggle-slider"></div>
-                    </div>
-                `;
-                break;
-
-            case 'number':
-                fieldHTML += `
-                    <input type="number" class="config-input" id="${fieldId}" value="${value}" 
-                        onchange="app.updateConfigValue('${key}', parseFloat(this.value)); app.triggerAutoSave();">
-                `;
-                break;
-
-            case 'color':
-                fieldHTML += `
-                    <div class="color-picker-placeholder" id="${fieldId}" data-key="${key}" data-value="${value}"></div>
-                `;
-                break;
-
-            case 'key':
-                fieldHTML += `
-                    <input type="text" class="config-input" id="${fieldId}" value="${value}" 
-                        style="width: 80px; text-align: center; font-weight: bold;"
-                        onchange="app.updateConfigValue('${key}', this.value.toUpperCase()); app.triggerAutoSave();">
-                `;
-                break;
-
-            case 'string':
-                fieldHTML += `
-                    <input type="text" class="config-input" id="${fieldId}" value="${value}" 
-                        onchange="app.updateConfigValue('${key}', this.value); app.triggerAutoSave();">
-                `;
-                break;
-
-            default:
-                fieldHTML += `<code style="color: #888;">${JSON.stringify(value)}</code>`;
+        if (fieldType === 'boolean') {
+            fieldHTML += `
+                <div class="toggle-switch ${value ? 'active' : ''}" 
+                    data-config-key="${key}" 
+                    onclick="app.handleToggleClick(this, '${key}');">
+                    <div class="toggle-slider"></div>
+                </div>
+            `;
+        } else if (fieldType === 'color') {
+            fieldHTML += `
+                <div class="color-picker-placeholder" id="${fieldId}" data-key="${key}" data-value="${value}"></div>
+            `;
+        } else if (dropdownOptions && dropdownOptions.length > 0) {
+            // Create dropdown
+            fieldHTML += `<select class="config-input" id="${fieldId}" onchange="app.updateConfigValue('${key}', this.value); app.triggerAutoSave();" style="width: 200px;">`;
+            
+            // Add current value if it's not in the dropdown options
+            let hasCurrentValue = dropdownOptions.includes(String(value));
+            if (!hasCurrentValue && value !== null && value !== undefined && value !== '') {
+                fieldHTML += `<option value="${value}" selected>${value}</option>`;
+            }
+            
+            // Add dropdown options
+            dropdownOptions.forEach(option => {
+                const selected = String(option) === String(value) ? 'selected' : '';
+                fieldHTML += `<option value="${option}" ${selected}>${option}</option>`;
+            });
+            
+            fieldHTML += `</select>`;
+        } else {
+            // Regular text input - display the actual value without quotes
+            const displayValue = value;
+            fieldHTML += `
+                <input type="text" class="config-input" id="${fieldId}" value="${displayValue}" 
+                    onchange="app.updateConfigValue('${key}', this.value); app.triggerAutoSave();">
+            `;
         }
 
         fieldHTML += `</div></div>`;
@@ -1870,18 +1866,45 @@ Object.assign(app, {
 
     getFieldType(value) {
         if (typeof value === 'boolean') return 'boolean';
-        if (typeof value === 'number') return 'number';
-        if (typeof value === 'string') {
-            // Check for 6 or 8 digit hex color (with or without #)
-            if (/^#?[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(value)) return 'color';
-            if (value.length <= 3 && value.match(/^[A-Z0-9]+$/)) return 'key';
-            return 'string';
-        }
-        return 'unknown';
+        // Check for 6 or 8 digit hex color (with or without #)
+        if (typeof value === 'string' && /^#?[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(value)) return 'color';
+        
+        // Everything else is treated as text input to allow any value
+        return 'text';
     },
 
     updateConfigValue(key, value) {
-        this.currentScriptConfig[key] = value;
+        // Smart type conversion - try to parse to appropriate type
+        let parsedValue = value;
+        
+        // Don't convert if it's already the right type from a toggle or color picker
+        if (typeof value === 'boolean' || (typeof value === 'string' && value.match(/^[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/))) {
+            parsedValue = value;
+        } else if (typeof value === 'string') {
+            const trimmed = value.trim();
+            
+            // Try to parse as boolean
+            if (trimmed.toLowerCase() === 'true') {
+                parsedValue = true;
+            } else if (trimmed.toLowerCase() === 'false') {
+                parsedValue = false;
+            }
+            // Try to parse as number (int or float)
+            else if (/^-?(\d+\.?\d*|\d*\.\d+)$/.test(trimmed)) {
+                const num = parseFloat(trimmed);
+                // Use integer if it's a whole number, otherwise use float
+                parsedValue = Number.isInteger(num) ? parseInt(trimmed) : num;
+            }
+            // Keep as string for everything else (including keys like "HOME", "E", etc.)
+            else {
+                parsedValue = value;
+            }
+        } else {
+            // For non-string inputs, keep as-is
+            parsedValue = value;
+        }
+        
+        this.currentScriptConfig[key] = parsedValue;
     },
 
     updateMainConfigDisplay() {
@@ -2076,7 +2099,7 @@ Object.assign(app, {
         }
 
         try {
-            console.log(`Fetching script source for ID ${scriptId} to extract config categories...`);
+            console.log(`Fetching script source for ID ${scriptId} to extract config metadata...`);
 
             const apiResponse = await this.apiCall('getScript', {
                 id: scriptId,
@@ -2093,7 +2116,7 @@ Object.assign(app, {
             } else if (typeof apiResponse === 'object' && apiResponse.id) {
                 scriptData = apiResponse;
             } else {
-                return {};
+                return { categories: {}, dropdowns: {} };
             }
 
             let scriptSource = '';
@@ -2102,7 +2125,7 @@ Object.assign(app, {
             } else if (scriptData.source) {
                 scriptSource = scriptData.source;
             } else {
-                return {};
+                return { categories: {}, dropdowns: {} };
             }
 
             // Decode any escaped characters
@@ -2115,24 +2138,25 @@ Object.assign(app, {
                     .replace(/\\\\/g, '\\');
             }
 
-            // Parse configuration categories from source
-            const categories = this.extractConfigCategories(scriptSource);
+            // Parse configuration metadata from source
+            const metadata = this.extractConfigCategories(scriptSource);
 
             // Cache the result
-            this.setCachedConfigMetadata(cacheKey, categories);
+            this.setCachedConfigMetadata(cacheKey, metadata);
 
-            return categories;
+            return metadata;
 
         } catch (error) {
             console.error(`Could not load config metadata for script ${scriptId}:`, error);
-            return {};
+            return { categories: {}, dropdowns: {} };
         }
     },
 
     extractConfigCategories(scriptSource) {
-        if (!scriptSource) return {};
+        if (!scriptSource) return { categories: {}, dropdowns: {} };
 
         const categories = {};
+        const dropdowns = {};
         const lines = scriptSource.split('\n');
         let currentCategory = null;
 
@@ -2163,6 +2187,19 @@ Object.assign(app, {
                 if (!categories[currentCategory].includes(settingName)) {
                     categories[currentCategory].push(settingName);
                 }
+
+                // Look for dropdown metadata in the same line or nearby lines
+                const currentLineWithComment = lines[i];
+                const dropdownMatch = currentLineWithComment.match(/--.*@dropdown:\s*(.+)/i);
+                if (dropdownMatch) {
+                    const dropdownOptions = dropdownMatch[1]
+                        .split(',')
+                        .map(option => option.trim())
+                        .filter(option => option.length > 0);
+                    if (dropdownOptions.length > 0) {
+                        dropdowns[settingName] = dropdownOptions;
+                    }
+                }
             }
 
             // Reset category when we hit end of a table or function
@@ -2171,7 +2208,7 @@ Object.assign(app, {
             }
         }
 
-        return categories;
+        return { categories, dropdowns };
     },
 
     // Helper function to analyze configuration structure
@@ -2479,7 +2516,8 @@ Object.assign(app, {
                 const data = JSON.parse(cached);
                 // Check if cache is still valid (24 hours)
                 if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
-                    return data.categories;
+                    // Return the full metadata object, not just categories
+                    return data.metadata || { categories: data.categories || {}, dropdowns: {} };
                 }
             }
         } catch (e) {
@@ -2488,10 +2526,10 @@ Object.assign(app, {
         return null;
     },
 
-    setCachedConfigMetadata(key, categories) {
+    setCachedConfigMetadata(key, metadata) {
         try {
             localStorage.setItem(key, JSON.stringify({
-                categories: categories,
+                metadata: metadata,  // Store the full metadata object
                 timestamp: Date.now()
             }));
         } catch (e) {

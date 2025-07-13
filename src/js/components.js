@@ -560,12 +560,12 @@ Object.assign(app, {
 
             return `
                 <div class="script-card compact ${isOwned ? 'owned' : ''}" 
-                     data-script-name="${script.name.toLowerCase()}" 
-                     data-script-author="${script.author.toLowerCase()}" 
-                     data-script-author-display="${script.author}"
-                     data-script-updated="${script.last_update || 0}" 
-                     data-script-software="${script.software}"
-                     data-script-software-name="${softwareName}">
+                    data-script-name="${script.name.toLowerCase()}" 
+                    data-script-author="${script.author.toLowerCase()}" 
+                    data-script-author-display="${script.author}"
+                    data-script-updated="${script.last_update || 0}" 
+                    data-script-software="${script.software}"
+                    data-script-software-name="${softwareName}">
                     <div class="script-header">
                         <div class="script-info">
                             <div class="script-name" style="display: flex; align-items: center; gap: 10px;">
@@ -580,11 +580,16 @@ Object.assign(app, {
                                 <span>Software: ${softwareName}</span>
                                 <span>Updated: ${script.elapsed || 'Never'}</span>
                             </div>
-                            ${script.forums ? `
-                                <a href="${script.forums}" target="_blank" class="forum-link">
-                                    💬 Forum Thread
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                                ${script.forums ? `
+                                    <a href="${script.forums}" target="_blank" class="forum-link">
+                                        💬 Forum Thread
+                                    </a>
+                                ` : ''}
+                                <a href="https://constelia.ai/members/source.php?id=${script.id}" target="_blank" class="forum-link" style="color: #4aff4a; border-color: rgba(74, 255, 74, 0.3); background: rgba(74, 255, 74, 0.1);">
+                                    📜 Script Source
                                 </a>
-                            ` : ''}
+                            </div>
                         </div>
                         <div style="display: flex; align-items: center;">
                             <div class="toggle-switch active" onclick="app.toggleScript(${script.id}, this)" title="Disable script">
@@ -622,13 +627,13 @@ Object.assign(app, {
 
             return `
                 <div class="script-card ${isOwned ? 'owned' : ''}" 
-                     data-script-name="${script.name.toLowerCase()}" 
-                     data-script-author="${script.author.toLowerCase()}"
-                     data-script-author-display="${script.author}"
-                     data-script-software-name="${softwareName}"
-                     data-script-categories="${(script.category_names || []).join(',')}"
-                     data-script-updated="${script.last_update || 0}"
-                     data-matches-search="true">
+                    data-script-name="${script.name.toLowerCase()}" 
+                    data-script-author="${script.author.toLowerCase()}"
+                    data-script-author-display="${script.author}"
+                    data-script-software-name="${softwareName}"
+                    data-script-categories="${(script.category_names || []).join(',')}"
+                    data-script-updated="${script.last_update || 0}"
+                    data-matches-search="true">
                     <div class="script-header">
                         <div class="script-info">
                             <div class="script-name" style="display: flex; align-items: center; gap: 10px;">
@@ -644,11 +649,16 @@ Object.assign(app, {
                                     ${script.category_names.map(cat => `<span class="category-badge">${cat}</span>`).join('')}
                                 </div>
                             ` : ''}
-                            ${script.forums ? `
-                                <a href="${script.forums}" target="_blank" class="forum-link">
-                                    💬 Forum Thread
+                            <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px;">
+                                ${script.forums ? `
+                                    <a href="${script.forums}" target="_blank" class="forum-link">
+                                        💬 Forum Thread
+                                    </a>
+                                ` : ''}
+                                <a href="https://constelia.ai/members/source.php?id=${script.id}" target="_blank" class="forum-link" style="color: #4aff4a; border-color: rgba(74, 255, 74, 0.3); background: rgba(74, 255, 74, 0.1);">
+                                    📜 Script Source
                                 </a>
-                            ` : ''}
+                            </div>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <div class="toggle-switch ${isActive ? 'active' : ''}" onclick="app.toggleScript(${script.id}, this)">
