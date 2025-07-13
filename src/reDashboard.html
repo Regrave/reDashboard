@@ -26,7 +26,7 @@
           <button class="roll-button" id="rollButton" onclick="app.rollLoot()"> 🎲 Roll Loot </button>
           <button class="settings-button" id="settingsButton" onclick="app.showSettingsModal()"> ⚙️ Settings </button>
         </div>
-        <h1> fantasy.dashboard <span class="version-badge">v1.3.7</span>
+        <h1> fantasy.dashboard <span class="version-badge">v1.4.0</span>
         </h1>
         <div class="login-section" id="loginSection" style="display: none;">
           <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your FC2 license key...">
@@ -73,6 +73,7 @@
         <button class="nav-tab" onclick="app.switchTab('scripts')">📜 Scripts</button>
         <button class="nav-tab" onclick="app.switchTab('teams')">👥 Teams</button>
         <button class="nav-tab" onclick="app.switchTab('builds')">🏗️ Builds</button>
+        <button class="nav-tab" onclick="app.switchTab('sessions')">🔐 Sessions</button>
         <button class="nav-tab" onclick="app.switchTab('perks')">✨ Perks</button>
         <button class="nav-tab" onclick="app.switchTab('config')">⚙️ Configuration</button>
       </div>
@@ -95,17 +96,17 @@
                   <div class="terminal-dot" style="background: #ffbd2e;"></div>
                   <div class="terminal-dot" style="background: #28ca42;"></div>
                 </div>
-                <div class="terminal-title">FC2 Terminal</div>
+                <div class="terminal-title" id="terminalTitle">FC2 Terminal</div>
               </div>
               <div class="terminal-body">
                 <div class="terminal-output" id="terminalOutput">
-                  <div class="terminal-welcome">
+                  <div class="terminal-welcome" id="terminalWelcome">
                     <div style="color: #4a9eff; font-weight: bold;">FC2 Member's Panel Terminal</div>
                     <div style="color: #888; font-size: 14px;">Type 'help' for available commands</div>
                   </div>
                 </div>
                 <div class="terminal-input-line">
-                  <span class="terminal-prompt">fc2@constelia:~$</span>
+                  <span class="terminal-prompt" id="terminalPrompt">fc2@constelia:~$</span>
                   <input type="text" class="terminal-input" id="terminalInput" placeholder="Enter command..." autocomplete="off">
                 </div>
               </div>
@@ -246,6 +247,33 @@
             </div>
           </div>
         </div>
+        <!-- Sessions Section -->
+        <div class="content-section" id="sessions-section">
+          <div class="card">
+            <h2>🔐 Current Session Information</h2>
+            <div id="currentSessionInfo">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          
+          <div class="card">
+            <h2>📊 Session Statistics</h2>
+            <div class="stats-grid" id="sessionStats">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          
+          <div class="card">
+            <h2>📈 Session History</h2>
+            <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
+              <button class="btn" onclick="app.refreshSessionHistory()">🔄 Refresh History</button>
+              <button class="btn btn-small" onclick="app.loadSessionHistory(true)" style="background: linear-gradient(135deg, #4aff4a, #357abd);">📊 Load Detailed History</button>
+            </div>
+            <div id="sessionHistoryContainer">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
         <!-- Perks Section -->
         <div class="content-section" id="perks-section">
           <div class="card">
@@ -353,7 +381,7 @@
       <span style="color: #ff6b6b; font-size: 14px; margin: 0 3px;">♡</span>
       <span style="opacity: 0.7;">by</span>
       <a href="https://constelia.ai/forums/index.php?members/rucka.17146/" target="_blank" style="color: #4a9eff; font-weight: 600; margin-left: 4px; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.color='#6bb6ff'; this.style.textDecoration='underline';" onmouseout="this.style.color='#4a9eff'; this.style.textDecoration='none';">Rucka</a>
-      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.3.7</span>
+      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.4.0</span>
     </div>
     <!-- Bottom-Right Notification Container -->
     <div class="notification-container" id="notificationContainer">

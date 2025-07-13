@@ -3261,6 +3261,280 @@ body {
 		.leaderboard-entry[data-element="water"] {
 			border-left: 3px solid #44ffff;
 		}
+
+		/* Session Information Styling */
+		.session-info-card {
+			background: rgba(255, 255, 255, 0.02);
+			border: 1px solid rgba(255, 255, 255, 0.05);
+			border-radius: 12px;
+			padding: 20px;
+		}
+
+		.session-info-item {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 12px;
+			padding: 8px 0;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+		}
+
+		.session-info-item:last-child {
+			border-bottom: none;
+			margin-bottom: 0;
+		}
+
+		.session-label {
+			color: #aaa;
+			font-size: 14px;
+			flex: 1;
+		}
+
+		.session-value {
+			color: #fff;
+			font-weight: 500;
+			font-size: 14px;
+			text-align: right;
+			font-family: 'Consolas', 'Monaco', monospace;
+		}
+
+		.session-history-list {
+			display: flex;
+			flex-direction: column;
+			gap: 12px;
+		}
+
+		.session-history-item {
+			background: rgba(255, 255, 255, 0.02);
+			border: 1px solid rgba(255, 255, 255, 0.05);
+			border-radius: 8px;
+			padding: 15px;
+			transition: all 0.3s;
+		}
+
+		.session-history-item:hover {
+			background: rgba(255, 255, 255, 0.04);
+			border-color: rgba(255, 255, 255, 0.1);
+		}
+
+		.session-history-item.success {
+			border-left: 3px solid #4aff4a;
+		}
+
+		.session-history-item.failure {
+			border-left: 3px solid #ff6666;
+		}
+
+		.session-history-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 8px;
+		}
+
+		.session-status {
+			font-weight: 600;
+			font-size: 14px;
+		}
+
+		.session-history-item.success .session-status {
+			color: #4aff4a;
+		}
+
+		.session-history-item.failure .session-status {
+			color: #ff6666;
+		}
+
+		.session-time {
+			color: #888;
+			font-size: 12px;
+			font-family: 'Consolas', 'Monaco', monospace;
+		}
+
+		.session-details {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 12px;
+		}
+
+		.session-detail {
+			background: rgba(255, 255, 255, 0.05);
+			padding: 4px 10px;
+			border-radius: 6px;
+			font-size: 12px;
+			color: #ccc;
+			border: 1px solid rgba(255, 255, 255, 0.1);
+		}
+
+		.session-error {
+			background: rgba(255, 102, 102, 0.1);
+			border-color: rgba(255, 102, 102, 0.3);
+			color: #ff9999;
+		}
+
+		/* Security Information Styling */
+		.security-info-card, .activity-info-card {
+			background: rgba(255, 255, 255, 0.02);
+			border: 1px solid rgba(255, 255, 255, 0.05);
+			border-radius: 12px;
+			padding: 20px;
+		}
+
+		.security-info-item {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 12px;
+			padding: 8px 0;
+			border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+		}
+
+		.security-info-item:last-child {
+			border-bottom: none;
+			margin-bottom: 0;
+		}
+
+		.security-label {
+			color: #aaa;
+			font-size: 14px;
+			flex: 1;
+		}
+
+		.security-value {
+			color: #fff;
+			font-weight: 500;
+			font-size: 14px;
+			text-align: right;
+		}
+
+		/* Steam Account Items */
+		.steam-account-item {
+			background: rgba(255, 255, 255, 0.03);
+			border-radius: 8px;
+			padding: 12px;
+			margin-bottom: 10px;
+			border-left: 3px solid transparent;
+			transition: all 0.3s;
+		}
+
+		.steam-account-item.clean {
+			border-left-color: #4aff4a;
+		}
+
+		.steam-account-item.flagged {
+			border-left-color: #ff6666;
+		}
+
+		.steam-account-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+			margin-bottom: 8px;
+		}
+
+		.steam-persona {
+			font-weight: 600;
+			color: #fff;
+			font-size: 14px;
+		}
+
+		.steam-status.clean {
+			color: #4aff4a;
+		}
+
+		.steam-status.flagged {
+			color: #ff6666;
+		}
+
+		.steam-account-details {
+			display: flex;
+			flex-wrap: wrap;
+			gap: 8px;
+		}
+
+		.steam-detail {
+			background: rgba(255, 255, 255, 0.05);
+			padding: 3px 8px;
+			border-radius: 4px;
+			font-size: 11px;
+			color: #ccc;
+			font-family: 'Consolas', 'Monaco', monospace;
+		}
+
+		.steam-ban {
+			background: rgba(255, 102, 102, 0.2);
+			color: #ff9999;
+			border: 1px solid rgba(255, 102, 102, 0.3);
+		}
+
+		/* Hash List */
+		.hash-list {
+			max-height: 120px;
+			overflow-y: auto;
+		}
+
+		.hash-item {
+			background: rgba(255, 255, 255, 0.03);
+			padding: 8px;
+			border-radius: 6px;
+			margin-bottom: 6px;
+			font-family: 'Consolas', 'Monaco', monospace;
+		}
+
+		/* Activity Items */
+		.activity-list {
+			max-height: 250px;
+			overflow-y: auto;
+		}
+
+		.activity-item {
+			background: rgba(255, 255, 255, 0.02);
+			border-radius: 6px;
+			padding: 10px;
+			margin-bottom: 8px;
+			border-left: 2px solid rgba(74, 158, 255, 0.3);
+		}
+
+		.activity-header {
+			display: flex;
+			justify-content: space-between;
+			align-items: center;
+		}
+
+		.activity-type {
+			font-weight: 600;
+			font-size: 14px;
+		}
+
+		.activity-time {
+			color: #888;
+			font-size: 11px;
+			font-family: 'Consolas', 'Monaco', monospace;
+		}
+
+		/* Mobile responsiveness for sessions */
+		@media (max-width: 768px) {
+			.session-info-item {
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 4px;
+			}
+			
+			.session-value {
+				text-align: left;
+			}
+			
+			.session-history-header {
+				flex-direction: column;
+				align-items: flex-start;
+				gap: 4px;
+			}
+			
+			.session-details {
+				flex-direction: column;
+				gap: 8px;
+			}
+		}
 	}
 }
 
