@@ -692,9 +692,9 @@ Object.assign(app, {
 
         // Map software ID to name
         const softwareNames = {
-            4: 'FC2 Global',
+            4: 'Omega',
             5: 'Universe4',
-            6: 'Constellation4',
+            6: 'Omega',
             7: 'Parallax2'
         };
         document.getElementById('scriptInfoSoftware').textContent =
@@ -747,14 +747,17 @@ Object.assign(app, {
         
         console.log('Set code editor value, length:', sourceCode.length);
 
-        // Focus the editor
+        // FIXED: Only focus the editor if no other element is currently focused
         setTimeout(() => {
-            codeEditor.focus();
+            const activeElement = document.activeElement;
+            if (!activeElement || activeElement === document.body || activeElement.tagName === 'BUTTON') {
+                codeEditor.focus();
+            }
         }, 200);
 
         // Update notes
         const initialNotes = draft ? draft.notes : '';
-        document.getElementById('updateNotes').value = '';
+        document.getElementById('updateNotes').value = initialNotes;
         this.updateNotesCharCounter();
 
         // Populate categories
@@ -785,12 +788,15 @@ Object.assign(app, {
             return;
         }
         
-        // Store cursor position
+        // Check if the code editor currently has focus
+        const hadFocus = document.activeElement === codeEditor;
+        
+        // Store cursor position only if code editor has focus
         let cursorOffset = 0;
         const selection = window.getSelection();
         
         try {
-            if (selection.rangeCount > 0 && codeEditor.contains(selection.anchorNode)) {
+            if (hadFocus && selection.rangeCount > 0 && codeEditor.contains(selection.anchorNode)) {
                 cursorOffset = this.getCaretPosition(codeEditor);
             }
         } catch (e) {
@@ -810,16 +816,20 @@ Object.assign(app, {
         codeEditor.innerHTML = tempDiv.innerHTML;
         codeEditor.className = 'code-editor hljs';
         
-        // Restore cursor position
-        setTimeout(() => {
-            try {
-                this.setCaretPosition(codeEditor, cursorOffset);
-            } catch (e) {
-                console.warn('Could not restore cursor position:', e);
-                // Just focus the editor if cursor restoration fails
-                codeEditor.focus();
-            }
-        }, 10);
+        // Only restore cursor position if the code editor had focus originally
+        if (hadFocus) {
+            setTimeout(() => {
+                try {
+                    this.setCaretPosition(codeEditor, cursorOffset);
+                } catch (e) {
+                    console.warn('Could not restore cursor position:', e);
+                    // FIXED: Only focus if it originally had focus and restoration failed
+                    if (document.activeElement !== codeEditor) {
+                        codeEditor.focus();
+                    }
+                }
+            }, 10);
+        }
         
         console.log('Highlighting completed');
     },
@@ -861,8 +871,8 @@ Object.assign(app, {
             currentOffset += nodeLength;
         }
         
-        // If we couldn't find the position, just focus at the end
-        element.focus();
+        // FIXED: Don't force focus - let the calling function handle it
+        // The calling function now checks if focus should be restored
     },
 
     getCodeEditorContent() {
@@ -901,6 +911,11 @@ Object.assign(app, {
         const codeEditor = document.getElementById('scriptCodeEditor');
         const updateNotes = document.getElementById('updateNotes');
 
+        // Remove any existing listeners to avoid duplicates
+        if (this.scriptEditorListenersAttached) {
+            return; // Already attached
+        }
+
         // Auto-save draft as user types
         const draftSave = () => {
             this.saveDraft();
@@ -914,13 +929,18 @@ Object.assign(app, {
 
         // Use 'input' event for contenteditable
         codeEditor.addEventListener('input', debouncedDraftSave);
-        updateNotes.addEventListener('input', () => {
+        updateNotes.addEventListener('input', (e) => {
+            // Ensure the event isn't being prevented
+            e.stopPropagation();
             this.updateNotesCharCounter();
             debouncedDraftSave();
         });
 
         // Enhanced code editor features
         this.setupCodeEditorFeatures(codeEditor);
+        
+        // Mark listeners as attached
+        this.scriptEditorListenersAttached = true;
     },
 
     setupCodeEditorFeatures(editor) {
@@ -1118,6 +1138,7 @@ Object.assign(app, {
 
         // Clear state
         this.currentEditingScript = null;
+        this.scriptEditorListenersAttached = false; // ADDED: Reset listeners flag
         clearTimeout(this.scriptEditorDraftTimeout);
 
         // Hide modal
@@ -1125,11 +1146,11 @@ Object.assign(app, {
 
         // Clear editor content
         const codeEditor = document.getElementById('scriptCodeEditor');
-            if (codeEditor) {
-                codeEditor.className = 'code-editor';
-                codeEditor.innerHTML = '';
-                codeEditor.removeAttribute('data-highlighted');
-            }
+        if (codeEditor) {
+            codeEditor.className = 'code-editor';
+            codeEditor.innerHTML = '';
+            codeEditor.removeAttribute('data-highlighted');
+        }
         document.getElementById('updateNotes').value = '';
         this.hideDraftIndicator();
         this.updateSaveIndicator('');
