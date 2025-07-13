@@ -586,9 +586,9 @@ Object.assign(app, {
                                         💬 Forum Thread
                                     </a>
                                 ` : ''}
-                                <a href="https://constelia.ai/members/source.php?id=${script.id}" target="_blank" class="forum-link" style="color: #4aff4a; border-color: rgba(74, 255, 74, 0.3); background: rgba(74, 255, 74, 0.1);">
+                                <div class="script-link" onclick="app.showScriptSource(${script.id})" style="color: #4aff4a; border-color: rgba(74, 255, 74, 0.3); background: rgba(74, 255, 74, 0.1);">
                                     📜 Script Source
-                                </a>
+                                </div>
                             </div>
                         </div>
                         <div style="display: flex; align-items: center;">
@@ -655,9 +655,9 @@ Object.assign(app, {
                                         💬 Forum Thread
                                     </a>
                                 ` : ''}
-                                <a href="https://constelia.ai/members/source.php?id=${script.id}" target="_blank" class="forum-link" style="color: #4aff4a; border-color: rgba(74, 255, 74, 0.3); background: rgba(74, 255, 74, 0.1);">
+                                <div class="script-link" onclick="app.showScriptSource(${script.id})" style="color: #4aff4a; border-color: rgba(74, 255, 74, 0.3); background: rgba(74, 255, 74, 0.1);">
                                     📜 Script Source
-                                </a>
+                                </div>
                             </div>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
@@ -810,61 +810,69 @@ Object.assign(app, {
     // ========================
 
     loadAutoSavePreference() {
-        try {
-            const autoSavePref = localStorage.getItem('fc2_auto_save');
-            this.autoSaveEnabled = autoSavePref === 'true';
+        if (!this.cachingEnabled) {
+            // Use defaults when caching is disabled
+            this.autoSaveEnabled = false;
+            this.liveOmegaEnabled = false;
+            console.log('🔄 Using default preferences (caching disabled)');
+        } else {
+            try {
+                const autoSavePref = localStorage.getItem('fc2_auto_save');
+                this.autoSaveEnabled = autoSavePref === 'true';
 
-            const liveOmegaPref = localStorage.getItem('fc2_live_omega');
-            this.liveOmegaEnabled = liveOmegaPref === 'true';
-
-            // Use setTimeout to ensure DOM elements are available
-            setTimeout(() => {
-                const autoSaveToggle = document.getElementById('autoSaveToggle');
-                const liveOmegaToggle = document.getElementById('liveOmegaToggle');
-                const liveOmegaContainer = document.getElementById('liveOmegaContainer');
-
-                if (autoSaveToggle) {
-                    if (this.autoSaveEnabled) {
-                        autoSaveToggle.classList.add('active');
-                    } else {
-                        autoSaveToggle.classList.remove('active');
-                    }
-                }
-
-                if (liveOmegaToggle) {
-                    if (this.liveOmegaEnabled) {
-                        liveOmegaToggle.classList.add('active');
-                    } else {
-                        liveOmegaToggle.classList.remove('active');
-                    }
-                }
-
-                // Show/hide Live Omega based on auto-save state
-                if (liveOmegaContainer) {
-                    if (this.autoSaveEnabled) {
-                        liveOmegaContainer.classList.add('visible');
-                    } else {
-                        liveOmegaContainer.classList.remove('visible');
-                        // Also disable Live Omega if auto-save is disabled
-                        if (this.liveOmegaEnabled) {
-                            this.liveOmegaEnabled = false;
-                            this.saveAutoSavePreference();
-                            if (liveOmegaToggle) {
-                                liveOmegaToggle.classList.remove('active');
-                            }
-                        }
-                    }
-                }
-            }, 100);
-        } catch (error) {
-            console.warn('Could not load preferences:', error);
+                const liveOmegaPref = localStorage.getItem('fc2_live_omega');
+                this.liveOmegaEnabled = liveOmegaPref === 'true';
+                
+                console.log('💾 Loaded preferences from cache');
+            } catch (error) {
+                console.warn('Could not load preferences:', error);
+                this.autoSaveEnabled = false;
+                this.liveOmegaEnabled = false;
+            }
         }
+
+        // Update UI
+        setTimeout(() => {
+            const autoSaveToggle = document.getElementById('autoSaveToggle');
+            const liveOmegaToggle = document.getElementById('liveOmegaToggle');
+            const liveOmegaContainer = document.getElementById('liveOmegaContainer');
+
+            if (autoSaveToggle) {
+                if (this.autoSaveEnabled) {
+                    autoSaveToggle.classList.add('active');
+                } else {
+                    autoSaveToggle.classList.remove('active');
+                }
+            }
+
+            if (liveOmegaToggle) {
+                if (this.liveOmegaEnabled) {
+                    liveOmegaToggle.classList.add('active');
+                } else {
+                    liveOmegaToggle.classList.remove('active');
+                }
+            }
+
+            if (liveOmegaContainer) {
+                if (this.autoSaveEnabled) {
+                    liveOmegaContainer.classList.add('visible');
+                } else {
+                    liveOmegaContainer.classList.remove('visible');
+                }
+            }
+        }, 100);
     },
 
     saveAutoSavePreference() {
+        if (!this.cachingEnabled) {
+            console.log('🔄 Not saving preferences (caching disabled)');
+            return;
+        }
+        
         try {
             localStorage.setItem('fc2_auto_save', this.autoSaveEnabled.toString());
             localStorage.setItem('fc2_live_omega', this.liveOmegaEnabled.toString());
+            console.log('💾 Saved preferences to cache');
         } catch (error) {
             console.warn('Could not save preferences:', error);
         }
