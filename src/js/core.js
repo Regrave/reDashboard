@@ -544,48 +544,209 @@ const app = {
 
     // Handshake management
     setHandshakeToken(value) {
-        try {
-            localStorage.setItem('fc2_handshake', value);
-            console.log(`✅ Handshake token saved to localStorage`);
-            return true;
-        } catch (error) {
-            console.warn('Could not save handshake token:', error);
-            return false;
+        const isOnline = this.isOnlineEnvironment();
+        
+        if (isOnline) {
+            // Use cookies for online sessions (server can verify)
+            try {
+                // Set cookie with 30 day expiration
+                const expires = new Date();
+                expires.setTime(expires.getTime() + (30 * 24 * 60 * 60 * 1000)); // 30 days
+                
+                let cookieString = `fc2_handshake=${value}; expires=${expires.toUTCString()}; path=/`;
+                
+                // Add secure flag if we're on HTTPS
+                if (location.protocol === 'https:') {
+                    cookieString += '; secure';
+                }
+                
+                // Add SameSite for security
+                cookieString += '; samesite=lax';
+                
+                document.cookie = cookieString;
+                
+                // Optional verification with delay (doesn't block success)
+                setTimeout(() => {
+                    const verification = this.getHandshakeToken();
+                    if (verification === value) {
+                        console.log(`✅ Handshake token cookie verified successfully`);
+                    } else {
+                        console.warn(`⚠️ Cookie verification failed, but cookie was set (timing issue)`);
+                    }
+                }, 10);
+                
+                console.log(`✅ Handshake token saved to cookie (online mode)`);
+                return true;
+                
+            } catch (error) {
+                console.warn('Could not save handshake token to cookie, falling back to localStorage:', error);
+                // Fallback to localStorage if cookies fail
+                try {
+                    localStorage.setItem('fc2_handshake', value);
+                    console.log(`✅ Handshake token saved to localStorage (fallback)`);
+                    return true;
+                } catch (localError) {
+                    console.warn('Could not save handshake token to localStorage either:', localError);
+                    return false;
+                }
+            }
+        } else {
+            // Use localStorage for offline sessions
+            try {
+                localStorage.setItem('fc2_handshake', value);
+                console.log(`✅ Handshake token saved to localStorage (offline mode)`);
+                return true;
+            } catch (error) {
+                console.warn('Could not save handshake token to localStorage:', error);
+                return false;
+            }
         }
     },
 
     getHandshakeToken() {
-        try {
-            const value = localStorage.getItem('fc2_handshake');
-            if (value) {
-                console.log(`📁 Retrieved handshake token from localStorage`);
-                return value;
-            }
-            return null;
-        } catch (error) {
-            console.warn('Could not read handshake token:', error);
-            return null;
-        }
-    },
+		const isOnline = this.isOnlineEnvironment();
+		
+		if (isOnline) {
+			// Try cookies first for online sessions
+			try {
+				const cookies = document.cookie.split(';');
+				for (let cookie of cookies) {
+					const [name, value] = cookie.trim().split('=');
+					if (name === 'fc2_handshake') {
+						console.log(`📁 Retrieved handshake token from cookie (online mode)`);
+						return value;
+					}
+				}
+				
+				// If no cookie found, check localStorage as fallback
+				const localValue = localStorage.getItem('fc2_handshake');
+				if (localValue) {
+					console.log(`📁 Retrieved handshake token from localStorage (fallback from cookie)`);
+					return localValue;
+				}
+				
+				return null;
+			} catch (error) {
+				console.warn('Could not read handshake token from cookie, trying localStorage:', error);
+				// Fallback to localStorage
+				try {
+					const value = localStorage.getItem('fc2_handshake');
+					if (value) {
+						console.log(`📁 Retrieved handshake token from localStorage (fallback)`);
+						return value;
+					}
+					return null;
+				} catch (localError) {
+					console.warn('Could not read handshake token from localStorage either:', localError);
+					return null;
+				}
+			}
+		} else {
+			// Use localStorage for offline sessions
+			try {
+				const value = localStorage.getItem('fc2_handshake');
+				if (value) {
+					console.log(`📁 Retrieved handshake token from localStorage (offline mode)`);
+					return value;
+				}
+				return null;
+			} catch (error) {
+				console.warn('Could not read handshake token from localStorage:', error);
+				return null;
+			}
+		}
+	},
 
     deleteHandshakeToken() {
-        try {
-            localStorage.removeItem('fc2_handshake');
-            console.log(`🗑️ Handshake token removed from localStorage`);
-        } catch (error) {
-            console.warn('Could not delete handshake token:', error);
-        }
-    },
+		const isOnline = this.isOnlineEnvironment();
+		
+		if (isOnline) {
+			// Clear cookie for online sessions
+			try {
+				// Clear the cookie by setting it to expire in the past
+				document.cookie = 'fc2_handshake=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/';
+				console.log(`🗑️ Handshake token removed from cookie (online mode)`);
+			} catch (error) {
+				console.warn('Could not delete handshake token cookie:', error);
+			}
+			
+			// Also clear localStorage as fallback cleanup
+			try {
+				localStorage.removeItem('fc2_handshake');
+				console.log(`🗑️ Handshake token removed from localStorage (cleanup)`);
+			} catch (error) {
+				console.warn('Could not delete handshake token from localStorage:', error);
+			}
+		} else {
+			// Clear localStorage for offline sessions
+			try {
+				localStorage.removeItem('fc2_handshake');
+				console.log(`🗑️ Handshake token removed from localStorage (offline mode)`);
+			} catch (error) {
+				console.warn('Could not delete handshake token from localStorage:', error);
+			}
+		}
+	},
 
     debugHandshakeToken() {
-        const handshake = this.getHandshakeToken();
-        console.log('=== Handshake Debug ===');
-        console.log('Storage: localStorage');
-        console.log('fc2_handshake:', handshake ? `Found (${handshake.substring(0, 20)}...)` : 'Not found');
-        console.log('All localStorage keys:', Object.keys(localStorage));
-        console.log('=====================');
-        return handshake;
-    },
+		const isOnline = this.isOnlineEnvironment();
+		
+		console.log('=== Handshake Debug ===');
+		console.log('Environment:', isOnline ? 'Online (server)' : 'Offline (file/local)');
+		console.log('Protocol:', location.protocol);
+		console.log('Hostname:', location.hostname);
+		
+		if (isOnline) {
+			console.log('Primary storage: Cookies');
+			console.log('Fallback storage: localStorage');
+			
+			// Check cookie
+			let cookieValue = null;
+			try {
+				const cookies = document.cookie.split(';');
+				for (let cookie of cookies) {
+					const [name, value] = cookie.trim().split('=');
+					if (name === 'fc2_handshake') {
+						cookieValue = value;
+						break;
+					}
+				}
+			} catch (error) {
+				console.log('Cookie read error:', error);
+			}
+			
+			console.log('fc2_handshake (cookie):', cookieValue ? `Found (${cookieValue.substring(0, 20)}...)` : 'Not found');
+			
+			// Check localStorage as fallback
+			let localValue = null;
+			try {
+				localValue = localStorage.getItem('fc2_handshake');
+			} catch (error) {
+				console.log('localStorage read error:', error);
+			}
+			
+			console.log('fc2_handshake (localStorage):', localValue ? `Found (${localValue.substring(0, 20)}...)` : 'Not found');
+			console.log('All cookies:', document.cookie || 'None');
+			
+			return cookieValue || localValue;
+		} else {
+			console.log('Primary storage: localStorage');
+			
+			let localValue = null;
+			try {
+				localValue = localStorage.getItem('fc2_handshake');
+			} catch (error) {
+				console.log('localStorage read error:', error);
+			}
+			
+			console.log('fc2_handshake (localStorage):', localValue ? `Found (${localValue.substring(0, 20)}...)` : 'Not found');
+			console.log('All localStorage keys:', Object.keys(localStorage));
+			
+			return localValue;
+		}
+		
+		console.log('=====================');
+	},
 
     // ========================
     // UI HELPER METHODS
@@ -676,6 +837,23 @@ const app = {
             avatarElement.appendChild(fallback);
         }
     },
+	
+	// Helper function to detect if we're in an online environment
+	isOnlineEnvironment() {
+		// Check if we're running from file:// protocol (offline)
+		if (location.protocol === 'file:') {
+			return false;
+		}
+		
+		// Check if we're on localhost/127.0.0.1 without a proper server
+		if ((location.hostname === 'localhost' || location.hostname === '127.0.0.1') && 
+			location.protocol === 'http:' && location.port === '') {
+			return false;
+		}
+		
+		// If we have a proper http/https server, we're online
+		return location.protocol === 'http:' || location.protocol === 'https:';
+	},
 
     handleConnectionError(error) {
         // Show appropriate error message
