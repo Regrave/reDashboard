@@ -987,7 +987,7 @@ Object.assign(app, {
             console.log('Handshake termination result:', result);
 
             // Clear stored handshake regardless of API result
-            this.deleteHandshakeToken(); // Updated function call
+            this.deleteHandshakeToken(); // FIXED: Use correct function name
 
             // Clear the input field
             keyInput.value = '';
@@ -1008,7 +1008,7 @@ Object.assign(app, {
             console.error('Error wiping handshake:', error);
 
             // Still clear local storage even if API call failed
-            this.deleteCookie('fc2_handshake');
+            this.deleteHandshakeToken(); // FIXED: Use correct function name instead of this.deleteCookie
             keyInput.value = '';
 
             if (error.message.includes('invalid license key')) {
