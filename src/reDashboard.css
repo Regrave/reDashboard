@@ -1756,6 +1756,17 @@ body {
 	-webkit-overflow-scrolling: touch;
 }
 
+.script-editor-sidebar textarea {
+    pointer-events: auto !important;
+    position: relative;
+    z-index: 10;
+}
+
+.script-editor-sidebar {
+    position: relative;
+    z-index: 5;
+}
+
 .code-editor-container {
 	flex: 1;
 	display: flex;
