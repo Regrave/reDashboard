@@ -685,7 +685,7 @@ Object.assign(app, {
         console.log('Populating script editor with data:', scriptData);
         console.log('Using draft:', draft);
 
-        // Populate script info - FIXED: Better handling of script data
+        // Populate script info
         document.getElementById('scriptInfoName').textContent = scriptData.name || 'Unknown';
         document.getElementById('scriptInfoId').textContent = scriptData.id || '-';
         document.getElementById('scriptInfoAuthor').textContent = scriptData.author || '-';
@@ -700,23 +700,19 @@ Object.assign(app, {
         document.getElementById('scriptInfoSoftware').textContent =
             softwareNames[scriptData.software] || `Software ${scriptData.software || 'Unknown'}`;
 
-        // Calculate elapsed time from last_update timestamp if available
+        // Calculate elapsed time
         let elapsedText = 'Never';
         if (scriptData.last_update) {
             elapsedText = this.getElapsedTime(scriptData.last_update);
         }
         document.getElementById('scriptInfoUpdated').textContent = elapsedText;
 
-        // Populate code editor - FIXED: Handle the actual API response structure
-        const codeEditor = document.getElementById('scriptCodeEditor');
-
-        // Try different possible properties for source code
+        // Get source code
         let sourceCode = '';
         if (draft && draft.code) {
             sourceCode = draft.code;
             console.log('Using draft source code');
         } else if (scriptData.script) {
-            // This is the correct property name from the API response
             sourceCode = scriptData.script;
             console.log('Using scriptData.script (main property)');
         } else if (scriptData.source) {
@@ -725,15 +721,12 @@ Object.assign(app, {
         } else if (scriptData.content) {
             sourceCode = scriptData.content;
             console.log('Using scriptData.content');
-        } else if (scriptData.script_source) {
-            sourceCode = scriptData.script_source;
-            console.log('Using scriptData.script_source');
         } else {
             sourceCode = '-- No source code available\n-- This might be an empty script or there was an error loading the source';
             console.warn('No source code found in script data. Available properties:', Object.keys(scriptData));
         }
 
-        // Decode any escaped characters in the source code
+        // Decode any escaped characters
         if (sourceCode && typeof sourceCode === 'string') {
             sourceCode = sourceCode
                 .replace(/\\n/g, '\n')
@@ -743,20 +736,28 @@ Object.assign(app, {
                 .replace(/\\\\/g, '\\');
         }
 
-        codeEditor.value = sourceCode;
+        // Set content and apply syntax highlighting
+        const codeEditor = document.getElementById('scriptCodeEditor');
+        // Reset the element completely first
+        codeEditor.className = 'code-editor';
+        codeEditor.innerHTML = '';
+        codeEditor.removeAttribute('data-highlighted');
+        codeEditor.textContent = sourceCode;
+        this.highlightCodeEditor();
+        
         console.log('Set code editor value, length:', sourceCode.length);
 
-        // Trigger syntax highlighting after setting the value
+        // Focus the editor
         setTimeout(() => {
-            this.updateSyntaxHighlighting();
-        }, 100);
+            codeEditor.focus();
+        }, 200);
 
-        // Update notes - use update_notes from API response
-        const initialNotes = draft ? draft.notes : (scriptData.update_notes || '');
-        document.getElementById('updateNotes').value = ''; // Always start with empty notes for new updates
+        // Update notes
+        const initialNotes = draft ? draft.notes : '';
+        document.getElementById('updateNotes').value = '';
         this.updateNotesCharCounter();
 
-        // Populate categories - FIXED: Better category handling
+        // Populate categories
         const selectedCategories = draft ? draft.categories : (scriptData.categories || scriptData.category_ids || []);
         this.populateCategories(selectedCategories);
 
@@ -768,6 +769,105 @@ Object.assign(app, {
         }
 
         this.updateSaveIndicator('');
+    },
+
+    highlightCodeEditor() {
+        const codeEditor = document.getElementById('scriptCodeEditor');
+        if (!codeEditor) return;
+        
+        console.log('highlightCodeEditor called');
+        
+        // Get the plain text content
+        const content = codeEditor.textContent;
+        
+        // Don't highlight empty content
+        if (!content || content.trim() === '') {
+            return;
+        }
+        
+        // Store cursor position
+        let cursorOffset = 0;
+        const selection = window.getSelection();
+        
+        try {
+            if (selection.rangeCount > 0 && codeEditor.contains(selection.anchorNode)) {
+                cursorOffset = this.getCaretPosition(codeEditor);
+            }
+        } catch (e) {
+            console.warn('Could not get cursor position:', e);
+        }
+        
+        // Create a temporary element to highlight
+        const tempDiv = document.createElement('div');
+        tempDiv.textContent = content;
+        tempDiv.className = 'hljs';
+        tempDiv.setAttribute('data-language', 'lua');
+        
+        // Highlight the temporary element
+        hljs.highlightElement(tempDiv);
+        
+        // Replace content with highlighted version
+        codeEditor.innerHTML = tempDiv.innerHTML;
+        codeEditor.className = 'code-editor hljs';
+        
+        // Restore cursor position
+        setTimeout(() => {
+            try {
+                this.setCaretPosition(codeEditor, cursorOffset);
+            } catch (e) {
+                console.warn('Could not restore cursor position:', e);
+                // Just focus the editor if cursor restoration fails
+                codeEditor.focus();
+            }
+        }, 10);
+        
+        console.log('Highlighting completed');
+    },
+
+    getCaretPosition(element) {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return 0;
+        
+        const range = selection.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(element);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+        return preCaretRange.toString().length;
+    },
+
+    setCaretPosition(element, offset) {
+        const walker = document.createTreeWalker(
+            element,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+        );
+        
+        let currentOffset = 0;
+        let node;
+        
+        while (node = walker.nextNode()) {
+            const nodeLength = node.textContent.length;
+            if (currentOffset + nodeLength >= offset) {
+                const range = document.createRange();
+                const selection = window.getSelection();
+                const targetOffset = offset - currentOffset;
+                range.setStart(node, Math.min(targetOffset, nodeLength));
+                range.setEnd(node, Math.min(targetOffset, nodeLength));
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+            currentOffset += nodeLength;
+        }
+        
+        // If we couldn't find the position, just focus at the end
+        element.focus();
+    },
+
+    getCodeEditorContent() {
+        const codeEditor = document.getElementById('scriptCodeEditor');
+        return codeEditor ? codeEditor.textContent : '';
     },
 
     populateCategories(selectedCategories = []) {
@@ -806,12 +906,13 @@ Object.assign(app, {
             this.saveDraft();
         };
 
-        // Debounced draft saving
+        // Debounced draft saving  
         const debouncedDraftSave = () => {
             clearTimeout(this.scriptEditorDraftTimeout);
             this.scriptEditorDraftTimeout = setTimeout(draftSave, 1000);
         };
 
+        // Use 'input' event for contenteditable
         codeEditor.addEventListener('input', debouncedDraftSave);
         updateNotes.addEventListener('input', () => {
             this.updateNotesCharCounter();
@@ -823,51 +924,36 @@ Object.assign(app, {
     },
 
     setupCodeEditorFeatures(editor) {
-        // Tab key support for indentation
+        // Simple input handler - highlight after typing stops
+        let typingTimer;
+        
+        editor.addEventListener('input', () => {
+            // Clear the previous timer
+            clearTimeout(typingTimer);
+            
+            // Set a new timer - highlight after 800ms of no typing
+            typingTimer = setTimeout(() => {
+                console.log('Highlighting after typing stopped');
+                this.highlightCodeEditor();
+            }, 800);
+        });
+
+        // Highlight immediately when clicking away
+        editor.addEventListener('blur', () => {
+            console.log('Highlighting on blur');
+            clearTimeout(typingTimer);
+            this.highlightCodeEditor();
+        });
+
+        // Tab key support
         editor.addEventListener('keydown', (e) => {
             if (e.key === 'Tab') {
                 e.preventDefault();
-                const start = editor.selectionStart;
-                const end = editor.selectionEnd;
-
-                // Insert tab character
-                editor.value = editor.value.substring(0, start) + '    ' + editor.value.substring(end);
-                editor.selectionStart = editor.selectionEnd = start + 4;
-
-                // Update syntax highlighting
-                this.updateSyntaxHighlighting();
+                document.execCommand('insertText', false, '    ');
             }
         });
-
-        // Auto-closing brackets and quotes
-        editor.addEventListener('input', (e) => {
-            if (e.inputType === 'insertText') {
-                const text = e.data;
-                const pos = editor.selectionStart;
-
-                // Auto-close common pairs
-                const pairs = {
-                    '(': ')',
-                    '[': ']',
-                    '{': '}',
-                    '"': '"',
-                    "'": "'"
-                };
-
-                if (pairs[text] && text !== '"' && text !== "'") {
-                    editor.value = editor.value.substring(0, pos) + pairs[text] + editor.value.substring(pos);
-                    editor.selectionStart = editor.selectionEnd = pos;
-
-                    // Update syntax highlighting
-                    this.updateSyntaxHighlighting();
-                }
-            }
-        });
-    },
-
-    updateSyntaxHighlighting() {
-        // Basic syntax highlighting could be added here if needed
-        // For now, we'll keep it simple without external highlighting libraries
+        
+        console.log('Script editor event listeners attached');
     },
 
     updateNotesCharCounter() {
@@ -888,7 +974,7 @@ Object.assign(app, {
         try {
             const draftData = {
                 scriptId: this.currentEditingScript?.id,
-                code: document.getElementById('scriptCodeEditor').value,
+                code: this.getCodeEditorContent(),
                 notes: document.getElementById('updateNotes').value,
                 categories: this.getSelectedCategories(),
                 timestamp: Date.now()
@@ -970,7 +1056,7 @@ Object.assign(app, {
             return;
         }
 
-        const code = document.getElementById('scriptCodeEditor').value.trim();
+        const code = this.getCodeEditorContent().trim();
         const notes = document.getElementById('updateNotes').value.trim();
         const categories = this.getSelectedCategories();
 
@@ -1023,7 +1109,7 @@ Object.assign(app, {
 
     closeScriptEditor() {
         // Ask about unsaved changes if there's content
-        const code = document.getElementById('scriptCodeEditor').value;
+        const code = this.getCodeEditorContent();
         const notes = document.getElementById('updateNotes').value;
 
         if ((code.trim() || notes.trim()) && !confirm('You have unsaved changes. Are you sure you want to close the editor?')) {
@@ -1038,7 +1124,12 @@ Object.assign(app, {
         document.getElementById('scriptEditorModal').classList.remove('active');
 
         // Clear editor content
-        document.getElementById('scriptCodeEditor').value = '';
+        const codeEditor = document.getElementById('scriptCodeEditor');
+            if (codeEditor) {
+                codeEditor.className = 'code-editor';
+                codeEditor.innerHTML = '';
+                codeEditor.removeAttribute('data-highlighted');
+            }
         document.getElementById('updateNotes').value = '';
         this.hideDraftIndicator();
         this.updateSaveIndicator('');
@@ -2089,18 +2180,21 @@ Object.assign(app, {
     // ========================
 
     async parseConfigurationMetadata(scriptId) {
-        // Check cache first
+        // Always check caching preference and session state
+        const useCache = this.cachingEnabled && this.sessionInitialized;
         const cacheKey = `config_metadata_${scriptId}`;
-        const cached = this.getCachedConfigMetadata(cacheKey);
-
-        if (cached) {
-            console.log(`Using cached config metadata for script ${scriptId}:`, cached);
-            return cached;
+        
+        if (useCache) {
+            const cached = this.getCachedConfigMetadata(cacheKey);
+            if (cached) {
+                console.log(`💾 Using cached config metadata for script ${scriptId}`);
+                return cached;
+            }
+        } else {
+            console.log(`🔄 Fetching fresh config metadata for script ${scriptId} (caching: ${this.cachingEnabled ? 'enabled but session not initialized' : 'disabled'})`);
         }
 
         try {
-            console.log(`Fetching script source for ID ${scriptId} to extract config metadata...`);
-
             const apiResponse = await this.apiCall('getScript', {
                 id: scriptId,
                 beautify: ''
@@ -2141,13 +2235,16 @@ Object.assign(app, {
             // Parse configuration metadata from source
             const metadata = this.extractConfigCategories(scriptSource);
 
-            // Cache the result
-            this.setCachedConfigMetadata(cacheKey, metadata);
+            // Cache the result if caching is enabled
+            if (this.cachingEnabled) {
+                this.setCachedConfigMetadata(cacheKey, metadata);
+                console.log(`💾 Cached config metadata for script ${scriptId}`);
+            }
 
             return metadata;
 
         } catch (error) {
-            console.error(`Could not load config metadata for script ${scriptId}:`, error);
+            console.error(`Error loading config metadata for script ${scriptId}:`, error);
             return { categories: {}, dropdowns: {} };
         }
     },
@@ -2510,14 +2607,21 @@ Object.assign(app, {
     },
 
     getCachedConfigMetadata(key) {
+        if (!this.cachingEnabled) {
+            return null;
+        }
+        
         try {
             const cached = localStorage.getItem(key);
             if (cached) {
                 const data = JSON.parse(cached);
                 // Check if cache is still valid (24 hours)
                 if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
-                    // Return the full metadata object, not just categories
                     return data.metadata || { categories: data.categories || {}, dropdowns: {} };
+                } else {
+                    // Remove expired cache
+                    localStorage.removeItem(key);
+                    console.log(`🗑️ Removed expired cache: ${key}`);
                 }
             }
         } catch (e) {
@@ -2527,13 +2631,260 @@ Object.assign(app, {
     },
 
     setCachedConfigMetadata(key, metadata) {
+        if (!this.cachingEnabled) {
+            return;
+        }
+        
         try {
             localStorage.setItem(key, JSON.stringify({
-                metadata: metadata,  // Store the full metadata object
+                metadata: metadata,
                 timestamp: Date.now()
             }));
         } catch (e) {
             console.warn('Error writing config metadata cache:', e);
         }
-    }
+    },
+
+    // ========================
+    // SCRIPT SOURCE VIEWER UTILITIES
+    // ========================
+
+    async showScriptSource(scriptId) {
+        try {
+            // Show the modal and loading overlay
+            const modal = document.getElementById('scriptSourceModal');
+            const loading = document.getElementById('scriptSourceLoading');
+
+            modal.classList.add('active');
+            loading.classList.remove('hidden');
+
+            console.log(`Fetching script source for ID: ${scriptId}`);
+
+            // FIXED: Use the same API call pattern as configuration metadata (remove source parameter)
+            const apiResponse = await this.apiCall('getScript', {
+                id: scriptId,
+                beautify: '' // Remove the 'source' parameter that requires forum login
+            });
+
+            console.log('Script source API response received:', apiResponse);
+
+            // Parse the nested response structure
+            let scriptData;
+            if (apiResponse && apiResponse.response && apiResponse.response._raw_response) {
+                try {
+                    scriptData = JSON.parse(apiResponse.response._raw_response);
+                } catch (e) {
+                    scriptData = apiResponse;
+                }
+            } else if (typeof apiResponse === 'object' && apiResponse.id) {
+                scriptData = apiResponse;
+            } else {
+                throw new Error('Invalid API response structure for script data');
+            }
+
+            // Store for clipboard functionality
+            this.currentSourceData = scriptData;
+
+            // Populate the modal
+            this.populateSourceModal(scriptData);
+
+            // Hide loading overlay
+            loading.classList.add('hidden');
+
+            this.showMessage(`Loaded source for "${scriptData.name}"`, 'success');
+
+        } catch (error) {
+            console.error('Error loading script source:', error);
+            this.showMessage(`Failed to load script source: ${error.message}`, 'error');
+            this.closeScriptSource();
+        }
+    },
+
+    populateSourceModal(scriptData) {
+        console.log('Populating source modal with data:', scriptData);
+
+        // Update title and info
+        document.getElementById('scriptSourceTitle').textContent = `- ${scriptData.name}`;
+        document.getElementById('sourceScriptName').textContent = scriptData.name || 'Unknown';
+        document.getElementById('sourceScriptAuthor').textContent = scriptData.author || 'Unknown';
+
+        // Map software ID to name
+        const softwareNames = {
+            4: 'FC2 Global',
+            5: 'Universe4', 
+            6: 'Constellation4',
+            7: 'Parallax2'
+        };
+        document.getElementById('sourceScriptSoftware').textContent = 
+            softwareNames[scriptData.software] || `Software ${scriptData.software || 'Unknown'}`;
+
+        // Calculate elapsed time
+        let elapsedText = 'Never';
+        if (scriptData.last_update) {
+            elapsedText = this.getElapsedTime(scriptData.last_update);
+        }
+        document.getElementById('sourceScriptUpdated').textContent = elapsedText;
+
+        // Get source code
+        let sourceCode = '';
+        if (scriptData.script) {
+            sourceCode = scriptData.script;
+        } else if (scriptData.source) {
+            sourceCode = scriptData.source;
+        } else if (scriptData.content) {
+            sourceCode = scriptData.content;
+        } else {
+            sourceCode = '-- No source code available\n-- This script may be empty or there was an error loading the source';
+        }
+
+        // Decode any escaped characters
+        if (sourceCode && typeof sourceCode === 'string') {
+            sourceCode = sourceCode
+                .replace(/\\n/g, '\n')
+                .replace(/\\t/g, '\t')
+                .replace(/\\"/g, '"')
+                .replace(/\\'/g, "'")
+                .replace(/\\\\/g, '\\');
+        }
+
+        // Update source code display with highlighting
+        const sourceElement = document.getElementById('scriptSourceCode');
+        sourceElement.textContent = sourceCode;
+        sourceElement.className = 'source-code-highlighted';
+        
+        // Apply syntax highlighting
+        hljs.highlightElement(sourceElement);
+
+        // Update line count
+        const lineCount = sourceCode.split('\n').length;
+        document.getElementById('sourceScriptLines').textContent = `Lines: ${lineCount.toLocaleString()}`;
+    },
+
+    async copySourceToClipboard() {
+        try {
+            const sourceElement = document.getElementById('scriptSourceCode');
+            const sourceCode = sourceElement.textContent;
+            
+            if (!sourceCode || sourceCode.trim() === '') {
+                this.showMessage('No source code to copy', 'error');
+                return;
+            }
+
+            await navigator.clipboard.writeText(sourceCode);
+            
+            // Visual feedback
+            const copyBtn = document.getElementById('copySourceBtn');
+            const originalText = copyBtn.textContent;
+            copyBtn.textContent = '✅ Copied!';
+            copyBtn.style.background = 'linear-gradient(135deg, #4aff4a, #357abd)';
+            
+            setTimeout(() => {
+                copyBtn.textContent = originalText;
+                copyBtn.style.background = '';
+            }, 2000);
+            
+            this.showMessage('Source code copied to clipboard!', 'success');
+            
+        } catch (error) {
+            console.error('Error copying to clipboard:', error);
+            
+            // Fallback: select the text
+            try {
+                const sourceElement = document.getElementById('scriptSourceCode');
+                const range = document.createRange();
+                range.selectNodeContents(sourceElement);
+                const selection = window.getSelection();
+                selection.removeAllRanges();
+                selection.addRange(range);
+                this.showMessage('Source code selected - press Ctrl+C to copy', 'success');
+            } catch (fallbackError) {
+                this.showMessage('Could not copy to clipboard', 'error');
+            }
+        }
+    },
+
+    closeScriptSource() {
+        // Clear stored data
+        this.currentSourceData = null;
+
+        // Hide modal
+        document.getElementById('scriptSourceModal').classList.remove('active');
+
+        // Clear content
+        document.getElementById('scriptSourceCode').textContent = '';
+        document.getElementById('scriptSourceTitle').textContent = 'Loading...';
+        document.getElementById('sourceScriptName').textContent = 'Script Name';
+        document.getElementById('sourceScriptAuthor').textContent = 'Author';
+        document.getElementById('sourceScriptSoftware').textContent = 'Software';
+        document.getElementById('sourceScriptUpdated').textContent = 'Last Updated';
+        document.getElementById('sourceScriptLines').textContent = 'Lines: Loading...';
+    },
+
+    // ========================
+    // CACHE MANAGEMENT UTILITIES
+    // ========================
+
+    clearAllCaches() {
+        try {
+            const keysToRemove = [];
+            for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && (
+                    // key.startsWith('script_draft_') || // Idk why I wanted to do this
+                    key.startsWith('config_metadata_')
+                )) {
+                    keysToRemove.push(key);
+                }
+            }
+            
+            keysToRemove.forEach(key => {
+                localStorage.removeItem(key);
+            });
+            
+            this.showMessage(`🗑️ Cleared ${keysToRemove.length} cached items`, 'success');
+            console.log(`✅ Cache clearing complete. Removed ${keysToRemove.length} items.`);
+            
+        } catch (error) {
+            console.error('Error clearing cache:', error);
+            this.showMessage('Error clearing cache', 'error');
+        }
+    },
+
+    debugCacheContents() {
+        console.log('🔍 Current Cache Contents:');
+        const cacheItems = [];
+        
+        for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && (
+                key.startsWith('script_draft_') || 
+                key.startsWith('config_metadata_') ||
+                key.startsWith('fc2_')
+            )) {
+                try {
+                    const value = localStorage.getItem(key);
+                    cacheItems.push({
+                        key: key,
+                        size: value ? value.length : 0,
+                        type: key.includes('draft') ? 'Draft' : 
+                            key.includes('metadata') ? 'Metadata' : 
+                            key.includes('fc2_') ? 'Setting' : 'Unknown'
+                    });
+                } catch (e) {
+                    console.warn(`Could not read cache item: ${key}`);
+                }
+            }
+        }
+        
+        console.log(`💾 Caching currently: ${this.cachingEnabled ? 'ENABLED' : 'DISABLED'}`);
+        console.log(`🔄 Session initialized: ${this.sessionInitialized ? 'YES' : 'NO'}`);
+        
+        if (cacheItems.length === 0) {
+            console.log('✅ No cached items found');
+        } else {
+            console.table(cacheItems);
+        }
+        
+        return cacheItems;
+    },
 });

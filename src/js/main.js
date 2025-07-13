@@ -114,6 +114,11 @@ function setupKeyboardListeners() {
             if (document.getElementById('settingsModal').classList.contains('active')) {
                 app.closeSettingsModal();
             }
+
+            // Close script source modal if open
+            if (document.getElementById('scriptSourceModal').classList.contains('active')) {
+                app.closeScriptSource();
+            }
         }
     });
 }
@@ -217,9 +222,17 @@ async function initializeApplication() {
             return;
         }
 
-        // Load user preferences first
-        app.loadAutoSavePreference();
-        console.log('✅ User preferences loaded');
+        if (typeof hljs !== 'undefined') {
+            hljs.configure({
+                languages: ['lua', 'json'],
+                ignoreUnescapedHTML: true
+            });
+            console.log('✅ Syntax highlighting initialized');
+        }
+
+        // Load caching preference first
+        app.loadCachingPreference();
+        console.log('✅ Caching preference loaded');
 
         // Setup event listeners
         setupKeyboardListeners();
@@ -246,11 +259,6 @@ async function initializeApplication() {
         }
 
         console.log('✅ FC2 Dashboard initialization complete');
-
-        // Log helpful information
-        console.log('💡 Available global functions:');
-        console.log('   • debugFC2() - Debug cookie status');
-        console.log('   • app - Main application object');
 
     } catch (error) {
         console.error('❌ Initialization failed:', error);

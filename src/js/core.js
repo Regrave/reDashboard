@@ -18,6 +18,10 @@ const app = {
     currentScriptConfig: {},
     configMetadataCache: {},
     currentScriptKey: '',
+
+        // Caching settings
+    cachingEnabled: true, // Default to enabled
+    sessionInitialized: false, // Track if we've done initial fresh load
     
     // Filters and language state
     availableFilters: {
@@ -872,8 +876,58 @@ const app = {
         }
     },
 
+    // ========================
+    // CACHING PREFERENCE MANAGEMENT
+    // ========================
+    
+    loadCachingPreference() {
+        try {
+            const cachingPref = localStorage.getItem('fc2_caching_enabled');
+            this.cachingEnabled = cachingPref !== 'false'; // Default to true unless explicitly disabled
+            
+            console.log(`💾 Caching preference loaded: ${this.cachingEnabled ? 'enabled' : 'disabled'}`);
+            
+            // Update UI if available
+            setTimeout(() => {
+                const cachingToggle = document.getElementById('cachingToggle');
+                const cachingStatus = document.getElementById('cachingStatus');
+                
+                if (cachingToggle) {
+                    if (this.cachingEnabled) {
+                        cachingToggle.classList.add('active');
+                    } else {
+                        cachingToggle.classList.remove('active');
+                    }
+                }
+                
+                if (cachingStatus) {
+                    cachingStatus.textContent = this.cachingEnabled ? 'Enabled' : 'Disabled';
+                    cachingStatus.style.color = this.cachingEnabled ? '#4aff4a' : '#ff6666';
+                }
+            }, 100);
+            
+        } catch (error) {
+            console.warn('Could not load caching preference:', error);
+            this.cachingEnabled = true; // Default to enabled on error
+        }
+    },
+
+    saveCachingPreference() {
+        try {
+            localStorage.setItem('fc2_caching_enabled', this.cachingEnabled.toString());
+            console.log(`💾 Caching preference saved: ${this.cachingEnabled}`);
+        } catch (error) {
+            console.warn('Could not save caching preference:', error);
+        }
+    },
+
     // Load initial data after successful login
     async loadInitialData() {
+        console.log('🔄 Loading initial data (always fresh on page load)...');
+        
+        // Mark that we're doing initial load
+        this.sessionInitialized = false;
+        
         // These methods will be defined in other modules
         await this.loadMemberInfo();
         await this.loadAllScripts();
@@ -885,9 +939,15 @@ const app = {
         await this.loadBuilds();
         await this.loadSessionInfo();
 
-        // Load preferences
+        // Load preferences (including caching preference)
+        this.loadCachingPreference();
         this.loadAutoSavePreference();
-    }
+        
+        // Mark session as initialized - now caching can be used if enabled
+        this.sessionInitialized = true;
+        
+        console.log(`✅ Initial data loaded. Caching now ${this.cachingEnabled ? 'enabled' : 'disabled'} for future requests.`);
+    },
 };
 
 // Make app available globally for HTML access

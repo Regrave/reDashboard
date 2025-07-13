@@ -357,7 +357,6 @@ Object.assign(app, {
             let parsedConfig = {};
             
             if (!configText || configText === '' || configText === 'null' || configText === 'undefined') {
-                // Configuration is truly empty/reset
                 console.log('Configuration is empty/reset, using empty object');
                 parsedConfig = {};
             } else if (typeof configText === 'string') {
@@ -370,7 +369,6 @@ Object.assign(app, {
                     parsedConfig = {};
                 }
             } else if (typeof configText === 'object' && configText !== null) {
-                // Already an object
                 parsedConfig = configText;
                 console.log('Configuration is already an object');
             } else {
@@ -378,16 +376,19 @@ Object.assign(app, {
                 parsedConfig = {};
             }
 
-            // Update the current config (don't fall back to cached member data)
+            // Update the current config
             this.currentConfig = parsedConfig;
             
-            // Update the display
-            document.getElementById('configDisplay').textContent = JSON.stringify(this.currentConfig, null, 2);
+            // Update the display with highlighting
+            const configDisplay = document.getElementById('configDisplay');
+            configDisplay.textContent = JSON.stringify(this.currentConfig, null, 2);
+            this.highlightJSONEditor();
+
+            // Setup event listeners for live editing
+            this.setupJSONEditorFeatures();
 
             // Update software dropdown after loading configuration
             this.populateSoftwareDropdown();
-
-            // Load auto-save preference to update toggle state
             this.loadAutoSavePreference();
 
             console.log('Configuration loaded successfully:', this.currentConfig);
@@ -395,16 +396,19 @@ Object.assign(app, {
         } catch (error) {
             console.error('Error loading configuration:', error);
             
-            // On API error, still use empty config instead of stale cache
+            // On API error, still use empty config
             console.log('API error occurred, using empty configuration');
             this.currentConfig = {};
             
-            // Update display with empty config
-            document.getElementById('configDisplay').textContent = JSON.stringify(this.currentConfig, null, 2);
+            // Update display with empty config and highlighting
+            const configDisplay = document.getElementById('configDisplay');
+            configDisplay.textContent = JSON.stringify(this.currentConfig, null, 2);
+            configDisplay.className = 'json-editor hljs';
+            hljs.highlightElement(configDisplay);
+            
             this.populateSoftwareDropdown();
             this.loadAutoSavePreference();
             
-            // Show user-friendly error message
             this.showMessage('Failed to load configuration. Using empty configuration.', 'error');
         }
     },
@@ -461,15 +465,22 @@ Object.assign(app, {
 
     formatJSON() {
         try {
-            const configText = document.getElementById('configDisplay').textContent;
+            const configDisplay = document.getElementById('configDisplay');
+            const configText = configDisplay.textContent;
             const parsed = JSON.parse(configText);
-            document.getElementById('configDisplay').textContent = JSON.stringify(parsed, null, 2);
+            const formatted = JSON.stringify(parsed, null, 2);
+            
+            configDisplay.textContent = formatted;
+            
+            // Apply JSON syntax highlighting
+            configDisplay.textContent = formatted;
+            this.highlightJSONEditor();
 
             // Update current config and software dropdown in case structure changed
             this.currentConfig = parsed;
             this.populateSoftwareDropdown();
 
-            this.showMessage('JSON formatted!', 'success');
+            this.showMessage('JSON formatted and highlighted!', 'success');
         } catch (e) {
             this.showMessage('Invalid JSON format', 'error');
         }
@@ -1636,5 +1647,171 @@ Object.assign(app, {
                 <div style="color: #888; font-size: 14px;">Level ${this.memberData.level} • ${this.memberData.xp.toLocaleString()} XP • Type 'help' for commands</div>
             `;
         }
+    },
+
+    toggleCaching() {
+        this.cachingEnabled = !this.cachingEnabled;
+        this.saveCachingPreference();
+
+        const toggle = document.getElementById('cachingToggle');
+        const status = document.getElementById('cachingStatus');
+
+        if (toggle) {
+            if (this.cachingEnabled) {
+                toggle.classList.add('active');
+                if (status) {
+                    status.textContent = 'Enabled';
+                    status.style.color = '#4aff4a';
+                }
+                this.showMessage('💾 Data caching enabled', 'success');
+            } else {
+                toggle.classList.remove('active');
+                if (status) {
+                    status.textContent = 'Disabled';
+                    status.style.color = '#ff6666';
+                }
+                this.showMessage('🔄 Data caching disabled - fresh data only', 'success');
+            }
+        }
+    },
+
+    highlightJSONEditor() {
+        const jsonEditor = document.getElementById('configDisplay');
+        if (!jsonEditor) return;
+        
+        console.log('highlightJSONEditor called');
+        
+        // Get the plain text content
+        const content = jsonEditor.textContent;
+        
+        // Don't highlight empty content
+        if (!content || content.trim() === '') {
+            return;
+        }
+        
+        // Validate JSON first
+        try {
+            JSON.parse(content);
+        } catch (e) {
+            // If JSON is invalid, don't highlight (but don't break either)
+            console.log('JSON invalid, skipping highlight');
+            return;
+        }
+        
+        // Store cursor position
+        let cursorOffset = 0;
+        const selection = window.getSelection();
+        
+        try {
+            if (selection.rangeCount > 0 && jsonEditor.contains(selection.anchorNode)) {
+                cursorOffset = this.getJSONCaretPosition(jsonEditor);
+            }
+        } catch (e) {
+            console.warn('Could not get JSON cursor position:', e);
+        }
+        
+        // Create a temporary element to highlight
+        const tempDiv = document.createElement('div');
+        tempDiv.textContent = content;
+        tempDiv.className = 'hljs';
+        tempDiv.setAttribute('data-language', 'json');
+        
+        // Highlight the temporary element
+        hljs.highlightElement(tempDiv);
+        
+        // Replace content with highlighted version
+        jsonEditor.innerHTML = tempDiv.innerHTML;
+        jsonEditor.className = 'json-editor hljs';
+        
+        // Restore cursor position
+        setTimeout(() => {
+            try {
+                this.setJSONCaretPosition(jsonEditor, cursorOffset);
+            } catch (e) {
+                console.warn('Could not restore JSON cursor position:', e);
+                jsonEditor.focus();
+            }
+        }, 10);
+        
+        console.log('JSON highlighting completed');
+    },
+
+    getJSONCaretPosition(element) {
+        const selection = window.getSelection();
+        if (selection.rangeCount === 0) return 0;
+        
+        const range = selection.getRangeAt(0);
+        const preCaretRange = range.cloneRange();
+        preCaretRange.selectNodeContents(element);
+        preCaretRange.setEnd(range.endContainer, range.endOffset);
+        return preCaretRange.toString().length;
+    },
+
+    setJSONCaretPosition(element, offset) {
+        const walker = document.createTreeWalker(
+            element,
+            NodeFilter.SHOW_TEXT,
+            null,
+            false
+        );
+        
+        let currentOffset = 0;
+        let node;
+        
+        while (node = walker.nextNode()) {
+            const nodeLength = node.textContent.length;
+            if (currentOffset + nodeLength >= offset) {
+                const range = document.createRange();
+                const selection = window.getSelection();
+                const targetOffset = offset - currentOffset;
+                range.setStart(node, Math.min(targetOffset, nodeLength));
+                range.setEnd(node, Math.min(targetOffset, nodeLength));
+                selection.removeAllRanges();
+                selection.addRange(range);
+                return;
+            }
+            currentOffset += nodeLength;
+        }
+        
+        element.focus();
+    },
+
+    setupJSONEditorFeatures() {
+        const jsonEditor = document.getElementById('configDisplay');
+        if (!jsonEditor) return;
+        
+        // Remove any existing listeners to avoid duplicates
+        jsonEditor.removeEventListener('input', this.jsonInputHandler);
+        jsonEditor.removeEventListener('blur', this.jsonBlurHandler);
+        jsonEditor.removeEventListener('keydown', this.jsonKeydownHandler);
+        
+        // Create bound handlers so we can remove them later
+        this.jsonInputHandler = () => {
+            clearTimeout(this.jsonHighlightTimeout);
+            this.jsonHighlightTimeout = setTimeout(() => {
+                console.log('JSON highlighting after typing stopped');
+                this.highlightJSONEditor();
+            }, 800);
+        };
+        
+        this.jsonBlurHandler = () => {
+            console.log('JSON highlighting on blur');
+            clearTimeout(this.jsonHighlightTimeout);
+            this.highlightJSONEditor();
+        };
+        
+        this.jsonKeydownHandler = (e) => {
+            if (e.key === 'Tab') {
+                e.preventDefault();
+                document.execCommand('insertText', false, '  '); // 2 spaces for JSON
+            }
+        };
+        
+        // Attach event listeners
+        jsonEditor.addEventListener('input', this.jsonInputHandler);
+        jsonEditor.addEventListener('blur', this.jsonBlurHandler);
+        jsonEditor.addEventListener('keydown', this.jsonKeydownHandler);
+        
+        console.log('JSON editor event listeners attached');
     },
 });
