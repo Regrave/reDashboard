@@ -83,7 +83,7 @@ const app = {
     // ========================
     
     parseApiResponse(responseText) {
-        // Check for common error messages first
+        // Check for common error messages first - be more specific
         if (typeof responseText === 'string') {
             if (responseText.includes('You are not logged into the Member\'s Panel')) {
                 throw new Error('You are not logged into the Member\'s Panel. Please log into the forums first.');
@@ -98,16 +98,27 @@ const app = {
                 throw new Error('Two-step authorization must be enabled on your forum account');
             }
             if (responseText.includes('not an active Session')) {
-                throw new Error('No active session found - please log into the forums');
+                throw new Error('No active session found - please log into the forums and create a session');
             }
             if (responseText.includes('handshake expired')) {
                 throw new Error('Session expired - please log in again');
             }
             if (responseText.includes('handshake invalid')) {
-                throw new Error('Invalid session token');
+                throw new Error('Invalid session token - please log in again');
             }
             if (responseText.includes('24 hours')) {
                 throw new Error('Handshake system locked for 24 hours');
+            }
+            // FIXED: More specific error detection for handshake conflicts
+            if (responseText.includes('handshake already exists')) {
+                throw new Error('HANDSHAKE_EXISTS'); // Special error type
+            }
+            // FIXED: Only trigger on actual encoding errors at the start of response, not anywhere in data
+            if (responseText.startsWith('encoding') || responseText.includes('encoding error')) {
+                throw new Error('Authentication encoding error - please log in again');
+            }
+            if (responseText.includes('hash not matching')) {
+                throw new Error('Security hash mismatch - please create a new session');
             }
         }
 
@@ -156,9 +167,34 @@ const app = {
             }
         }
 
+        // FIXED: Sanitize API key from debug output
+        const sanitizedUrl = url.toString().replace(this.apiKey, '***REDACTED***');
+        console.log('🔗 Making API call:', {
+            cmd: cmd,
+            url: sanitizedUrl,
+            protocol: location.protocol,
+            params: params
+        });
+
         try {
             const response = await fetch(url);
+            
+            console.log('📡 API Response received:', {
+                status: response.status,
+                statusText: response.statusText,
+                headers: Object.fromEntries(response.headers.entries()),
+                ok: response.ok
+            });
+            
             const text = await response.text();
+            
+            // FIXED: Sanitize API key from response text preview
+            const sanitizedText = text.replace(new RegExp(this.apiKey, 'g'), '***REDACTED***');
+            console.log('📄 Raw API Response Text:', {
+                length: text.length,
+                preview: sanitizedText.substring(0, 500) + (sanitizedText.length > 500 ? '...' : ''),
+                // Remove fullText to avoid leaking sensitive data
+            });
 
             // Check for specific error messages
             if (text.includes('You are not logged into the Member\'s Panel')) {
@@ -173,9 +209,40 @@ const app = {
                 throw new Error('No active session found - please log into the forums');
             }
 
-            return this.parseApiResponse(text);
+            const parsedResponse = this.parseApiResponse(text);
+            
+            // FIXED: Sanitize API key from parsed response debug output
+            const sanitizedResponse = JSON.stringify(parsedResponse, (key, value) => {
+                if (typeof value === 'string' && value.includes(this.apiKey)) {
+                    return value.replace(new RegExp(this.apiKey, 'g'), '***REDACTED***');
+                }
+                return value;
+            });
+            console.log('✅ Parsed API Response:', JSON.parse(sanitizedResponse));
+            
+            return parsedResponse;
 
         } catch (error) {
+            // FIXED: Sanitize API key from error output
+            const sanitizedUrl = url.toString().replace(this.apiKey, '***REDACTED***');
+            console.error('❌ API Call Error Details:', {
+                message: error.message,
+                stack: error.stack,
+                cmd: cmd,
+                url: sanitizedUrl,
+                protocol: location.protocol
+            });
+            
+            // Better CORS detection for file:// protocol
+            if (location.protocol === 'file:' && (
+                error.message.includes('Failed to fetch') ||
+                error.message.includes('CORS') ||
+                error.message.includes('Cross-Origin') ||
+                error.name === 'TypeError'
+            )) {
+                throw new Error('CORS_ERROR_FILE_PROTOCOL');
+            }
+            
             this.showMessage(`API Error: ${error.message}`, 'error');
             throw error;
         }
@@ -276,7 +343,7 @@ const app = {
 
     async tryHandshakeLogin() {
         console.log('🔍 Checking for saved handshake...');
-        const handshakeToken = this.debugHandshakeToken(); // Updated function name
+        const handshakeToken = this.debugHandshakeToken();
 
         if (!handshakeToken) {
             console.log('❌ No handshake token found');
@@ -302,7 +369,20 @@ const app = {
                     beautify: ''
                 });
 
-                this.memberData = response;
+                // FIXED: Add validation for response data
+                if (!response || typeof response !== 'object') {
+                    throw new Error('Invalid member data received from API');
+                }
+
+                // FIXED: Ensure required properties exist with defaults
+                this.memberData = {
+                    username: response.username || 'Unknown',
+                    level: response.level || 0,
+                    xp: response.xp || 0,
+                    protection: response.protection || 2,
+                    ...response
+                };
+                
                 this.memberScripts = response.scripts || [];
                 this.memberProjects = response.fc2t || [];
 
@@ -317,15 +397,22 @@ const app = {
 
                 return true;
             }
-            } catch (error) {
-                console.error('❌ Handshake login failed:', error);
+        } catch (error) {
+            console.error('❌ Handshake login failed:', error);
 
-                // If handshake failed, remove the invalid token
+            // FIXED: Clear invalid handshake immediately on specific errors
+            const errorMessage = error.message.toLowerCase();
+            if (errorMessage.includes('expired') || 
+                errorMessage.includes('invalid') || 
+                errorMessage.includes('handshake') ||
+                errorMessage.includes('encoding') ||
+                errorMessage.includes('forum') ||
+                errorMessage.includes('session')) {
+                
+                console.log('🗑️ Clearing invalid handshake token due to backend changes');
                 this.deleteHandshakeToken();
-
-            // Show login form with appropriate message
-            if (error.message.includes('expired') || error.message.includes('invalid')) {
-                this.showMessage('Session expired. Please log in again.', 'error');
+                
+                this.showMessage('Session expired due to recent system updates. Please log in again.', 'error');
             } else {
                 this.showMessage('Could not restore session. Please log in.', 'error');
             }
@@ -353,33 +440,122 @@ const app = {
         try {
             const rememberMe = document.getElementById('rememberMe').checked;
 
+            // FIXED: Check if we already have a working handshake for this key
+            const existingHandshake = this.getHandshakeToken();
+            if (existingHandshake) {
+                console.log('🔍 Found existing handshake, testing it first...');
+                try {
+                    // Try to use existing handshake
+                    this.apiKey = await this.getHandshake(existingHandshake);
+                    
+                    // Test if it works with a simple API call
+                    const testResponse = await this.apiCall('getMember', {
+                        beautify: ''
+                    });
+
+                    if (testResponse && testResponse.username) {
+                        // Existing handshake works!
+                        this.memberData = testResponse;
+                        this.memberScripts = testResponse.scripts || [];
+                        this.memberProjects = testResponse.fc2t || [];
+
+                        this.showMessage(`Welcome back, ${this.memberData.username}! Used existing session.`, 'success');
+                        this.updateUIAfterLogin();
+                        apiKeyInput.value = '';
+                        await this.loadInitialData();
+                        return;
+                    }
+                } catch (existingError) {
+                    console.log('❌ Existing handshake failed, will create new one:', existingError.message);
+                    // Clear the invalid handshake and continue with new auth
+                    this.deleteHandshakeToken();
+                }
+            }
+
+            // No existing handshake OR existing one failed, create new one
             if (rememberMe) {
-                // Use handshake system for persistent sessions
-                this.showMessage('Authorizing secure session...', 'success');
-                const handshakeToken = await this.authorizeHandshake(licenseKey);
+                try {
+                    // Use handshake system for persistent sessions
+                    this.showMessage('Creating secure session...', 'success');
+                    const handshakeToken = await this.authorizeHandshake(licenseKey);
 
-                // Use handshake to get the actual key (verify it works)
-                this.apiKey = await this.getHandshake(handshakeToken);
+                    // Use handshake to get the actual key (verify it works)
+                    this.apiKey = await this.getHandshake(handshakeToken);
 
-                // Verify connection by getting member info
-                const response = await this.apiCall('getMember', {
-                    scripts: '',
-                    bans: '',
-                    fc2t: '',
-                    beautify: ''
-                });
+                    // Verify connection by getting member info
+                    const response = await this.apiCall('getMember', {
+                        scripts: '',
+                        bans: '',
+                        fc2t: '',
+                        beautify: ''
+                    });
 
-                this.memberData = response;
-                this.memberScripts = response.scripts || [];
-                this.memberProjects = response.fc2t || [];
+                    this.memberData = {
+                        username: response.username || 'Unknown',
+                        level: response.level || 0,
+                        xp: response.xp || 0,
+                        protection: response.protection || 2,
+                        ...response
+                    };
+                    this.memberScripts = response.scripts || [];
+                    this.memberProjects = response.fc2t || [];
 
-                // Save handshake token for future use
-                const tokenSaved = this.setHandshakeToken(handshakeToken);
+                    // Save handshake token for future use
+                    const tokenSaved = this.setHandshakeToken(handshakeToken);
 
-                if (tokenSaved) {
-                    this.showMessage(`Connected successfully! Welcome, ${this.memberData.username}! Session will be remembered.`, 'success');
-                } else {
-                    this.showMessage(`Connected successfully! Welcome, ${this.memberData.username}!`, 'success');
+                    if (tokenSaved) {
+                        this.showMessage(`Connected successfully! Welcome, ${this.memberData.username}! Session will be remembered.`, 'success');
+                    } else {
+                        this.showMessage(`Connected successfully! Welcome, ${this.memberData.username}!`, 'success');
+                    }
+
+                } catch (handshakeError) {
+                    // FIXED: Handle handshake conflicts with auto-regeneration
+                    if (handshakeError.message === 'HANDSHAKE_EXISTS') {
+                        try {
+                            this.showMessage('🔄 Session conflict detected, regenerating...', 'success');
+                            
+                            // Auto-wipe the existing handshake using the provided license key
+                            await this.autoWipeAndRegenerateHandshake(licenseKey);
+                            
+                            // Clear any stored handshake
+                            this.deleteHandshakeToken();
+                            
+                            // Now try to create a new handshake
+                            const newHandshakeToken = await this.authorizeHandshake(licenseKey);
+                            this.apiKey = await this.getHandshake(newHandshakeToken);
+                            
+                            // Verify connection
+                            const response = await this.apiCall('getMember', {
+                                scripts: '',
+                                bans: '',
+                                fc2t: '',
+                                beautify: ''
+                            });
+
+                            this.memberData = {
+                                username: response.username || 'Unknown',
+                                level: response.level || 0,
+                                xp: response.xp || 0,
+                                protection: response.protection || 2,
+                                ...response
+                            };
+                            this.memberScripts = response.scripts || [];
+                            this.memberProjects = response.fc2t || [];
+
+                            // Save new handshake token
+                            const tokenSaved = this.setHandshakeToken(newHandshakeToken);
+                            
+                            this.showMessage(`✅ Session regenerated successfully! Welcome, ${this.memberData.username}!`, 'success');
+                            
+                        } catch (regenerationError) {
+                            console.error('Failed to auto-regenerate handshake:', regenerationError);
+                            this.showMessage('⚠️ Session conflict detected. Please try again or clear your browser data.', 'error');
+                            return;
+                        }
+                    } else {
+                        throw handshakeError; // Re-throw other errors
+                    }
                 }
 
             } else {
@@ -395,7 +571,13 @@ const app = {
                     beautify: ''
                 });
 
-                this.memberData = response;
+                this.memberData = {
+                    username: response.username || 'Unknown',
+                    level: response.level || 0,
+                    xp: response.xp || 0,
+                    protection: response.protection || 2,
+                    ...response
+                };
                 this.memberScripts = response.scripts || [];
                 this.memberProjects = response.fc2t || [];
 
@@ -410,7 +592,7 @@ const app = {
         } catch (error) {
             console.error('Connection error:', error);
             this.apiKey = '';
-            this.memberData = null; // Reset member data on error
+            this.memberData = null;
             this.handleConnectionError(error);
         } finally {
             // Re-enable connect button
@@ -755,16 +937,20 @@ const app = {
     // ========================
     // UI HELPER METHODS
     // ========================
-    
+
     updateUIAfterLogin() {
         // Hide login section and show main interface
         document.getElementById('loginSection').style.display = 'none';
         document.getElementById('advancedLogin').style.display = 'none';
         document.getElementById('connectedInfo').classList.add('active');
         document.getElementById('settingsButton').classList.add('active');
-        document.getElementById('connectedUsername').textContent = this.memberData.username;
-        document.getElementById('userLevel').textContent = this.memberData.level;
-        document.getElementById('userXP').textContent = this.memberData.xp.toLocaleString();
+        document.getElementById('connectedUsername').textContent = this.memberData.username || 'Unknown';
+        document.getElementById('userLevel').textContent = this.memberData.level || '0';
+        
+        // FIXED: Add defensive check for XP
+        const xpValue = this.memberData.xp || 0;
+        document.getElementById('userXP').textContent = xpValue.toLocaleString();
+        
         this.setUserAvatar(this.memberData);
 
         document.getElementById('navTabs').classList.add('active');
@@ -860,17 +1046,40 @@ const app = {
 	},
 
     handleConnectionError(error) {
+        // Don't clean up on handshake conflicts - that's not an invalid session
+        const errorMessage = error.message.toLowerCase();
+        if (errorMessage === 'handshake_exists') {
+            // Don't clean up - just show helpful message
+            this.showMessage('⚠️ You already have an active session. Try refreshing the page or clearing browser data.', 'error');
+            return;
+        }
+        
+        // Handle CORS errors specifically
+        if (error.message === 'CORS_ERROR_FILE_PROTOCOL') {
+            this.showMessage('❌ CORS Error: Cannot make API calls from file:// protocol.\n\nSolutions:\n• Serve this page over HTTP/HTTPS using a local web server\n• Use Python: python -m http.server 8000\n• Use Node.js: npx serve\n• Use VS Code Live Server extension', 'error');
+            return;
+        }
+        
+        // Only clean up on actual authentication failures
+        if (errorMessage.includes('expired') || 
+            errorMessage.includes('invalid') || 
+            (errorMessage.includes('encoding') && !errorMessage.includes('handshake')) ||
+            errorMessage.includes('session')) {
+            
+            this.cleanupInvalidSession();
+        }
+
         // Show appropriate error message
-        if (error.message.includes('Failed to fetch') && location.protocol === 'file:') {
-            this.showMessage('❌ CORS Error: Cannot make API calls from file://. Please serve this page over HTTP/HTTPS (e.g., use a local web server)', 'error');
-        } else if (error.message.includes('24 hours')) {
+        if (error.message.includes('24 hours')) {
             this.showMessage('Handshake system locked for 24 hours. Please try again later.', 'error');
-        } else if (error.message.includes('expired')) {
-            this.showMessage('Handshake token has expired. Please use your license key to generate a new one.', 'error');
-        } else if (error.message.includes('invalid')) {
-            this.showMessage('Invalid handshake token. Please check the token or use your license key.', 'error');
-        } else if (error.message.includes('mismatch')) {
-            this.showMessage('Handshake token was created on a different device/browser. Please use your license key.', 'error');
+        } else if (error.message === 'HANDSHAKE_EXISTS') {
+            this.showMessage('⚠️ You already have an active session. Please clear your browser cookies for constelia.ai and try again.', 'error');
+        } else if (error.message.includes('expired') || error.message.includes('encoding')) {
+            this.showMessage('🔄 Authentication system was recently updated. Please log in again with your license key.', 'error');
+        } else if (error.message.includes('invalid') || error.message.includes('handshake')) {
+            this.showMessage('❌ Session invalid due to recent system updates. Please log in again.', 'error');
+        } else if (error.message.includes('forum')) {
+            this.showMessage('⚠️ Please ensure you are logged into the forums at constelia.ai and have 2FA enabled.', 'error');
         } else {
             this.showMessage(`Connection failed: ${error.message}`, 'error');
         }
@@ -1253,6 +1462,65 @@ const app = {
             `;
         }
     },
+
+    // Defensive coding jutsu
+    cleanupInvalidSession() {
+        console.log('🧹 Cleaning up invalid session data...');
+        
+        // Clear handshake token
+        this.deleteHandshakeToken();
+        
+        // Reset application state
+        this.resetAppState();
+        
+        // Clear any cached authentication data
+        try {
+            // Clear any auth-related localStorage items
+            Object.keys(localStorage).forEach(key => {
+                if (key.startsWith('fc2_') && (key.includes('auth') || key.includes('session') || key.includes('handshake'))) {
+                    localStorage.removeItem(key);
+                    console.log(`🗑️ Cleared cached item: ${key}`);
+                }
+            });
+        } catch (error) {
+            console.warn('Could not clear cached auth data:', error);
+        }
+        
+        console.log('✅ Session cleanup complete');
+    },
+
+    async autoWipeAndRegenerateHandshake(licenseKey) {
+        console.log('🗑️ Auto-wiping existing handshake for regeneration...');
+        
+        try {
+            // Use the provided license key to call terminateHandshake
+            const url = new URL('https://constelia.ai/api.php');
+            url.searchParams.append('key', licenseKey);
+            url.searchParams.append('cmd', 'terminateHandshake');
+
+            const response = await fetch(url);
+            const text = await response.text();
+
+            // Parse the response (don't throw on errors here, just log)
+            try {
+                const result = this.parseApiResponse(text);
+                console.log('✅ Auto-wipe handshake result:', result);
+            } catch (parseError) {
+                console.log('⚠️ Auto-wipe completed (parse error expected):', parseError.message);
+            }
+
+            // Always clear local storage regardless of API result
+            this.deleteHandshakeToken();
+            
+            console.log('✅ Auto-wipe handshake completed successfully');
+
+        } catch (error) {
+            console.warn('⚠️ Auto-wipe handshake had an error, but continuing:', error.message);
+            
+            // Still clear local storage even if API call failed
+            this.deleteHandshakeToken();
+        }
+    }
 };
 
 // Make app available globally for HTML access
