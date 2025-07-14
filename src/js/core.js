@@ -923,30 +923,335 @@ const app = {
 
     // Load initial data after successful login
     async loadInitialData() {
-        console.log('🔄 Loading initial data (always fresh on page load)...');
+        console.log('🔄 Loading initial data with API consolidation...');
         
         // Mark that we're doing initial load
         this.sessionInitialized = false;
         
-        // These methods will be defined in other modules
-        await this.loadMemberInfo();
-        await this.loadAllScripts();
-        await this.loadAllProjects();
-        await this.loadConfiguration();
-        await this.loadOmegaInfo();
-        await this.loadPerks();
-        await this.loadLanguages();
-        await this.loadBuilds();
-        await this.loadSessionInfo();
+        try {
+            // STEP 1: Get comprehensive member data in ONE call (already done in connect, but get full data)
+            console.log('📊 Loading comprehensive member data...');
+            const memberResponse = await this.apiCall('getMember', {
+                scripts: '',
+                bans: '',
+                history: '',
+                fc2t: '',
+                xp: '',
+                rolls: '',
+                hashes: '',
+                beautify: ''
+            });
+            
+            // Update member data with comprehensive info
+            this.memberData = memberResponse;
+            this.memberScripts = memberResponse.scripts || [];
+            this.memberProjects = memberResponse.fc2t || [];
+            this.ownedPerks = memberResponse.perks || [];
+            
+            console.log(`✅ Member data loaded: ${this.memberScripts.length} scripts, ${this.memberProjects.length} projects`);
+            
+            // STEP 2: Make parallel calls for data that requires different endpoints
+            console.log('🔄 Loading additional data in parallel...');
+            const [
+                allScripts,
+                allProjects, 
+                configuration,
+                allPerks,
+                translations,
+                allBuilds,
+                omegaInfo
+            ] = await Promise.all([
+                this.apiCall('getAllScripts').catch(e => { console.warn('getAllScripts failed:', e); return []; }),
+                this.apiCall('getFC2TProjects').catch(e => { console.warn('getFC2TProjects failed:', e); return []; }),
+                this.apiCall('getConfiguration').catch(e => { console.warn('getConfiguration failed:', e); return '{}'; }),
+                this.apiCall('listPerks').catch(e => { console.warn('listPerks failed:', e); return []; }),
+                this.apiCall('getTranslations').catch(e => { console.warn('getTranslations failed:', e); return {}; }),
+                this.apiCall('getBuilds').catch(e => { console.warn('getBuilds failed:', e); return []; }),
+                this.apiCall('getSoftware', { name: 'omega' }).catch(e => { console.warn('getSoftware failed:', e); return {}; })
+            ]);
+            
+            // STEP 3: Process and store all the data
+            this.allScripts = allScripts;
+            this.allProjects = allProjects;
+            this.allPerks = allPerks;
+            this.allBuilds = allBuilds;
+            
+            // Process configuration
+            this.processConfigurationData(configuration);
+            
+            // Process languages from translations
+            this.processLanguageData(translations);
+            
+            // Process omega info
+            this.processOmegaInfo(omegaInfo);
+            
+            // Process builds
+            this.processBuildsData(allBuilds);
+            
+            console.log('✅ All data processed, updating displays...');
+            
+            // STEP 4: Update all displays at once
+            this.updateAllDisplays();
+            
+            // Load preferences (including caching preference)
+            this.loadCachingPreference();
+            this.loadAutoSavePreference();
+            
+            // Mark session as initialized - now caching can be used if enabled
+            this.sessionInitialized = true;
+            
+            console.log(`✅ Optimized data loading complete. Caching now ${this.cachingEnabled ? 'enabled' : 'disabled'} for future requests.`);
+            
+        } catch (error) {
+            console.error('❌ Error during optimized data loading:', error);
+            this.showMessage('Error loading dashboard data. Some features may not work properly.', 'error');
+            
+            // Still mark as initialized to prevent hanging
+            this.sessionInitialized = true;
+        }
+    },
+    
+    processConfigurationData(configText) {
+        try {
+            console.log('Processing configuration data...');
+            
+            // Handle different types of empty/reset configurations
+            let parsedConfig = {};
+            
+            if (!configText || configText === '' || configText === 'null' || configText === 'undefined') {
+                console.log('Configuration is empty/reset, using empty object');
+                parsedConfig = {};
+            } else if (typeof configText === 'string') {
+                try {
+                    parsedConfig = JSON.parse(configText);
+                    console.log('Successfully parsed configuration JSON');
+                } catch (parseError) {
+                    console.error('Failed to parse configuration JSON:', parseError);
+                    console.log('Using empty object due to parse error');
+                    parsedConfig = {};
+                }
+            } else if (typeof configText === 'object' && configText !== null) {
+                parsedConfig = configText;
+                console.log('Configuration is already an object');
+            } else {
+                console.log('Unknown configuration format, using empty object');
+                parsedConfig = {};
+            }
 
-        // Load preferences (including caching preference)
-        this.loadCachingPreference();
-        this.loadAutoSavePreference();
-        
-        // Mark session as initialized - now caching can be used if enabled
-        this.sessionInitialized = true;
-        
-        console.log(`✅ Initial data loaded. Caching now ${this.cachingEnabled ? 'enabled' : 'disabled'} for future requests.`);
+            // Update the current config
+            this.currentConfig = parsedConfig;
+            
+            console.log('✅ Configuration processed successfully');
+            
+        } catch (error) {
+            console.error('Error processing configuration:', error);
+            this.currentConfig = {};
+        }
+    },
+
+    processLanguageData(translations) {
+        try {
+            console.log('Processing language data...');
+            
+            // Extract all unique language codes from the translations
+            const languageSet = new Set();
+
+            if (typeof translations === 'object' && translations) {
+                // Iterate through all translation entries
+                Object.values(translations).forEach(translationEntry => {
+                    if (typeof translationEntry === 'object' && translationEntry) {
+                        // Get all language codes from this translation entry
+                        Object.keys(translationEntry).forEach(langCode => {
+                            languageSet.add(langCode);
+                        });
+                    }
+                });
+            }
+
+            // Convert Set to object with display names
+            this.availableLanguages = {};
+            languageSet.forEach(langCode => {
+                // Create nice display names
+                const displayName = this.formatLanguageName(langCode);
+                this.availableLanguages[langCode] = displayName;
+            });
+
+            console.log(`✅ Processed ${Object.keys(this.availableLanguages).length} languages`);
+            
+        } catch (error) {
+            console.error('Error processing languages:', error);
+            
+            // Fallback to basic language list
+            this.availableLanguages = {
+                'french': 'French',
+                'chinese': 'Chinese', 
+                'spanish': 'Spanish',
+                'russian': 'Russian',
+                'dutch': 'Dutch',
+                'polish': 'Polish',
+                'turkish': 'Turkish',
+                'german': 'German',
+                'portuguese': 'Portuguese',
+                'danish': 'Danish',
+                'norwegian': 'Norwegian'
+            };
+        }
+    },
+
+    processOmegaInfo(omegaInfo) {
+        try {
+            console.log('Processing Omega info...');
+            
+            this.omegaVersion = omegaInfo.version || 'Latest Version';
+            this.omegaLastUpdate = omegaInfo.elapsed || 'Recently';
+            
+            console.log('✅ Omega info processed');
+            
+        } catch (error) {
+            console.error('Error processing Omega info:', error);
+            // Keep defaults
+            this.omegaVersion = 'Latest Version';
+            this.omegaLastUpdate = 'Recently';
+        }
+    },
+
+    processBuildsData(allBuilds) {
+        try {
+            console.log('Processing builds data...');
+            
+            this.allBuilds = allBuilds || [];
+
+            this.myBuilds = this.allBuilds.filter(build =>
+                build.author === this.memberData.username &&
+                (build.private !== 1 || build.author === this.memberData.username)
+            );
+            
+            console.log(`✅ Processed ${this.allBuilds.length} builds (${this.myBuilds.length} mine)`);
+            
+        } catch (error) {
+            console.error('Error processing builds:', error);
+            this.allBuilds = [];
+            this.myBuilds = [];
+        }
+    },
+
+    updateAllDisplays() {
+        try {
+            console.log('🎨 Updating all UI displays...');
+            
+            // Update member info display
+            this.updateMemberInfoDisplay();
+            
+            // Update script displays
+            this.displayMyScripts();
+            this.displayAvailableScripts();
+            this.populateScriptConfigSelect();
+            
+            // Update project displays  
+            this.displayMyProjects();
+            this.displayAvailableProjects();
+            
+            // Update build displays
+            this.displayMyBuilds();
+            this.displayAvailableBuilds();
+            
+            // Update configuration displays
+            this.updateConfigurationDisplay();
+            this.populateSoftwareDropdown();
+            
+            // Update perk displays
+            this.updatePerkStats();
+            this.displayPerks();
+            
+            // Update language dropdown
+            this.populateLanguageDropdown();
+            
+            // Update omega info
+            this.updateOmegaInfoDisplay();
+            
+            // Update session displays
+            this.displayCurrentSessionInfo();
+            this.displaySessionStats();
+            this.displaySessionHistory();
+            this.updatePersonalizedTerminal();
+            
+            // Apply default sorting
+            setTimeout(() => {
+                this.sortMyScripts();
+                this.sortAvailableScripts();
+                this.sortMyProjects();
+                this.sortAvailableProjects();
+                this.sortMyBuilds();
+                this.sortAvailableBuilds();
+            }, 100);
+            
+            console.log('✅ All displays updated');
+            
+        } catch (error) {
+            console.error('Error updating displays:', error);
+            this.showMessage('Error updating interface. Please refresh the page.', 'error');
+        }
+    },
+
+    updateMemberInfoDisplay() {
+        const memberStatsEl = document.getElementById('memberStats');
+        if (!memberStatsEl) return;
+
+        memberStatsEl.innerHTML = `
+            <div class="stat-box">
+                <div class="stat-label">Username</div>
+                <div class="stat-value">${this.memberData.username}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Level</div>
+                <div class="stat-value">${this.memberData.level}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">XP</div>
+                <div class="stat-value">${this.memberData.xp.toLocaleString()}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Posts</div>
+                <div class="stat-value">${this.memberData.posts || 0}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Score</div>
+                <div class="stat-value">${this.memberData.score || 0}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Active Scripts</div>
+                <div class="stat-value">${this.memberScripts.length}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Active Projects</div>
+                <div class="stat-value">${this.memberProjects.length}</div>
+            </div>
+            <div class="stat-box">
+                <div class="stat-label">Protection Mode</div>
+                <div class="stat-value">${this.protectionModes[this.memberData.protection] || 'Unknown'}</div>
+            </div>
+        `;
+
+        // Populate protection mode dropdown
+        this.populateProtectionModeDropdown();
+    },
+
+    updateConfigurationDisplay() {
+        const configDisplay = document.getElementById('configDisplay');
+        if (configDisplay) {
+            configDisplay.textContent = JSON.stringify(this.currentConfig, null, 2);
+            this.highlightJSONEditor();
+            this.setupJSONEditorFeatures();
+        }
+    },
+
+    updateOmegaInfoDisplay() {
+        const omegaInfoEl = document.getElementById('omegaInfo');
+        if (omegaInfoEl) {
+            omegaInfoEl.innerHTML = `
+                ${this.omegaVersion} • Last Updated: ${this.omegaLastUpdate}
+            `;
+        }
     },
 };
 
