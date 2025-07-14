@@ -9,45 +9,19 @@ Object.assign(app, {
     // ========================
 
     async loadMemberInfo() {
-        const memberStatsEl = document.getElementById('memberStats');
-
-        memberStatsEl.innerHTML = `
-            <div class="stat-box">
-                <div class="stat-label">Username</div>
-                <div class="stat-value">${this.memberData.username}</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Level</div>
-                <div class="stat-value">${this.memberData.level}</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">XP</div>
-                <div class="stat-value">${this.memberData.xp.toLocaleString()}</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Posts</div>
-                <div class="stat-value">${this.memberData.posts || 0}</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Score</div>
-                <div class="stat-value">${this.memberData.score || 0}</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Active Scripts</div>
-                <div class="stat-value">${this.memberScripts.length}</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Active Projects</div>
-                <div class="stat-value">${this.memberProjects.length}</div>
-            </div>
-            <div class="stat-box">
-                <div class="stat-label">Protection Mode</div>
-                <div class="stat-value">${this.protectionModes[this.memberData.protection] || 'Unknown'}</div>
-            </div>
-        `;
-
-        // Populate protection mode dropdown
-        this.populateProtectionModeDropdown();
+        // If this is called outside of initial load, refresh member data
+        if (this.sessionInitialized) {
+            const response = await this.apiCall('getMember', {
+                scripts: '',
+                bans: '',
+                fc2t: '',
+                beautify: ''
+            });
+            this.memberData = response;
+            this.memberScripts = response.scripts || [];
+            this.memberProjects = response.fc2t || [];
+        }
+        this.updateMemberInfoDisplay();
     },
 
     showSettingsModal() {
@@ -63,60 +37,53 @@ Object.assign(app, {
     },
 
     async loadAllScripts() {
-        try {
+        // Only fetch if not part of initial load
+        if (this.sessionInitialized) {
             const response = await this.apiCall('getAllScripts');
             this.allScripts = response;
-
-            this.displayMyScripts();
-            this.displayAvailableScripts();
-            this.populateScriptConfigSelect();
-
-            // Apply default sorting (recently updated)
-            setTimeout(() => {
-                this.sortMyScripts();
-                this.sortAvailableScripts();
-            }, 100);
-
-        } catch (error) {
-            console.error('Error loading scripts:', error);
         }
+        
+        this.displayMyScripts();
+        this.displayAvailableScripts();
+        this.populateScriptConfigSelect();
+
+        // Apply default sorting
+        setTimeout(() => {
+            this.sortMyScripts();
+            this.sortAvailableScripts();
+        }, 100);
     },
 
     async loadAllProjects() {
-        try {
+        // Only fetch if not part of initial load  
+        if (this.sessionInitialized) {
             const response = await this.apiCall('getFC2TProjects');
             this.allProjects = response;
-
-            this.displayMyProjects();
-            this.displayAvailableProjects();
-
-            // Apply default sorting (recently updated)
-            setTimeout(() => {
-                this.sortMyProjects();
-                this.sortAvailableProjects();
-            }, 100);
-
-        } catch (error) {
-            console.error('Error loading projects:', error);
         }
+
+        this.displayMyProjects();
+        this.displayAvailableProjects();
+
+        // Apply default sorting
+        setTimeout(() => {
+            this.sortMyProjects();
+            this.sortAvailableProjects();
+        }, 100);
     },
 
     async loadOmegaInfo() {
-        try {
-            // Try to get Omega version info
-            const response = await this.apiCall('getSoftware', {
-                name: 'omega'
-            });
-            this.omegaVersion = response.version || 'Latest Version';
-            this.omegaLastUpdate = response.elapsed || 'Recently';
-
-            document.getElementById('omegaInfo').innerHTML = `
-                ${this.omegaVersion} • Last Updated: ${this.omegaLastUpdate}
-            `;
-        } catch (error) {
-            // If omega software info isn't available, keep default text
-            console.log('Could not load Omega version info, using defaults');
+        // Only fetch if not part of initial load
+        if (this.sessionInitialized) {
+            try {
+                const response = await this.apiCall('getSoftware', { name: 'omega' });
+                this.omegaVersion = response.version || 'Latest Version';
+                this.omegaLastUpdate = response.elapsed || 'Recently';
+            } catch (error) {
+                console.log('Could not load Omega version info, using defaults');
+            }
         }
+        
+        this.updateOmegaInfoDisplay();
     },
 
     // ========================
@@ -1689,6 +1656,21 @@ Object.assign(app, {
             return;
         }
         
+        // Check if the JSON editor currently has focus
+        const hadFocus = document.activeElement === jsonEditor;
+        
+        // Store cursor position only if JSON editor has focus
+        let cursorOffset = 0;
+        const selection = window.getSelection();
+        
+        try {
+            if (hadFocus && selection.rangeCount > 0 && jsonEditor.contains(selection.anchorNode)) {
+                cursorOffset = this.getJSONCaretPosition(jsonEditor);
+            }
+        } catch (e) {
+            console.warn('Could not get JSON cursor position:', e);
+        }
+        
         // Validate JSON first
         try {
             JSON.parse(content);
@@ -1696,18 +1678,6 @@ Object.assign(app, {
             // If JSON is invalid, don't highlight (but don't break either)
             console.log('JSON invalid, skipping highlight');
             return;
-        }
-        
-        // Store cursor position
-        let cursorOffset = 0;
-        const selection = window.getSelection();
-        
-        try {
-            if (selection.rangeCount > 0 && jsonEditor.contains(selection.anchorNode)) {
-                cursorOffset = this.getJSONCaretPosition(jsonEditor);
-            }
-        } catch (e) {
-            console.warn('Could not get JSON cursor position:', e);
         }
         
         // Create a temporary element to highlight
@@ -1723,15 +1693,20 @@ Object.assign(app, {
         jsonEditor.innerHTML = tempDiv.innerHTML;
         jsonEditor.className = 'json-editor hljs';
         
-        // Restore cursor position
-        setTimeout(() => {
-            try {
-                this.setJSONCaretPosition(jsonEditor, cursorOffset);
-            } catch (e) {
-                console.warn('Could not restore JSON cursor position:', e);
-                jsonEditor.focus();
-            }
-        }, 10);
+        // Only restore cursor position if the JSON editor had focus originally
+        if (hadFocus) {
+            setTimeout(() => {
+                try {
+                    this.setJSONCaretPosition(jsonEditor, cursorOffset);
+                } catch (e) {
+                    console.warn('Could not restore JSON cursor position:', e);
+                    // Only focus if it originally had focus and restoration failed
+                    if (document.activeElement !== jsonEditor) {
+                        jsonEditor.focus();
+                    }
+                }
+            }, 10);
+        }
         
         console.log('JSON highlighting completed');
     },
@@ -1781,37 +1756,62 @@ Object.assign(app, {
         if (!jsonEditor) return;
         
         // Remove any existing listeners to avoid duplicates
-        jsonEditor.removeEventListener('input', this.jsonInputHandler);
-        jsonEditor.removeEventListener('blur', this.jsonBlurHandler);
-        jsonEditor.removeEventListener('keydown', this.jsonKeydownHandler);
+        if (this.jsonEditorListenersAttached) {
+            return; // Already attached
+        }
         
-        // Create bound handlers so we can remove them later
-        this.jsonInputHandler = () => {
-            clearTimeout(this.jsonHighlightTimeout);
-            this.jsonHighlightTimeout = setTimeout(() => {
+        // Simple input handler - highlight after typing stops
+        let typingTimer;
+        
+        jsonEditor.addEventListener('input', () => {
+            // Clear the previous timer
+            clearTimeout(typingTimer);
+            
+            // Set a new timer - highlight after 800ms of no typing
+            typingTimer = setTimeout(() => {
                 console.log('JSON highlighting after typing stopped');
                 this.highlightJSONEditor();
             }, 800);
-        };
-        
-        this.jsonBlurHandler = () => {
+        });
+
+        // Highlight immediately when clicking away
+        jsonEditor.addEventListener('blur', () => {
             console.log('JSON highlighting on blur');
-            clearTimeout(this.jsonHighlightTimeout);
+            clearTimeout(typingTimer);
             this.highlightJSONEditor();
-        };
-        
-        this.jsonKeydownHandler = (e) => {
+        });
+
+        // Tab key support
+        jsonEditor.addEventListener('keydown', (e) => {
             if (e.key === 'Tab') {
                 e.preventDefault();
                 document.execCommand('insertText', false, '  '); // 2 spaces for JSON
             }
-        };
+        });
         
-        // Attach event listeners
-        jsonEditor.addEventListener('input', this.jsonInputHandler);
-        jsonEditor.addEventListener('blur', this.jsonBlurHandler);
-        jsonEditor.addEventListener('keydown', this.jsonKeydownHandler);
+        // Mark listeners as attached
+        this.jsonEditorListenersAttached = true;
         
         console.log('JSON editor event listeners attached');
+    },
+    
+    formatLanguageName(langCode) {
+        // Create nice display names for language codes
+        const languageNames = {
+            'french': 'French (Français)',
+            'chinese': 'Chinese (中文)',
+            'spanish': 'Spanish (Español)',
+            'russian': 'Russian (Русский)',
+            'dutch': 'Dutch (Nederlands)',
+            'polish': 'Polish (Polski)',
+            'turkish': 'Turkish (Türkçe)',
+            'german': 'German (Deutsch)',
+            'portuguese': 'Portuguese (Português)',
+            'danish': 'Danish (Dansk)',
+            'norwegian': 'Norwegian (Norsk)',
+            // ... add more as needed
+        };
+        
+        return languageNames[langCode] || (langCode.charAt(0).toUpperCase() + langCode.slice(1));
     },
 });
