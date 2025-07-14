@@ -2908,4 +2908,26 @@ Object.assign(app, {
         
         return cacheItems;
     },
+
+    async refreshBuilds() {
+        try {
+            // Show loading state
+            const myBuildsGrid = document.getElementById('myBuildsGrid');
+            const availableBuildsGrid = document.getElementById('availableBuildsGrid');
+            
+            if (myBuildsGrid) myBuildsGrid.innerHTML = '<div class="spinner"></div>';
+            if (availableBuildsGrid) availableBuildsGrid.innerHTML = '<div class="spinner"></div>';
+            
+            // Add a small delay to help with session state
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // Try to load builds
+            await this.loadBuilds();
+            
+            this.showMessage('Builds refreshed successfully!', 'success');
+        } catch (error) {
+            console.error('Error refreshing builds:', error);
+            this.showMessage('Failed to refresh builds. Please try again later.', 'error');
+        }
+    },
 });

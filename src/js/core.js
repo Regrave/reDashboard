@@ -85,39 +85,56 @@ const app = {
     parseApiResponse(responseText) {
         // Check for common error messages first - be more specific
         if (typeof responseText === 'string') {
-            if (responseText.includes('You are not logged into the Member\'s Panel')) {
+            // Only check for errors at the START of the response or in specific error formats
+            // Don't trigger on error strings that might be inside valid JSON data
+            
+            // First, check if this looks like valid JSON data
+            const trimmed = responseText.trim();
+            if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
+                // This looks like JSON, try to parse it first before checking for errors
+                try {
+                    const parsed = JSON.parse(responseText);
+                    // If it parses successfully, it's valid data, not an error
+                    return parsed;
+                } catch (e) {
+                    // If JSON parsing fails, continue with error checking
+                }
+            }
+            
+            // Now check for actual error messages (not inside JSON data)
+            if (responseText.startsWith('You are not logged into the Member\'s Panel') || 
+                responseText.includes('You are not logged into the Member\'s Panel</pre>')) {
                 throw new Error('You are not logged into the Member\'s Panel. Please log into the forums first.');
             }
-            if (responseText.includes('invalid license key')) {
+            if (responseText.startsWith('invalid license key')) {
                 throw new Error('Invalid license key');
             }
-            if (responseText.includes('authorization denied')) {
+            if (responseText.startsWith('authorization denied')) {
                 throw new Error('Authorization denied by server');
             }
-            if (responseText.includes('enable 2-step')) {
+            if (responseText.startsWith('enable 2-step')) {
                 throw new Error('Two-step authorization must be enabled on your forum account');
             }
-            if (responseText.includes('not an active Session')) {
+            if (responseText.startsWith('not an active Session')) {
                 throw new Error('No active session found - please log into the forums and create a session');
             }
-            if (responseText.includes('handshake expired')) {
+            if (responseText.startsWith('handshake expired')) {
                 throw new Error('Session expired - please log in again');
             }
-            if (responseText.includes('handshake invalid')) {
+            if (responseText.startsWith('handshake invalid')) {
                 throw new Error('Invalid session token - please log in again');
             }
-            if (responseText.includes('24 hours')) {
+            if (responseText.includes('24 hours') && responseText.length < 100) {
                 throw new Error('Handshake system locked for 24 hours');
             }
-            // FIXED: More specific error detection for handshake conflicts
-            if (responseText.includes('handshake already exists')) {
-                throw new Error('HANDSHAKE_EXISTS'); // Special error type
+            if (responseText.startsWith('handshake already exists')) {
+                throw new Error('HANDSHAKE_EXISTS');
             }
-            // FIXED: Only trigger on actual encoding errors at the start of response, not anywhere in data
-            if (responseText.startsWith('encoding') || responseText.includes('encoding error')) {
+            if (responseText.startsWith('encoding')) {
                 throw new Error('Authentication encoding error - please log in again');
             }
-            if (responseText.includes('hash not matching')) {
+            // Remove the problematic getBuilds hash check - it's causing false positives
+            if (responseText.startsWith('hash not matching')) {
                 throw new Error('Security hash mismatch - please create a new session');
             }
         }
@@ -167,17 +184,20 @@ const app = {
             }
         }
 
-        // FIXED: Sanitize API key from debug output
-        const sanitizedUrl = url.toString().replace(this.apiKey, '***REDACTED***');
+        // Create a sanitized version ONLY for logging
+        const urlString = url.toString();
+        const sanitizedUrlForLogging = urlString.replace(this.apiKey, '***REDACTED***');
+        
         console.log('🔗 Making API call:', {
             cmd: cmd,
-            url: sanitizedUrl,
+            url: sanitizedUrlForLogging,
             protocol: location.protocol,
             params: params
         });
 
         try {
-            const response = await fetch(url);
+            // Use the original URL string for the actual request
+            const response = await fetch(urlString);
             
             console.log('📡 API Response received:', {
                 status: response.status,
@@ -188,12 +208,11 @@ const app = {
             
             const text = await response.text();
             
-            // FIXED: Sanitize API key from response text preview
+            // Sanitize response text preview
             const sanitizedText = text.replace(new RegExp(this.apiKey, 'g'), '***REDACTED***');
             console.log('📄 Raw API Response Text:', {
                 length: text.length,
                 preview: sanitizedText.substring(0, 500) + (sanitizedText.length > 500 ? '...' : ''),
-                // Remove fullText to avoid leaking sensitive data
             });
 
             // Check for specific error messages
@@ -211,7 +230,7 @@ const app = {
 
             const parsedResponse = this.parseApiResponse(text);
             
-            // FIXED: Sanitize API key from parsed response debug output
+            // Sanitize API key from parsed response debug output
             const sanitizedResponse = JSON.stringify(parsedResponse, (key, value) => {
                 if (typeof value === 'string' && value.includes(this.apiKey)) {
                     return value.replace(new RegExp(this.apiKey, 'g'), '***REDACTED***');
@@ -223,7 +242,7 @@ const app = {
             return parsedResponse;
 
         } catch (error) {
-            // FIXED: Sanitize API key from error output
+            // Sanitize API key from error output
             const sanitizedUrl = url.toString().replace(this.apiKey, '***REDACTED***');
             console.error('❌ API Call Error Details:', {
                 message: error.message,
@@ -320,6 +339,9 @@ const app = {
             const text = await response.text();
             const result = this.parseApiResponse(text);
 
+            
+            // console.log('🔐 getHandshake result:', result); // Debug
+
             if (result.status !== 200) {
                 throw new Error(result.message || 'Failed to get handshake');
             }
@@ -356,10 +378,15 @@ const app = {
 
             // Try to get the license key using the handshake token
             const licenseKey = await this.getHandshake(handshakeToken);
+            
+            // Debug
+            console.log('🔑 Got license key from handshake:', licenseKey ? `${licenseKey.substring(0, 4)}...` : 'NULL');
 
             if (licenseKey) {
                 this.apiKey = licenseKey;
-                console.log('✅ Handshake valid, got license key');
+                
+                // Debug
+                console.log('🔑 Set this.apiKey to:', this.apiKey ? `${this.apiKey.substring(0, 4)}...` : 'NULL');
 
                 // Verify the key works by getting member info
                 const response = await this.apiCall('getMember', {
@@ -369,12 +396,12 @@ const app = {
                     beautify: ''
                 });
 
-                // FIXED: Add validation for response data
+                // Add validation for response data
                 if (!response || typeof response !== 'object') {
                     throw new Error('Invalid member data received from API');
                 }
 
-                // FIXED: Ensure required properties exist with defaults
+                // Ensure required properties exist with defaults
                 this.memberData = {
                     username: response.username || 'Unknown',
                     level: response.level || 0,
@@ -400,7 +427,7 @@ const app = {
         } catch (error) {
             console.error('❌ Handshake login failed:', error);
 
-            // FIXED: Clear invalid handshake immediately on specific errors
+            // Clear invalid handshake immediately on specific errors
             const errorMessage = error.message.toLowerCase();
             if (errorMessage.includes('expired') || 
                 errorMessage.includes('invalid') || 
@@ -440,7 +467,7 @@ const app = {
         try {
             const rememberMe = document.getElementById('rememberMe').checked;
 
-            // FIXED: Check if we already have a working handshake for this key
+            // Check if we already have a working handshake for this key
             const existingHandshake = this.getHandshakeToken();
             if (existingHandshake) {
                 console.log('🔍 Found existing handshake, testing it first...');
@@ -510,7 +537,7 @@ const app = {
                     }
 
                 } catch (handshakeError) {
-                    // FIXED: Handle handshake conflicts with auto-regeneration
+                    // Handle handshake conflicts with auto-regeneration
                     if (handshakeError.message === 'HANDSHAKE_EXISTS') {
                         try {
                             this.showMessage('🔄 Session conflict detected, regenerating...', 'success');
@@ -947,7 +974,7 @@ const app = {
         document.getElementById('connectedUsername').textContent = this.memberData.username || 'Unknown';
         document.getElementById('userLevel').textContent = this.memberData.level || '0';
         
-        // FIXED: Add defensive check for XP
+        // Add defensive check for XP
         const xpValue = this.memberData.xp || 0;
         document.getElementById('userXP').textContent = xpValue.toLocaleString();
         
@@ -1167,7 +1194,6 @@ const app = {
                 configuration,
                 allPerks,
                 translations,
-                allBuilds,
                 omegaInfo
             ] = await Promise.all([
                 this.apiCall('getAllScripts').catch(e => { console.warn('getAllScripts failed:', e); return []; }),
@@ -1175,11 +1201,37 @@ const app = {
                 this.apiCall('getConfiguration').catch(e => { console.warn('getConfiguration failed:', e); return '{}'; }),
                 this.apiCall('listPerks').catch(e => { console.warn('listPerks failed:', e); return []; }),
                 this.apiCall('getTranslations').catch(e => { console.warn('getTranslations failed:', e); return {}; }),
-                this.apiCall('getBuilds').catch(e => { console.warn('getBuilds failed:', e); return []; }),
                 this.apiCall('getSoftware', { name: 'omega' }).catch(e => { console.warn('getSoftware failed:', e); return {}; })
             ]);
             
-            // STEP 3: Process and store all the data
+            // STEP 3: Try to load builds separately with retry logic
+            let allBuilds = [];
+            try {
+                allBuilds = await this.apiCall('getBuilds');
+            } catch (buildError) {
+                console.warn('Initial getBuilds failed:', buildError.message);
+                
+                // If it's a hash mismatch, try once more after a small delay
+                if (buildError.message.includes('hash mismatch') || buildError.message.includes('Security hash')) {
+                    console.log('🔄 Retrying getBuilds after hash mismatch...');
+                    await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
+                    
+                    try {
+                        allBuilds = await this.apiCall('getBuilds');
+                        console.log('✅ getBuilds succeeded on retry');
+                    } catch (retryError) {
+                        console.warn('getBuilds retry also failed:', retryError.message);
+                        allBuilds = [];
+                        
+                        // Show a less alarming message to the user
+                        this.showMessage('Build system temporarily unavailable. Other features are working normally.', 'warning');
+                    }
+                } else {
+                    allBuilds = [];
+                }
+            }
+            
+            // STEP 4: Process and store all the data
             this.allScripts = allScripts;
             this.allProjects = allProjects;
             this.allPerks = allPerks;
@@ -1199,7 +1251,7 @@ const app = {
             
             console.log('✅ All data processed, updating displays...');
             
-            // STEP 4: Update all displays at once
+            // STEP 5: Update all displays at once
             this.updateAllDisplays();
             
             // Load preferences (including caching preference)
