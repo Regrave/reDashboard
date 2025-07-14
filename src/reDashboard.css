@@ -691,24 +691,30 @@ body {
 }
 
 .json-editor {
-	background: #0a0a0a;
-	border: 1px solid #444;
-	border-radius: 8px;
-	padding: 15px;
-	color: #0f0;
-	font-family: 'Consolas', 'Monaco', monospace;
-	font-size: 14px;
-	min-height: 300px;
-	max-height: 500px;
-	overflow: auto;
-	white-space: pre-wrap;
-	word-wrap: break-word;
+    background: #0a0a0a;
+    border: 1px solid #444;
+    border-radius: 8px;
+    padding: 15px;
+    color: #0f0;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 14px;
+    min-height: 300px;
+    max-height: 500px;
+    overflow: auto;
+    white-space: pre-wrap;
+    word-wrap: break-word;
+    cursor: text;
+    user-select: text;
 }
 
 .json-editor:focus {
 	outline: none;
 	border-color: #4a9eff;
 	box-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
+}
+
+.json-editor:not(:focus) {
+    cursor: pointer;
 }
 
 .script-config-form {
@@ -804,8 +810,46 @@ body {
 }
 
 .form-select option {
-	background: #2a2a2a;
-	color: #fff;
+    background: #2a2a2a !important;
+    color: #fff !important;
+}
+
+/* Additional dropdown styling for better visibility */
+.form-select {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    color: #fff;
+    font-size: 16px;
+    transition: all 0.3s;
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6,9 12,15 18,9'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+}
+
+.form-select:focus {
+    outline: none;
+    border-color: #4a9eff;
+    background: rgba(255, 255, 255, 0.1);
+    box-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
+}
+
+/* Force dropdown options styling (browser-specific) */
+.config-input option,
+.form-select option {
+    background-color: #2a2a2a !important;
+    color: #ffffff !important;
+    padding: 8px 12px;
+}
+
+/* Webkit browsers */
+.config-input option:checked,
+.form-select option:checked {
+    background-color: #4a9eff !important;
+    color: #ffffff !important;
 }
 
 .config-input {
