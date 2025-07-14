@@ -16,7 +16,6 @@ const app = {
     omegaLastUpdate: 'Recently',
     currentConfig: {},
     currentScriptConfig: {},
-    configMetadataCache: {},
     currentScriptKey: '',
 
         // Caching settings
@@ -83,94 +82,44 @@ const app = {
     // ========================
     
     parseApiResponse(responseText) {
-        // Check for common error messages first - be more specific
-        if (typeof responseText === 'string') {
-            // Only check for errors at the START of the response or in specific error formats
-            // Don't trigger on error strings that might be inside valid JSON data
+        // Try to parse as JSON first
+        try {
+            const jsonData = JSON.parse(responseText);
             
-            // First, check if this looks like valid JSON data
-            const trimmed = responseText.trim();
-            if (trimmed.startsWith('[') || trimmed.startsWith('{')) {
-                // This looks like JSON, try to parse it first before checking for errors
-                try {
-                    const parsed = JSON.parse(responseText);
-                    // If it parses successfully, it's valid data, not an error
-                    return parsed;
-                } catch (e) {
-                    // If JSON parsing fails, continue with error checking
+            // For handshake responses, return the full object including status
+            if (jsonData && jsonData.status !== undefined) {
+                return jsonData;
+            }
+
+            // For regular API responses
+            if (jsonData && jsonData.code && jsonData.code !== 200) {
+                throw new Error(jsonData.message || 'API request failed');
+            }
+
+            return jsonData.message || jsonData;
+        } catch (e) {
+            // If JSON parsing fails, check for HTML wrapper
+            if (responseText.includes('<pre>')) {
+                const match = responseText.match(/<pre>([\s\S]*?)<\/pre>/);
+                if (match && match[1]) {
+                    try {
+                        const jsonData = JSON.parse(match[1]);
+                        
+                        if (jsonData && jsonData.code && jsonData.code !== 200) {
+                            throw new Error(jsonData.message || 'API request failed');
+                        }
+                        
+                        return jsonData.message || jsonData;
+                    } catch (parseError) {
+                        // If we can't parse the JSON inside the HTML, just throw the raw response
+                        throw new Error(responseText);
+                    }
                 }
             }
             
-            // Now check for actual error messages (not inside JSON data)
-            if (responseText.startsWith('You are not logged into the Member\'s Panel') || 
-                responseText.includes('You are not logged into the Member\'s Panel</pre>')) {
-                throw new Error('You are not logged into the Member\'s Panel. Please log into the forums first.');
-            }
-            if (responseText.startsWith('invalid license key')) {
-                throw new Error('Invalid license key');
-            }
-            if (responseText.startsWith('authorization denied')) {
-                throw new Error('Authorization denied by server');
-            }
-            if (responseText.startsWith('enable 2-step')) {
-                throw new Error('Two-step authorization must be enabled on your forum account');
-            }
-            if (responseText.startsWith('not an active Session')) {
-                throw new Error('No active session found - please log into the forums and create a session');
-            }
-            if (responseText.startsWith('handshake expired')) {
-                throw new Error('Session expired - please log in again');
-            }
-            if (responseText.startsWith('handshake invalid')) {
-                throw new Error('Invalid session token - please log in again');
-            }
-            if (responseText.includes('24 hours') && responseText.length < 100) {
-                throw new Error('Handshake system locked for 24 hours');
-            }
-            if (responseText.startsWith('handshake already exists')) {
-                throw new Error('HANDSHAKE_EXISTS');
-            }
-            if (responseText.startsWith('encoding')) {
-                throw new Error('Authentication encoding error - please log in again');
-            }
-            // Remove the problematic getBuilds hash check - it's causing false positives
-            if (responseText.startsWith('hash not matching')) {
-                throw new Error('Security hash mismatch - please create a new session');
-            }
+            // For anything else that's not JSON, just throw the raw response
+            throw new Error(responseText);
         }
-
-        let jsonData;
-
-        if (responseText.includes('<pre>')) {
-            const match = responseText.match(/<pre>([\s\S]*?)<\/pre>/);
-            if (match && match[1]) {
-                try {
-                    jsonData = JSON.parse(match[1]);
-                } catch (e) {
-                    throw new Error('Failed to parse JSON from HTML wrapper');
-                }
-            } else {
-                throw new Error('Could not extract JSON from response');
-            }
-        } else {
-            try {
-                jsonData = JSON.parse(responseText);
-            } catch (e) {
-                return responseText; // Raw response (like configuration)
-            }
-        }
-
-        // For handshake responses, return the full object including status
-        if (jsonData && jsonData.status !== undefined) {
-            return jsonData;
-        }
-
-        // For regular API responses
-        if (jsonData && jsonData.code && jsonData.code !== 200) {
-            throw new Error(jsonData.message || 'API request failed');
-        }
-
-        return jsonData.message || jsonData;
     },
 
     async apiCall(cmd, params = {}) {
@@ -196,7 +145,6 @@ const app = {
         });
 
         try {
-            // Use the original URL string for the actual request
             const response = await fetch(urlString);
             
             console.log('📡 API Response received:', {
@@ -214,19 +162,6 @@ const app = {
                 length: text.length,
                 preview: sanitizedText.substring(0, 500) + (sanitizedText.length > 500 ? '...' : ''),
             });
-
-            // Check for specific error messages
-            if (text.includes('You are not logged into the Member\'s Panel')) {
-                throw new Error('You are not logged into the Member\'s Panel. Please log into the forums at constelia.ai first, then try again.');
-            } else if (text.includes('invalid license key')) {
-                throw new Error('Invalid license key');
-            } else if (text.includes('authorization denied')) {
-                throw new Error('Authorization denied by server');
-            } else if (text.includes('enable 2-step')) {
-                throw new Error('Two-step authorization must be enabled on your forum account');
-            } else if (text.includes('not an active Session')) {
-                throw new Error('No active session found - please log into the forums');
-            }
 
             const parsedResponse = this.parseApiResponse(text);
             
@@ -262,7 +197,6 @@ const app = {
                 throw new Error('CORS_ERROR_FILE_PROTOCOL');
             }
             
-            this.showMessage(`API Error: ${error.message}`, 'error');
             throw error;
         }
     },
@@ -376,19 +310,11 @@ const app = {
             console.log('🔄 Attempting to restore session with handshake...');
             this.showMessage('Attempting to restore session...', 'success');
 
-            // Try to get the license key using the handshake token
             const licenseKey = await this.getHandshake(handshakeToken);
             
-            // Debug
-            console.log('🔑 Got license key from handshake:', licenseKey ? `${licenseKey.substring(0, 4)}...` : 'NULL');
-
             if (licenseKey) {
                 this.apiKey = licenseKey;
-                
-                // Debug
-                console.log('🔑 Set this.apiKey to:', this.apiKey ? `${this.apiKey.substring(0, 4)}...` : 'NULL');
 
-                // Verify the key works by getting member info
                 const response = await this.apiCall('getMember', {
                     scripts: '',
                     bans: '',
@@ -396,12 +322,10 @@ const app = {
                     beautify: ''
                 });
 
-                // Add validation for response data
                 if (!response || typeof response !== 'object') {
                     throw new Error('Invalid member data received from API');
                 }
 
-                // Ensure required properties exist with defaults
                 this.memberData = {
                     username: response.username || 'Unknown',
                     level: response.level || 0,
@@ -416,19 +340,15 @@ const app = {
                 console.log('✅ Session restored successfully');
                 this.showMessage(`Welcome back, ${this.memberData.username}! Session restored successfully.`, 'success');
 
-                // Update UI
                 this.updateUIAfterLogin();
-
-                // Load initial data
                 await this.loadInitialData();
-
                 return true;
             }
         } catch (error) {
             console.error('❌ Handshake login failed:', error);
 
-            // Clear invalid handshake immediately on specific errors
             const errorMessage = error.message.toLowerCase();
+            
             if (errorMessage.includes('expired') || 
                 errorMessage.includes('invalid') || 
                 errorMessage.includes('handshake') ||
@@ -436,10 +356,11 @@ const app = {
                 errorMessage.includes('forum') ||
                 errorMessage.includes('session')) {
                 
-                console.log('🗑️ Clearing invalid handshake token due to backend changes');
+                console.log('🔄 Invalid handshake detected, showing recovery interface...');
                 this.deleteHandshakeToken();
+                this.showInlineSessionRecovery();
+                return false;
                 
-                this.showMessage('Session expired due to recent system updates. Please log in again.', 'error');
             } else {
                 this.showMessage('Could not restore session. Please log in.', 'error');
             }
@@ -538,7 +459,7 @@ const app = {
 
                 } catch (handshakeError) {
                     // Handle handshake conflicts with auto-regeneration
-                    if (handshakeError.message === 'HANDSHAKE_EXISTS') {
+                    if (handshakeError.message.includes('handshake already exists')) {
                         try {
                             this.showMessage('🔄 Session conflict detected, regenerating...', 'success');
                             
@@ -1073,42 +994,23 @@ const app = {
 	},
 
     handleConnectionError(error) {
-        // Don't clean up on handshake conflicts - that's not an invalid session
-        const errorMessage = error.message.toLowerCase();
-        if (errorMessage === 'handshake_exists') {
-            // Don't clean up - just show helpful message
-            this.showMessage('⚠️ You already have an active session. Try refreshing the page or clearing browser data.', 'error');
-            return;
-        }
-        
         // Handle CORS errors specifically
         if (error.message === 'CORS_ERROR_FILE_PROTOCOL') {
             this.showMessage('❌ CORS Error: Cannot make API calls from file:// protocol.\n\nSolutions:\n• Serve this page over HTTP/HTTPS using a local web server\n• Use Python: python -m http.server 8000\n• Use Node.js: npx serve\n• Use VS Code Live Server extension', 'error');
             return;
         }
         
-        // Only clean up on actual authentication failures
+        // For everything else, just show the actual error message
+        this.showMessage(`API Error: ${error.message}`, 'error');
+        
+        // Only clean up session on specific authentication-related errors
+        const errorMessage = error.message.toLowerCase();
         if (errorMessage.includes('expired') || 
             errorMessage.includes('invalid') || 
-            (errorMessage.includes('encoding') && !errorMessage.includes('handshake')) ||
-            errorMessage.includes('session')) {
-            
+            errorMessage.includes('session') ||
+            errorMessage.includes('handshake') ||
+            errorMessage.includes('encoding')) {
             this.cleanupInvalidSession();
-        }
-
-        // Show appropriate error message
-        if (error.message.includes('24 hours')) {
-            this.showMessage('Handshake system locked for 24 hours. Please try again later.', 'error');
-        } else if (error.message === 'HANDSHAKE_EXISTS') {
-            this.showMessage('⚠️ You already have an active session. Please clear your browser cookies for constelia.ai and try again.', 'error');
-        } else if (error.message.includes('expired') || error.message.includes('encoding')) {
-            this.showMessage('🔄 Authentication system was recently updated. Please log in again with your license key.', 'error');
-        } else if (error.message.includes('invalid') || error.message.includes('handshake')) {
-            this.showMessage('❌ Session invalid due to recent system updates. Please log in again.', 'error');
-        } else if (error.message.includes('forum')) {
-            this.showMessage('⚠️ Please ensure you are logged into the forums at constelia.ai and have 2FA enabled.', 'error');
-        } else {
-            this.showMessage(`Connection failed: ${error.message}`, 'error');
         }
     },
 
@@ -1161,7 +1063,6 @@ const app = {
     async loadInitialData() {
         console.log('🔄 Loading initial data with API consolidation...');
         
-        // Mark that we're doing initial load
         this.sessionInitialized = false;
         
         try {
@@ -1178,7 +1079,6 @@ const app = {
                 beautify: ''
             });
             
-            // Update member data with comprehensive info
             this.memberData = memberResponse;
             this.memberScripts = memberResponse.scripts || [];
             this.memberProjects = memberResponse.fc2t || [];
@@ -1188,87 +1088,162 @@ const app = {
             
             // STEP 2: Make parallel calls for data that requires different endpoints
             console.log('🔄 Loading additional data in parallel...');
-            const [
-                allScripts,
-                allProjects, 
-                configuration,
-                allPerks,
-                translations,
-                omegaInfo
-            ] = await Promise.all([
-                this.apiCall('getAllScripts').catch(e => { console.warn('getAllScripts failed:', e); return []; }),
-                this.apiCall('getFC2TProjects').catch(e => { console.warn('getFC2TProjects failed:', e); return []; }),
-                this.apiCall('getConfiguration').catch(e => { console.warn('getConfiguration failed:', e); return '{}'; }),
-                this.apiCall('listPerks').catch(e => { console.warn('listPerks failed:', e); return []; }),
-                this.apiCall('getTranslations').catch(e => { console.warn('getTranslations failed:', e); return {}; }),
-                this.apiCall('getSoftware', { name: 'omega' }).catch(e => { console.warn('getSoftware failed:', e); return {}; })
-            ]);
+            const dataResults = await this.loadDataInParallel();
             
-            // STEP 3: Try to load builds separately with retry logic
-            let allBuilds = [];
-            try {
-                allBuilds = await this.apiCall('getBuilds');
-            } catch (buildError) {
-                console.warn('Initial getBuilds failed:', buildError.message);
-                
-                // If it's a hash mismatch, try once more after a small delay
-                if (buildError.message.includes('hash mismatch') || buildError.message.includes('Security hash')) {
-                    console.log('🔄 Retrying getBuilds after hash mismatch...');
-                    await new Promise(resolve => setTimeout(resolve, 500)); // 500ms delay
-                    
-                    try {
-                        allBuilds = await this.apiCall('getBuilds');
-                        console.log('✅ getBuilds succeeded on retry');
-                    } catch (retryError) {
-                        console.warn('getBuilds retry also failed:', retryError.message);
-                        allBuilds = [];
-                        
-                        // Show a less alarming message to the user
-                        this.showMessage('Build system temporarily unavailable. Other features are working normally.', 'warning');
-                    }
-                } else {
-                    allBuilds = [];
-                }
-            }
+            // STEP 3: Process successful results
+            this.processDataResults(dataResults);
             
-            // STEP 4: Process and store all the data
-            this.allScripts = allScripts;
-            this.allProjects = allProjects;
-            this.allPerks = allPerks;
-            this.allBuilds = allBuilds;
-            
-            // Process configuration
-            this.processConfigurationData(configuration);
-            
-            // Process languages from translations
-            this.processLanguageData(translations);
-            
-            // Process omega info
-            this.processOmegaInfo(omegaInfo);
-            
-            // Process builds
-            this.processBuildsData(allBuilds);
-            
+            // STEP 4: Update displays
             console.log('✅ All data processed, updating displays...');
-            
-            // STEP 5: Update all displays at once
             this.updateAllDisplays();
             
-            // Load preferences (including caching preference)
+            // Load preferences
             this.loadCachingPreference();
             this.loadAutoSavePreference();
             
-            // Mark session as initialized - now caching can be used if enabled
             this.sessionInitialized = true;
-            
             console.log(`✅ Optimized data loading complete. Caching now ${this.cachingEnabled ? 'enabled' : 'disabled'} for future requests.`);
             
         } catch (error) {
             console.error('❌ Error during optimized data loading:', error);
-            this.showMessage('Error loading dashboard data. Some features may not work properly.', 'error');
             
-            // Still mark as initialized to prevent hanging
+            // Instead of throwing, try fallback loading
+            console.log('🔄 Attempting fallback data loading...');
+            await this.fallbackDataLoading();
+            
             this.sessionInitialized = true;
+        }
+    },
+
+    async loadDataInParallel() {
+        const dataPromises = [
+            this.apiCall('getAllScripts').catch(e => { console.warn('getAllScripts failed:', e); return []; }),
+            this.apiCall('getFC2TProjects').catch(e => { console.warn('getFC2TProjects failed:', e); return []; }),
+            this.apiCall('getConfiguration').catch(e => { console.warn('getConfiguration failed:', e); return '{}'; }),
+            this.apiCall('listPerks').catch(e => { console.warn('listPerks failed:', e); return []; }),
+            this.apiCall('getTranslations').catch(e => { console.warn('getTranslations failed:', e); return {}; }),
+            this.apiCall('getSoftware', { name: 'omega' }).catch(e => { console.warn('getSoftware failed:', e); return {}; }),
+            this.loadBuildsWithRetry()
+        ];
+        
+        return await Promise.allSettled(dataPromises);
+    },
+
+    async loadBuildsWithRetry() {
+        try {
+            return await this.apiCall('getBuilds');
+        } catch (buildError) {
+            console.warn('Initial getBuilds failed:', buildError.message);
+            
+            if (buildError.message.includes('hash mismatch') || buildError.message.includes('Security hash')) {
+                console.log('🔄 Retrying getBuilds after hash mismatch...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
+                try {
+                    const result = await this.apiCall('getBuilds');
+                    console.log('✅ getBuilds succeeded on retry');
+                    return result;
+                } catch (retryError) {
+                    console.warn('getBuilds retry also failed:', retryError.message);
+                    return [];
+                }
+            }
+            return [];
+        }
+    },
+
+    processDataResults(results) {
+        const [allScripts, allProjects, configuration, allPerks, translations, omegaInfo, allBuilds] = results;
+        
+        // Process each result, handling failures gracefully
+        this.allScripts = allScripts.status === 'fulfilled' ? allScripts.value : [];
+        this.allProjects = allProjects.status === 'fulfilled' ? allProjects.value : [];
+        this.allPerks = allPerks.status === 'fulfilled' ? allPerks.value : [];
+        this.allBuilds = allBuilds.status === 'fulfilled' ? allBuilds.value : [];
+        
+        if (configuration.status === 'fulfilled') {
+            this.processConfigurationData(configuration.value);
+        } else {
+            this.currentConfig = {};
+        }
+        
+        if (translations.status === 'fulfilled') {
+            this.processLanguageData(translations.value);
+        } else {
+            this.availableLanguages = {};
+        }
+        
+        if (omegaInfo.status === 'fulfilled') {
+            this.processOmegaInfo(omegaInfo.value);
+        } else {
+            this.omegaVersion = 'Latest Version';
+            this.omegaLastUpdate = 'Recently';
+        }
+        
+        this.processBuildsData(this.allBuilds);
+    },
+
+    async fallbackDataLoading() {
+        console.log('🔄 Using fallback data loading with minimal requirements...');
+        
+        try {
+            // Load only essential data
+            this.allScripts = [];
+            this.allProjects = [];
+            this.allPerks = [];
+            this.allBuilds = [];
+            this.currentConfig = {};
+            this.availableLanguages = {};
+            
+            // At minimum, try to load scripts since that's most important
+            try {
+                this.allScripts = await this.apiCall('getAllScripts');
+                console.log('✅ Fallback: Scripts loaded');
+            } catch (e) {
+                console.warn('Fallback: Could not load scripts');
+            }
+            
+            // Try configuration
+            try {
+                const config = await this.apiCall('getConfiguration');
+                this.processConfigurationData(config);
+                console.log('✅ Fallback: Configuration loaded');
+            } catch (e) {
+                console.warn('Fallback: Could not load configuration');
+            }
+            
+            this.updateAllDisplays();
+            this.showMessage('⚠️ Some features may be limited due to connection issues. Core functionality is available.', 'warning');
+            
+        } catch (error) {
+            console.error('❌ Even fallback loading failed:', error);
+            this.showBasicInterface();
+            this.showMessage('⚠️ Limited offline mode. Some features unavailable.', 'error');
+        }
+    },
+
+    showBasicInterface() {
+        // Show minimal interface even if data loading completely fails
+        this.displayMyScripts();
+        this.updateMemberInfoDisplay();
+        
+        // Show helpful message
+        const overviewSection = document.getElementById('overview-section');
+        if (overviewSection) {
+            const existingCards = overviewSection.querySelectorAll('.card');
+            if (existingCards.length > 0) {
+                const helpCard = document.createElement('div');
+                helpCard.className = 'card';
+                helpCard.innerHTML = `
+                    <h2>⚠️ Limited Mode</h2>
+                    <p style="color: #aaa; margin-bottom: 15px;">
+                        The dashboard is running in limited mode due to connection issues. 
+                        Try refreshing the page or check your internet connection.
+                    </p>
+                    <button class="btn" onclick="window.location.reload()">🔄 Refresh Page</button>
+                `;
+                existingCards[existingCards.length - 1].parentNode.insertBefore(helpCard, existingCards[existingCards.length - 1].nextSibling);
+            }
         }
     },
     
@@ -1397,63 +1372,71 @@ const app = {
     },
 
     updateAllDisplays() {
-        try {
-            console.log('🎨 Updating all UI displays...');
+        console.log('🎨 Updating all UI displays...');
+        
+        const updates = [
+            { name: 'Member Info', fn: () => this.updateMemberInfoDisplay() },
+            { name: 'My Scripts', fn: () => this.displayMyScripts() },
+            { name: 'Available Scripts', fn: () => this.displayAvailableScripts() },
+            { name: 'Script Config', fn: () => this.populateScriptConfigSelect() },
+            { name: 'My Projects', fn: () => this.displayMyProjects() },
+            { name: 'Available Projects', fn: () => this.displayAvailableProjects() },
+            { name: 'My Builds', fn: () => this.displayMyBuilds() },
+            { name: 'Available Builds', fn: () => this.displayAvailableBuilds() },
+            { name: 'Configuration', fn: () => this.updateConfigurationDisplay() },
+            { name: 'Software Dropdown', fn: () => this.populateSoftwareDropdown() },
+            { name: 'Perk Stats', fn: () => this.updatePerkStats() },
+            { name: 'Perks Display', fn: () => this.displayPerks() },
+            { name: 'Language Dropdown', fn: () => this.populateLanguageDropdown() },
+            { name: 'Omega Info', fn: () => this.updateOmegaInfoDisplay() },
+            { name: 'Session Info', fn: () => this.displayCurrentSessionInfo() },
+            { name: 'Session Stats', fn: () => this.displaySessionStats() },
+            { name: 'Session History', fn: () => this.displaySessionHistory() },
+            { name: 'Terminal', fn: () => this.updatePersonalizedTerminal() }
+        ];
+        
+        const failed = [];
+        let successCount = 0;
+        
+        updates.forEach(update => {
+            try {
+                update.fn();
+                successCount++;
+            } catch (error) {
+                console.error(`❌ Failed to update ${update.name}:`, error);
+                failed.push(update.name);
+            }
+        });
+        
+        console.log(`✅ Display update complete: ${successCount}/${updates.length} successful`);
+        
+        if (failed.length > 0) {
+            console.warn('❌ Failed updates:', failed);
             
-            // Update member info display
-            this.updateMemberInfoDisplay();
-            
-            // Update script displays
-            this.displayMyScripts();
-            this.displayAvailableScripts();
-            this.populateScriptConfigSelect();
-            
-            // Update project displays  
-            this.displayMyProjects();
-            this.displayAvailableProjects();
-            
-            // Update build displays
-            this.displayMyBuilds();
-            this.displayAvailableBuilds();
-            
-            // Update configuration displays
-            this.updateConfigurationDisplay();
-            this.populateSoftwareDropdown();
-            
-            // Update perk displays
-            this.updatePerkStats();
-            this.displayPerks();
-            
-            // Update language dropdown
-            this.populateLanguageDropdown();
-            
-            // Update omega info
-            this.updateOmegaInfoDisplay();
-            
-            // Update session displays
-            this.displayCurrentSessionInfo();
-            this.displaySessionStats();
-            this.displaySessionHistory();
-            this.updatePersonalizedTerminal();
-            
-            // Apply default sorting
-            setTimeout(() => {
+            if (failed.length < updates.length / 2) {
+                // Less than half failed - show warning but don't break
+                this.showMessage(`⚠️ Some sections failed to load: ${failed.join(', ')}. Most features are working.`, 'warning');
+            } else {
+                // More than half failed - something is seriously wrong
+                this.showMessage('⚠️ Multiple sections failed to load. Try refreshing individual tabs instead of the whole page.', 'error');
+            }
+        }
+        
+        // Apply default sorting (with error handling)
+        setTimeout(() => {
+            try {
                 this.sortMyScripts();
                 this.sortAvailableScripts();
                 this.sortMyProjects();
                 this.sortAvailableProjects();
                 this.sortMyBuilds();
                 this.sortAvailableBuilds();
-            }, 100);
-            
-            console.log('✅ All displays updated');
-            
-        } catch (error) {
-            console.error('Error updating displays:', error);
-            this.showMessage('Error updating interface. Please refresh the page.', 'error');
-        }
+            } catch (error) {
+                console.warn('❌ Error during sorting:', error);
+            }
+        }, 100);
     },
-
+    
     updateMemberInfoDisplay() {
         const memberStatsEl = document.getElementById('memberStats');
         if (!memberStatsEl) return;
@@ -1571,6 +1554,122 @@ const app = {
             
             // Still clear local storage even if API call failed
             this.deleteHandshakeToken();
+        }
+    },
+    
+    showInlineSessionRecovery() {
+        const loginSection = document.getElementById('loginSection');
+        const recoverySection = document.createElement('div');
+        recoverySection.id = 'sessionRecovery';
+        recoverySection.className = 'session-recovery';
+        recoverySection.innerHTML = `
+            <div style="background: rgba(255, 140, 0, 0.1); border: 1px solid rgba(255, 140, 0, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #ff8c00; margin-bottom: 15px;">🔄 Session Expired</h3>
+                <p style="color: #aaa; margin-bottom: 15px;">
+                    Your saved session has expired due to recent system updates. 
+                    Enter your license key below to create a new secure session.
+                </p>
+                <div style="display: flex; gap: 10px; align-items: center;">
+                    <input type="password" class="api-key-input" id="recoveryApiKey" placeholder="Enter your license key..." style="flex: 1;">
+                    <button class="btn" onclick="app.recoverSession()">🔄 Recover Session</button>
+                    <button class="btn btn-small" onclick="app.cancelRecovery()" style="background: #666;">Cancel</button>
+                </div>
+            </div>
+        `;
+        
+        loginSection.style.display = 'none';
+        loginSection.parentNode.insertBefore(recoverySection, loginSection);
+    },
+
+    async recoverSession() {
+        const recoveryInput = document.getElementById('recoveryApiKey');
+        const licenseKey = recoveryInput.value.trim();
+        
+        if (!licenseKey) {
+            this.showMessage('Please enter your license key', 'error');
+            return;
+        }
+        
+        try {
+            const success = await this.regenerateHandshakeWithKey(licenseKey);
+            if (success) {
+                this.cancelRecovery();
+            }
+        } catch (error) {
+            console.error('Recovery failed:', error);
+            this.showMessage('Session recovery failed. Please try again.', 'error');
+        }
+    },
+
+    async regenerateHandshakeWithKey(licenseKey) {
+        try {
+            console.log('🔄 Regenerating handshake with license key...');
+            
+            const recoveryButton = document.querySelector('#sessionRecovery button');
+            if (recoveryButton) {
+                recoveryButton.disabled = true;
+                recoveryButton.textContent = '🔄 Regenerating...';
+            }
+            
+            await this.autoWipeAndRegenerateHandshake(licenseKey);
+            this.deleteHandshakeToken();
+            
+            const newHandshakeToken = await this.authorizeHandshake(licenseKey);
+            this.apiKey = await this.getHandshake(newHandshakeToken);
+            
+            const response = await this.apiCall('getMember', {
+                scripts: '',
+                bans: '',
+                fc2t: '',
+                beautify: ''
+            });
+
+            if (!response || typeof response !== 'object') {
+                throw new Error('Invalid member data after regeneration');
+            }
+
+            this.memberData = {
+                username: response.username || 'Unknown',
+                level: response.level || 0,
+                xp: response.xp || 0,
+                protection: response.protection || 2,
+                ...response
+            };
+            this.memberScripts = response.scripts || [];
+            this.memberProjects = response.fc2t || [];
+
+            this.setHandshakeToken(newHandshakeToken);
+            
+            console.log('✅ Handshake regenerated successfully');
+            this.showMessage(`🎉 Session renewed successfully! Welcome back, ${this.memberData.username}!`, 'success');
+            
+            this.updateUIAfterLogin();
+            await this.loadInitialData();
+            
+            return true;
+            
+        } catch (error) {
+            console.error('❌ Handshake regeneration with key failed:', error);
+            this.showMessage(`Session recovery failed: ${error.message}`, 'error');
+            return false;
+        } finally {
+            const recoveryButton = document.querySelector('#sessionRecovery button');
+            if (recoveryButton) {
+                recoveryButton.disabled = false;
+                recoveryButton.textContent = '🔄 Recover Session';
+            }
+        }
+    },
+
+    cancelRecovery() {
+        const recoverySection = document.getElementById('sessionRecovery');
+        const loginSection = document.getElementById('loginSection');
+        
+        if (recoverySection) {
+            recoverySection.remove();
+        }
+        if (loginSection) {
+            loginSection.style.display = 'flex';
         }
     }
 };

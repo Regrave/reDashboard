@@ -1794,24 +1794,4 @@ Object.assign(app, {
         
         console.log('JSON editor event listeners attached');
     },
-    
-    formatLanguageName(langCode) {
-        // Create nice display names for language codes
-        const languageNames = {
-            'french': 'French (Français)',
-            'chinese': 'Chinese (中文)',
-            'spanish': 'Spanish (Español)',
-            'russian': 'Russian (Русский)',
-            'dutch': 'Dutch (Nederlands)',
-            'polish': 'Polish (Polski)',
-            'turkish': 'Turkish (Türkçe)',
-            'german': 'German (Deutsch)',
-            'portuguese': 'Portuguese (Português)',
-            'danish': 'Danish (Dansk)',
-            'norwegian': 'Norwegian (Norsk)',
-            // ... add more as needed
-        };
-        
-        return languageNames[langCode] || (langCode.charAt(0).toUpperCase() + langCode.slice(1));
-    },
 });
