@@ -124,6 +124,22 @@ body {
 	display: block;
 }
 
+/* Always show omega button in header for users who need to download it first */
+.header-buttons .omega-button {
+	display: block !important;
+}
+
+/* Hide other header buttons until logged in */
+.header-buttons .roll-button:not(.active),
+.header-buttons .settings-button:not(.active) {
+	display: none;
+}
+
+/* Allow omega button to show in login section */
+.login-section .omega-button {
+	display: block;
+}
+
 .roll-button:hover:not(:disabled),
 .omega-button:hover:not(:disabled) {
 	transform: translateY(-2px);
