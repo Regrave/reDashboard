@@ -2795,11 +2795,16 @@ Object.assign(app, {
 
         // Update source code display with highlighting
         const sourceElement = document.getElementById('scriptSourceCode');
-        sourceElement.textContent = sourceCode;
-        sourceElement.className = 'source-code-highlighted';
         
-        // Apply syntax highlighting
-        hljs.highlightElement(sourceElement);
+        // Clear any previous highlighting
+        sourceElement.textContent = sourceCode;
+        sourceElement.className = 'language-lua source-code-highlighted';
+        sourceElement.removeAttribute('data-highlighted');
+        
+        // Force highlight.js to re-process the element
+        if (typeof hljs !== 'undefined') {
+            hljs.highlightElement(sourceElement);
+        }
 
         // Update line count
         const lineCount = sourceCode.split('\n').length;
@@ -2856,8 +2861,13 @@ Object.assign(app, {
         // Hide modal
         document.getElementById('scriptSourceModal').classList.remove('active');
 
-        // Clear content
-        document.getElementById('scriptSourceCode').textContent = '';
+        // Clear content but preserve the element structure for highlight.js
+        const codeElement = document.getElementById('scriptSourceCode');
+        codeElement.textContent = '';
+        // Remove highlight.js classes to ensure fresh highlighting next time
+        codeElement.className = 'source-code-highlighted';
+        codeElement.removeAttribute('data-highlighted');
+        
         document.getElementById('scriptSourceTitle').textContent = 'Loading...';
         document.getElementById('sourceScriptName').textContent = 'Script Name';
         document.getElementById('sourceScriptAuthor').textContent = 'Author';
