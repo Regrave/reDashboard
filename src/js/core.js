@@ -314,30 +314,8 @@ const app = {
             if (licenseKey) {
                 this.apiKey = licenseKey;
 
-                const response = await this.apiCall('getMember', {
-                    scripts: '',
-                    bans: '',
-                    fc2t: '',
-                    beautify: ''
-                });
-
-                if (!response || typeof response !== 'object') {
-                    throw new Error('Invalid member data received from API');
-                }
-
-                this.memberData = {
-                    username: response.username || 'Unknown',
-                    level: response.level || 0,
-                    xp: response.xp || 0,
-                    protection: response.protection || 2,
-                    ...response
-                };
-                
-                this.memberScripts = response.scripts || [];
-                this.memberProjects = response.fc2t || [];
-
-                this.showMessage(`Welcome back, ${this.memberData.username}! Session restored successfully.`, 'success');
-
+                // Skip the getMember call here - we'll do it in loadInitialData
+                this.showMessage('Session restored, loading data...', 'success');
                 this.updateUIAfterLogin();
                 await this.loadInitialData();
                 return true;
@@ -394,23 +372,12 @@ const app = {
                     // Try to use existing handshake
                     this.apiKey = await this.getHandshake(existingHandshake);
                     
-                    // Test if it works with a simple API call
-                    const testResponse = await this.apiCall('getMember', {
-                        beautify: ''
-                    });
-
-                    if (testResponse && testResponse.username) {
-                        // Existing handshake works!
-                        this.memberData = testResponse;
-                        this.memberScripts = testResponse.scripts || [];
-                        this.memberProjects = testResponse.fc2t || [];
-
-                        this.showMessage(`Welcome back, ${this.memberData.username}! Used existing session.`, 'success');
-                        this.updateUIAfterLogin();
-                        apiKeyInput.value = '';
-                        await this.loadInitialData();
-                        return;
-                    }
+                    // If we got a key, assume it works and let loadInitialData verify
+                    this.showMessage('Connected successfully, loading data...', 'success');
+                    this.updateUIAfterLogin();
+                    apiKeyInput.value = '';
+                    await this.loadInitialData();
+                    return;
                 } catch (existingError) {
                     console.log('❌ Existing handshake failed, will create new one:', existingError.message);
                     // Clear the invalid handshake and continue with new auth
@@ -428,31 +395,13 @@ const app = {
                     // Use handshake to get the actual key (verify it works)
                     this.apiKey = await this.getHandshake(handshakeToken);
 
-                    // Verify connection by getting member info
-                    const response = await this.apiCall('getMember', {
-                        scripts: '',
-                        bans: '',
-                        fc2t: '',
-                        beautify: ''
-                    });
-
-                    this.memberData = {
-                        username: response.username || 'Unknown',
-                        level: response.level || 0,
-                        xp: response.xp || 0,
-                        protection: response.protection || 2,
-                        ...response
-                    };
-                    this.memberScripts = response.scripts || [];
-                    this.memberProjects = response.fc2t || [];
-
                     // Save handshake token for future use
                     const tokenSaved = this.setHandshakeToken(handshakeToken);
 
                     if (tokenSaved) {
-                        this.showMessage(`Connected successfully! Welcome, ${this.memberData.username}! Session will be remembered.`, 'success');
+                        this.showMessage('Connected successfully, loading data... Session will be remembered.', 'success');
                     } else {
-                        this.showMessage(`Connected successfully! Welcome, ${this.memberData.username}!`, 'success');
+                        this.showMessage('Connected successfully, loading data...', 'success');
                     }
 
                 } catch (handshakeError) {
@@ -470,29 +419,11 @@ const app = {
                             // Now try to create a new handshake
                             const newHandshakeToken = await this.authorizeHandshake(licenseKey);
                             this.apiKey = await this.getHandshake(newHandshakeToken);
-                            
-                            // Verify connection
-                            const response = await this.apiCall('getMember', {
-                                scripts: '',
-                                bans: '',
-                                fc2t: '',
-                                beautify: ''
-                            });
-
-                            this.memberData = {
-                                username: response.username || 'Unknown',
-                                level: response.level || 0,
-                                xp: response.xp || 0,
-                                protection: response.protection || 2,
-                                ...response
-                            };
-                            this.memberScripts = response.scripts || [];
-                            this.memberProjects = response.fc2t || [];
 
                             // Save new handshake token
                             const tokenSaved = this.setHandshakeToken(newHandshakeToken);
                             
-                            this.showMessage(`✅ Session regenerated successfully! Welcome, ${this.memberData.username}!`, 'success');
+                            this.showMessage('✅ Session regenerated successfully, loading data...', 'success');
                             
                         } catch (regenerationError) {
                             console.error('Failed to auto-regenerate handshake:', regenerationError);
@@ -509,25 +440,7 @@ const app = {
                 this.showMessage('Connecting for this session...', 'success');
                 this.apiKey = licenseKey;
 
-                // Verify connection by getting member info
-                const response = await this.apiCall('getMember', {
-                    scripts: '',
-                    bans: '',
-                    fc2t: '',
-                    beautify: ''
-                });
-
-                this.memberData = {
-                    username: response.username || 'Unknown',
-                    level: response.level || 0,
-                    xp: response.xp || 0,
-                    protection: response.protection || 2,
-                    ...response
-                };
-                this.memberScripts = response.scripts || [];
-                this.memberProjects = response.fc2t || [];
-
-                this.showMessage(`Connected successfully! Welcome, ${this.memberData.username}!`, 'success');
+                this.showMessage('Connected successfully, loading data...', 'success');
             }
 
             // Only update UI and load data if connection was successful
@@ -567,29 +480,17 @@ const app = {
             this.showMessage('Verifying handshake token...', 'success');
             this.apiKey = await this.getHandshake(handshakeToken);
 
-            // Verify connection by getting member info
-            const response = await this.apiCall('getMember', {
-                scripts: '',
-                bans: '',
-                fc2t: '',
-                beautify: ''
-            });
-
-            this.memberData = response;
-            this.memberScripts = response.scripts || [];
-            this.memberProjects = response.fc2t || [];
-
             // Save handshake token only if "Remember me" is checked
             const rememberMe = document.getElementById('rememberMe').checked;
             if (rememberMe) {
                 const tokenSaved = this.setHandshakeToken(handshakeToken);
                 if (tokenSaved) {
-                    this.showMessage(`Connected successfully with handshake! Welcome, ${this.memberData.username}! Session will be remembered.`, 'success');
+                    this.showMessage('Connected successfully with handshake, loading data... Session will be remembered.', 'success');
                 } else {
-                    this.showMessage(`Connected successfully with handshake! Welcome, ${this.memberData.username}!`, 'success');
+                    this.showMessage('Connected successfully with handshake, loading data...', 'success');
                 }
             } else {
-                this.showMessage(`Connected successfully with handshake! Welcome, ${this.memberData.username}!`, 'success');
+                this.showMessage('Connected successfully with handshake, loading data...', 'success');
             }
 
             // Only update UI and load data if connection was successful
@@ -886,14 +787,23 @@ const app = {
         document.getElementById('advancedLogin').style.display = 'none';
         document.getElementById('connectedInfo').classList.add('active');
         document.getElementById('settingsButton').classList.add('active');
-        document.getElementById('connectedUsername').textContent = this.memberData.username || 'Unknown';
-        document.getElementById('userLevel').textContent = this.memberData.level || '0';
         
-        // Add defensive check for XP
-        const xpValue = this.memberData.xp || 0;
-        document.getElementById('userXP').textContent = xpValue.toLocaleString();
-        
-        this.setUserAvatar(this.memberData);
+        // Only update member info if we have memberData
+        if (this.memberData) {
+            document.getElementById('connectedUsername').textContent = this.memberData.username || 'Unknown';
+            document.getElementById('userLevel').textContent = this.memberData.level || '0';
+            
+            // Add defensive check for XP
+            const xpValue = this.memberData.xp || 0;
+            document.getElementById('userXP').textContent = xpValue.toLocaleString();
+            
+            this.setUserAvatar(this.memberData);
+        } else {
+            // Show loading state
+            document.getElementById('connectedUsername').textContent = 'Loading...';
+            document.getElementById('userLevel').textContent = '...';
+            document.getElementById('userXP').textContent = '...';
+        }
 
         document.getElementById('navTabs').classList.add('active');
         document.getElementById('contentArea').classList.add('active');
@@ -1061,31 +971,72 @@ const app = {
         this.sessionInitialized = false;
         
         try {
-            // STEP 1: Get comprehensive member data in ONE call (already done in connect, but get full data)
-            const memberResponse = await this.apiCall('getMember', {
-                scripts: '',
-                bans: '',
-                history: '',
-                fc2t: '',
-                xp: '',
-                rolls: '',
-                hashes: '',
-                beautify: ''
+            // Execute ALL API calls in parallel for maximum speed
+            const allDataPromises = [
+                // Member data - comprehensive call (critical)
+                this.apiCall('getMember', {
+                    scripts: '',
+                    bans: '',
+                    history: '',
+                    fc2t: '',
+                    xp: '',
+                    rolls: '',
+                    hashes: '',
+                    beautify: ''
+                }),
+                // All other data calls
+                this.apiCall('getAllScripts').catch(e => { console.warn('getAllScripts failed:', e); return []; }),
+                this.apiCall('getFC2TProjects').catch(e => { console.warn('getFC2TProjects failed:', e); return []; }),
+                this.apiCall('getConfiguration').catch(e => { console.warn('getConfiguration failed:', e); return '{}'; }),
+                this.apiCall('listPerks').catch(e => { console.warn('listPerks failed:', e); return []; }),
+                this.apiCall('getTranslations').catch(e => { console.warn('getTranslations failed:', e); return {}; }),
+                this.apiCall('getSoftware', { name: 'omega' }).catch(e => { console.warn('getSoftware failed:', e); return {}; }),
+                this.loadBuildsWithRetry()
+            ];
+            
+            // Start processing member data as soon as it arrives (don't wait for other calls)
+            allDataPromises[0].then(memberResponse => {
+                this.memberData = memberResponse;
+                this.memberScripts = memberResponse.scripts || [];
+                this.memberProjects = memberResponse.fc2t || [];
+                this.ownedPerks = memberResponse.perks || [];
+                
+                // Update the header with actual member info immediately
+                document.getElementById('connectedUsername').textContent = this.memberData.username || 'Unknown';
+                document.getElementById('userLevel').textContent = this.memberData.level || '0';
+                const xpValue = this.memberData.xp || 0;
+                document.getElementById('userXP').textContent = xpValue.toLocaleString();
+                this.setUserAvatar(this.memberData);
+                
+                // Show welcome message immediately when member data arrives
+                this.showMessage(`Welcome, ${this.memberData.username}!`, 'success');
+                
+                // Update member-specific displays immediately
+                try {
+                    this.updateMemberInfoDisplay();
+                    this.displayMyScripts();
+                    this.displayMyProjects();
+                    this.updatePersonalizedTerminal();
+                } catch (e) {
+                    console.warn('Some displays could not be updated immediately:', e);
+                }
+            }).catch(e => {
+                console.error('Failed to load member data:', e);
+                this.showMessage('Failed to load member data', 'error');
             });
             
-            this.memberData = memberResponse;
-            this.memberScripts = memberResponse.scripts || [];
-            this.memberProjects = memberResponse.fc2t || [];
-            this.ownedPerks = memberResponse.perks || [];
+            // Wait for all calls to complete
+            const results = await Promise.allSettled(allDataPromises);
             
+            // Verify member data loaded successfully
+            if (results[0].status !== 'fulfilled') {
+                throw new Error('Failed to load member data');
+            }
             
-            // STEP 2: Make parallel calls for data that requires different endpoints
-            const dataResults = await this.loadDataInParallel();
+            // Process other results
+            this.processDataResults(results.slice(1)); // Skip first result (member data)
             
-            // STEP 3: Process successful results
-            this.processDataResults(dataResults);
-            
-            // STEP 4: Update displays
+            // Update displays
             this.updateAllDisplays();
             
             // Load preferences
@@ -1134,7 +1085,8 @@ const app = {
             
             if (buildError.message.includes('hash mismatch') || buildError.message.includes('Security hash')) {
                 console.log('🔄 Retrying getBuilds after hash mismatch...');
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // Reduced delay from 500ms to 100ms for faster retry
+                await new Promise(resolve => setTimeout(resolve, 100));
                 
                 try {
                     const result = await this.apiCall('getBuilds');
@@ -1604,32 +1556,11 @@ const app = {
             
             const newHandshakeToken = await this.authorizeHandshake(licenseKey);
             this.apiKey = await this.getHandshake(newHandshakeToken);
-            
-            const response = await this.apiCall('getMember', {
-                scripts: '',
-                bans: '',
-                fc2t: '',
-                beautify: ''
-            });
-
-            if (!response || typeof response !== 'object') {
-                throw new Error('Invalid member data after regeneration');
-            }
-
-            this.memberData = {
-                username: response.username || 'Unknown',
-                level: response.level || 0,
-                xp: response.xp || 0,
-                protection: response.protection || 2,
-                ...response
-            };
-            this.memberScripts = response.scripts || [];
-            this.memberProjects = response.fc2t || [];
 
             this.setHandshakeToken(newHandshakeToken);
             
             console.log('✅ Handshake regenerated successfully');
-            this.showMessage(`🎉 Session renewed successfully! Welcome back, ${this.memberData.username}!`, 'success');
+            this.showMessage('🎉 Session renewed successfully, loading data...', 'success');
             
             // Remove the session recovery section if it exists
             const recoverySection = document.getElementById('sessionRecovery');

@@ -71,6 +71,7 @@ body {
 	display: flex;
 	align-items: center;
 	gap: 15px;
+	flex-wrap: wrap;
 }
 
 .version-badge {
@@ -90,6 +91,7 @@ body {
 	gap: 10px;
 	flex-direction: row;
 	align-items: flex-start;
+	z-index: 10;
 }
 
 .roll-button,
@@ -352,6 +354,28 @@ body {
 	backdrop-filter: blur(10px);
 	scroll-behavior: smooth;
 	-webkit-overflow-scrolling: touch;
+	/* Subtle scrollbar for desktop */
+	scrollbar-width: thin;
+	scrollbar-color: rgba(74, 158, 255, 0.2) transparent;
+}
+
+/* Custom scrollbar for nav tabs on desktop */
+.nav-tabs::-webkit-scrollbar {
+	height: 8px;
+}
+
+.nav-tabs::-webkit-scrollbar-track {
+	background: rgba(255, 255, 255, 0.02);
+	border-radius: 4px;
+}
+
+.nav-tabs::-webkit-scrollbar-thumb {
+	background: rgba(74, 158, 255, 0.3);
+	border-radius: 4px;
+}
+
+.nav-tabs::-webkit-scrollbar-thumb:hover {
+	background: rgba(74, 158, 255, 0.5);
 }
 
 .nav-tabs.active {
@@ -2694,6 +2718,125 @@ body {
 }
 
 /* ========================
+   RESPONSIVE DESIGN
+   ======================== */
+
+/* Large screens - optimize button layout */
+@media (max-width: 1600px) {
+	.header-buttons {
+		gap: 8px;
+	}
+	
+	.roll-button,
+	.omega-button,
+	.settings-button {
+		padding: 10px 16px;
+		font-size: 15px;
+	}
+}
+
+/* Medium screens - move buttons above title and center everything */
+@media (max-width: 1050px) {
+	.header {
+		padding: 20px;
+		padding-top: 70px; /* Space for buttons above */
+		position: relative;
+	}
+	
+	.header h1 {
+		font-size: 2em;
+		padding-right: 0 !important;
+		justify-content: center !important;
+		text-align: center !important;
+		width: 100%;
+		margin: 0 auto;
+		display: flex !important;
+		flex-wrap: wrap !important;
+	}
+	
+	/* Move buttons above title */
+	.header-buttons {
+		position: absolute !important;
+		top: 15px !important;
+		left: 50% !important;
+		right: unset !important;
+		transform: translateX(-50%) !important;
+		max-width: 90%;
+		gap: 8px;
+		justify-content: center !important;
+		flex-wrap: nowrap !important; /* Prevent wrapping */
+		z-index: 10;
+		display: flex !important;
+	}
+	
+	.roll-button,
+	.omega-button,
+	.settings-button {
+		padding: 10px 15px;
+		font-size: 14px;
+		display: inline-block !important;
+	}
+	
+	/* Ensure omega button stays visible */
+	.header-buttons .omega-button {
+		display: inline-block !important;
+	}
+	
+	.omega-info {
+		font-size: 11px;
+		position: static !important;
+		transform: none !important;
+		margin-top: 5px;
+		text-align: center;
+		width: 100%;
+	}
+	
+	/* Also center the login section and connected info */
+	.login-section,
+	.connected-info {
+		width: 100%;
+		justify-content: center;
+		text-align: center;
+	}
+}
+
+/* Small tablets and large phones - only apply below 800px, not in the 800-1050px range */
+@media (max-width: 800px) {
+	.header h1 {
+		font-size: 1.8em;
+		/* Remove padding-right to inherit from 1050px query */
+	}
+	
+	/* Don't override button positioning from 1050px query */
+	.header-buttons {
+		/* Remove max-width to prevent grouping */
+		gap: 6px;
+		flex-wrap: nowrap !important; /* Prevent wrapping */
+	}
+	
+	.roll-button,
+	.omega-button,
+	.settings-button {
+		padding: 8px 12px;
+		font-size: 13px;
+		min-width: 100px;
+	}
+	
+	.version-badge {
+		font-size: 0.38em;
+		padding: 4px 10px;
+	}
+	
+	/* Prevent text overlap by limiting title width */
+	.header h1 span:first-child {
+		max-width: calc(100% - 260px);
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+	}
+}
+
+/* ========================
    MOBILE RESPONSIVE
    ======================== */
 @media (max-width: 768px) {
@@ -2704,6 +2847,7 @@ body {
 
 	.header {
 		padding: 20px 15px;
+		padding-top: 60px; /* Ensure space for buttons */
 		position: relative;
 	}
 
@@ -2718,20 +2862,19 @@ body {
 		padding: 3px 8px;
 	}
 
-	/* Header buttons - move below title */
+	/* Header buttons - already positioned above, just adjust sizing */
 	.header-buttons {
-		position: static !important;
-		margin-top: 15px;
-		width: 100%;
-		justify-content: center;
-		flex-wrap: wrap;
+		gap: 6px;
+		flex-wrap: nowrap !important; /* Prevent wrapping */
+		top: 10px !important; /* Ensure it doesn't overlap with user section */
 	}
 
 	.roll-button,
-	.omega-button {
-		padding: 12px 16px;
-		font-size: 14px;
-		min-width: 120px;
+	.omega-button,
+	.settings-button {
+		padding: 10px 15px; /* Same as 1050px breakpoint */
+		font-size: 14px; /* Same as 1050px breakpoint */
+		min-width: auto; /* Allow buttons to be more compact */
 		text-align: center;
 		min-height: 44px;
 	}
@@ -2764,18 +2907,35 @@ body {
 		flex-direction: column;
 		text-align: center;
 		gap: 15px;
+		margin-top: 60px; /* Ensure it doesn't overlap with buttons */
+		position: relative;
+		z-index: 1;
 	}
 
 	/* Navigation tabs */
 	.nav-tabs {
 		overflow-x: auto;
 		-webkit-overflow-scrolling: touch;
-		scrollbar-width: none;
-		-ms-overflow-style: none;
+		/* Keep thin scrollbar visible for better UX */
+		scrollbar-width: thin;
+		scrollbar-color: rgba(74, 158, 255, 0.3) transparent;
 	}
 
 	.nav-tabs::-webkit-scrollbar {
-		display: none;
+		height: 6px;
+	}
+	
+	.nav-tabs::-webkit-scrollbar-track {
+		background: transparent;
+	}
+	
+	.nav-tabs::-webkit-scrollbar-thumb {
+		background: rgba(74, 158, 255, 0.3);
+		border-radius: 3px;
+	}
+	
+	.nav-tabs::-webkit-scrollbar-thumb:hover {
+		background: rgba(74, 158, 255, 0.5);
 	}
 
 	.nav-tab {
@@ -2868,6 +3028,12 @@ body {
 		padding: 10px 16px;
 		font-size: 14px;
 		min-height: 40px;
+	}
+	
+	/* Ensure settings button matches other header buttons */
+	.settings-button {
+		padding: 10px 15px;
+		font-size: 14px;
 	}
 
 	/* Form elements */
@@ -3160,11 +3326,29 @@ body {
 
 	.header {
 		padding: 15px 10px;
+		padding-top: 60px; /* Less space needed for smaller buttons */
 	}
 
 	.header h1 {
 		font-size: 1.4em;
 		gap: 8px;
+		padding-right: 0;
+		justify-content: center;
+		text-align: center;
+	}
+	
+	/* Adjust button sizing for very small screens */
+	.header-buttons {
+		top: 10px !important;
+		max-width: calc(100% - 20px);
+	}
+	
+	.roll-button,
+	.omega-button,
+	.settings-button {
+		padding: 8px 10px;
+		font-size: 12px;
+		min-width: 80px;
 	}
 
 	.version-badge {
