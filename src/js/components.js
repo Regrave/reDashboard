@@ -2330,4 +2330,305 @@ Object.assign(app, {
         };
         return softwareMap[softwareId] || `software_${softwareId}`;
     },
+
+    async loadDivinityChart() {
+        try {
+            // Use API to get divinity chart data
+            const data = await this.apiCall('getDivinityChart');
+            
+            // Update totals
+            document.getElementById('airTotal').textContent = data.totals.Air.toLocaleString();
+            document.getElementById('fireTotal').textContent = data.totals.Fire.toLocaleString();
+            document.getElementById('waterTotal').textContent = data.totals.Water.toLocaleString();
+            document.getElementById('earthTotal').textContent = data.totals.Earth.toLocaleString();
+            
+            // Store data for filtering
+            this.divinityData = data;
+            this.displayDivinityMembers(data.members);
+            
+            // Set up filters only once
+            const searchInput = document.getElementById('divinitySearchInput');
+            const signFilter = document.getElementById('divinitySignFilter');
+            
+            if (!searchInput.hasAttribute('data-listener-attached')) {
+                searchInput.addEventListener('input', () => this.filterDivinityMembers());
+                searchInput.setAttribute('data-listener-attached', 'true');
+            }
+            
+            if (!signFilter.hasAttribute('data-listener-attached')) {
+                signFilter.addEventListener('change', () => this.filterDivinityMembers());
+                signFilter.setAttribute('data-listener-attached', 'true');
+            }
+            
+        } catch (error) {
+            console.error('Error loading divinity chart:', error);
+            document.getElementById('divinityGrid').innerHTML = '<p style="text-align: center; color: #888;">Failed to load divinity chart data</p>';
+        }
+    },
+
+    displayDivinityMembers(members) {
+        const container = document.getElementById('divinityGrid');
+        
+        const zodiacSymbols = {
+            'Aries': '♈',
+            'Taurus': '♉',
+            'Gemini': '♊',
+            'Cancer': '♋',
+            'Leo': '♌',
+            'Virgo': '♍',
+            'Libra': '♎',
+            'Scorpio': '♏',
+            'Sagittarius': '♐',
+            'Capricorn': '♑',
+            'Aquarius': '♒',
+            'Pisces': '♓'
+        };
+        
+        container.innerHTML = members.map(member => this.createDivinityMemberCard(member, zodiacSymbols)).join('');
+    },
+
+
+    createDivinityMemberCard(member, zodiacSymbols) {
+        const gainClass = member.gain > 0 ? 'gain-positive' : (member.gain < 0 ? 'gain-negative' : '');
+        const gainSymbol = member.gain > 0 ? '▲' : (member.gain < 0 ? '▼' : '');
+        const profileUrl = `https://constelia.ai/forums/index.php?members/${member.forum_username}.${member.forum_uid}/`;
+        const firstLetter = member.forum_username.charAt(0).toUpperCase();
+        
+        // Determine element based on zodiac sign
+        const elementMap = {
+            'Aries': { element: 'Fire', emoji: '🔥', bgColor: '#ff4444', textColor: '#fff' },
+            'Leo': { element: 'Fire', emoji: '🔥', bgColor: '#ff4444', textColor: '#fff' },
+            'Sagittarius': { element: 'Fire', emoji: '🔥', bgColor: '#ff4444', textColor: '#fff' },
+            'Taurus': { element: 'Earth', emoji: '🌍', bgColor: '#8b6914', textColor: '#fff' },
+            'Virgo': { element: 'Earth', emoji: '🌍', bgColor: '#8b6914', textColor: '#fff' },
+            'Capricorn': { element: 'Earth', emoji: '🌍', bgColor: '#8b6914', textColor: '#fff' },
+            'Gemini': { element: 'Air', emoji: '🌬️', bgColor: '#e0e0e0', textColor: '#333' },
+            'Libra': { element: 'Air', emoji: '🌬️', bgColor: '#e0e0e0', textColor: '#333' },
+            'Aquarius': { element: 'Air', emoji: '🌬️', bgColor: '#e0e0e0', textColor: '#333' },
+            'Cancer': { element: 'Water', emoji: '💧', bgColor: '#4682b4', textColor: '#fff' },
+            'Scorpio': { element: 'Water', emoji: '💧', bgColor: '#4682b4', textColor: '#fff' },
+            'Pisces': { element: 'Water', emoji: '💧', bgColor: '#4682b4', textColor: '#fff' }
+        };
+        
+        const elementInfo = elementMap[member.sign] || { element: 'Unknown', emoji: '❓', bgColor: '#666', textColor: '#fff' };
+        
+        // Try to construct avatar URL using forum_uid
+        // For UIDs like 17146, use 17; for 1, use 0; for 16601, use 16
+        const uidPrefix = member.forum_uid < 1000 ? 0 : Math.floor(member.forum_uid / 1000);
+        const avatarUrl = `https://constelia.ai/forums/data/avatars/l/${uidPrefix}/${member.forum_uid}.jpg`;
+        
+        // Create URL-encoded SVG for fallback
+        const fallbackSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><circle cx='20' cy='20' r='20' fill='#444'/><text x='20' y='20' text-anchor='middle' dominant-baseline='middle' fill='#aaa' font-size='16'>${firstLetter}</text></svg>`;
+        const fallbackDataUrl = 'data:image/svg+xml,' + encodeURIComponent(fallbackSvg);
+        
+        return `
+            <div class="script-card compact" data-username="${member.forum_username.toLowerCase()}" data-sign="${member.sign}">
+                <div class="script-header">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #4a9eff;">#${member.rank}</div>
+                        <img src="${avatarUrl}" alt="${member.forum_username}" 
+                             style="width: 40px; height: 40px; border-radius: 50%; background: #444; object-fit: cover;"
+                             onerror="this.onerror=null; this.src='${fallbackDataUrl}'">
+                        <div class="script-info">
+                            <div style="display: flex; align-items: center; gap: 8px;">
+                                <a href="${profileUrl}" target="_blank" style="text-decoration: none;">
+                                    <div class="script-name" style="color: #4a9eff; cursor: pointer;">${member.forum_username}</div>
+                                </a>
+                                <span style="background: ${elementInfo.bgColor}; color: ${elementInfo.textColor}; padding: 2px 8px; border-radius: 12px; font-size: 11px; font-weight: 500;">
+                                    ${elementInfo.emoji} ${elementInfo.element}
+                                </span>
+                            </div>
+                            <div class="script-meta">
+                                ${zodiacSymbols[member.sign] || ''} ${member.sign} • ${member.xp.toLocaleString()} XP
+                                <span class="${gainClass}" style="margin-left: 10px;">
+                                    ${gainSymbol} ${Math.abs(member.gain).toLocaleString()}
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 12px; color: #888;">Perks</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #4aff4a;">${member.perks.length}</div>
+                    </div>
+                </div>
+            </div>
+        `;
+    },
+
+    filterDivinityMembers() {
+        const searchTerm = document.getElementById('divinitySearchInput').value.toLowerCase();
+        const selectedSign = document.getElementById('divinitySignFilter').value;
+        
+        let filteredMembers = this.divinityData.members.filter(member => {
+            const matchesSearch = member.forum_username.toLowerCase().includes(searchTerm);
+            const matchesSign = !selectedSign || member.sign === selectedSign;
+            return matchesSearch && matchesSign;
+        });
+        
+        this.displayDivinityMembers(filteredMembers);
+    },
+
+    async loadAchievements() {
+        try {
+            // Get all available achievements
+            const allAchievements = await this.apiCall('getAchievements');
+            this.allAchievements = allAchievements;
+            
+            // Get user's unlocked achievements from member data
+            const memberAchievements = this.memberData.achievements || [];
+            
+            // Calculate stats
+            const totalAchievements = allAchievements.length;
+            const unlockedCount = memberAchievements.length;
+            const lockedCount = totalAchievements - unlockedCount;
+            
+            // Calculate total XP from achievements (simplified - you may need to adjust based on actual XP values)
+            const xpPerAchievement = 100; // Adjust based on actual values
+            const totalXP = unlockedCount * xpPerAchievement;
+            
+            // Update stats
+            document.getElementById('totalAchievements').textContent = totalAchievements;
+            document.getElementById('unlockedAchievements').textContent = unlockedCount;
+            document.getElementById('lockedAchievements').textContent = lockedCount;
+            document.getElementById('achievementXP').textContent = totalXP.toLocaleString();
+            
+            // Display achievements
+            this.displayAchievements(allAchievements, memberAchievements);
+            
+        } catch (error) {
+            console.error('Error loading achievements:', error);
+            document.getElementById('achievementsGrid').innerHTML = '<p style="text-align: center; color: #888;">Failed to load achievements</p>';
+        }
+    },
+
+    displayAchievements(allAchievements, userAchievements) {
+        const container = document.getElementById('achievementsGrid');
+        
+        // Tarot card names mapping - dynamically generate based on available achievements
+        const baseTarotNames = [
+            "The Fool", "The Magician", "The High Priestess", "The Empress", "The Emperor",
+            "The Hierophant", "The Lovers", "The Chariot", "Strength", "The Hermit",
+            "Wheel of Fortune", "Justice", "The Hanged Man", "Death", "Temperance",
+            "The Devil", "The Tower", "The Star", "The Moon", "The Sun",
+            "Judgement", "The World"
+        ];
+        
+        // Generate tarot names for all achievements
+        const tarotNames = [];
+        for (let i = 0; i < allAchievements.length; i++) {
+            if (i < baseTarotNames.length) {
+                tarotNames.push(baseTarotNames[i]);
+            } else {
+                // For additional cards beyond the standard 22
+                tarotNames.push(`Arcana ${i}`);
+            }
+        }
+        
+        // Achievement descriptions (you can expand this based on actual data)
+        const descriptions = {
+            0: "Begin your journey with innocence and wonder",
+            1: "Master the art of manifestation",
+            2: "Unlock hidden knowledge and intuition",
+            3: "Embrace creativity and abundance",
+            4: "Command authority and leadership",
+            5: "Seek spiritual wisdom and guidance",
+            6: "Find harmony in relationships",
+            7: "Drive forward with determination",
+            8: "Discover your inner strength",
+            9: "Journey within for enlightenment",
+            10: "Accept the cycles of fate",
+            11: "Balance the scales of justice",
+            12: "See from a different perspective",
+            13: "Transform and begin anew",
+            14: "Find balance and moderation",
+            15: "Break free from limitations",
+            16: "Rebuild from destruction",
+            17: "Hope guides your path",
+            18: "Navigate through illusion",
+            19: "Bask in success and joy",
+            20: "Face your final reckoning",
+            21: "Complete the cycle of mastery"
+        };
+        
+        // Generate descriptions for additional achievements
+        const getDescription = (index, achievement) => {
+            if (descriptions[index]) {
+                return descriptions[index];
+            }
+            // Use the achievement data if available, otherwise generic description
+            return typeof achievement === 'string' ? achievement : `Unlock the secrets of Arcana ${index}`;
+        };
+        
+        container.innerHTML = allAchievements.map((achievement, index) => {
+            const isUnlocked = userAchievements.includes(index);
+            const cardName = tarotNames[index];
+            const description = getDescription(index, achievement);
+            const imageUrl = `https://gfx.tarot.com/images/site/decks/universal-waite/full_size/${index}.jpg`;
+            
+            return `
+                <div class="achievement-card ${isUnlocked ? 'unlocked' : 'locked'}" 
+                     onclick="app.showAchievementDetail(${index}, '${cardName.replace(/'/g, "\\'")}', '${description.replace(/'/g, "\\'")}', ${isUnlocked})">
+                    <img src="${imageUrl}" alt="${cardName}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgdmlld0JveD0iMCAwIDgwIDgwIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiMzMzMiLz48dGV4dCB4PSI0MCIgeT0iNDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM2NjYiIGZvbnQtc2l6ZT0iMTQiPj88L3RleHQ+PC9zdmc+'">
+                    <h4 class="achievement-name">${cardName}</h4>
+                    <div class="achievement-xp">100 XP</div>
+                </div>
+            `;
+        }).join('');
+    },
+
+    showAchievementDetail(id, name, description, isUnlocked) {
+        document.getElementById('achievementModalTitle').textContent = isUnlocked ? '🏆 Achievement Unlocked!' : '🔒 Achievement Locked';
+        document.getElementById('achievementImage').src = `https://gfx.tarot.com/images/site/decks/universal-waite/full_size/${id}.jpg`;
+        document.getElementById('achievementName').textContent = name;
+        document.getElementById('achievementDescription').textContent = description;
+        document.getElementById('achievementXPReward').textContent = '100 XP';
+        
+        const statusDiv = document.getElementById('achievementStatus');
+        if (isUnlocked) {
+            statusDiv.innerHTML = '<div style="color: #4aff4a; font-size: 18px;">✅ You have unlocked this achievement!</div>';
+        } else {
+            statusDiv.innerHTML = '<div style="color: #ff8c00; font-size: 18px;">🔒 This achievement is still locked</div>';
+        }
+        
+        document.getElementById('achievementModal').classList.add('active');
+    },
+
+    closeAchievementModal() {
+        document.getElementById('achievementModal').classList.remove('active');
+    },
+
+    showRedeemAchievementsModal() {
+        document.getElementById('redeemAchievementsModal').classList.add('active');
+    },
+
+    closeRedeemAchievementsModal() {
+        document.getElementById('redeemAchievementsModal').classList.remove('active');
+        document.getElementById('achievementsDataInput').value = '';
+    },
+
+    async redeemAchievements() {
+        const achievementsData = document.getElementById('achievementsDataInput').value.trim();
+        
+        if (!achievementsData) {
+            this.showMessage('Please paste your achievements.dat file content', 'error');
+            return;
+        }
+        
+        try {
+            const result = await this.apiCall('redeemAchievements', {
+                value: achievementsData
+            }, 'POST');
+            
+            this.showMessage('Achievements redeemed successfully!', 'success');
+            this.closeRedeemAchievementsModal();
+            
+            // Reload member info and achievements
+            await this.loadMemberInfo();
+            await this.loadAchievements();
+            
+        } catch (error) {
+            console.error('Error redeeming achievements:', error);
+            this.showMessage(`Failed to redeem achievements: ${error.message}`, 'error');
+        }
+    },
 });

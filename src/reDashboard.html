@@ -80,6 +80,8 @@
         <button class="nav-tab" onclick="app.switchTab('builds')">🏗️ Builds</button>
         <button class="nav-tab" onclick="app.switchTab('sessions')">🔐 Sessions</button>
         <button class="nav-tab" onclick="app.switchTab('perks')">✨ Perks</button>
+        <button class="nav-tab" onclick="app.switchTab('achievements')">🏆 Achievements</button>
+        <button class="nav-tab" onclick="app.switchTab('divinity')">🔮 Divinity Chart</button>
         <button class="nav-tab" onclick="app.switchTab('config')">⚙️ Configuration</button>
       </div>
       <!-- Content Area -->
@@ -321,6 +323,89 @@
               </select>
             </div>
             <div class="scripts-grid" id="perksGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Achievements Section -->
+        <div class="content-section" id="achievements-section">
+          <div class="card">
+            <h2>🏆 Achievements</h2>
+            <div class="stats-grid" style="margin-bottom: 30px;">
+              <div class="stat-card">
+                <h3>Total Achievements</h3>
+                <div class="value" id="totalAchievements">0</div>
+              </div>
+              <div class="stat-card">
+                <h3>Unlocked</h3>
+                <div class="value" id="unlockedAchievements">0</div>
+              </div>
+              <div class="stat-card">
+                <h3>Locked</h3>
+                <div class="value" id="lockedAchievements">0</div>
+              </div>
+              <div class="stat-card">
+                <h3>XP Available</h3>
+                <div class="value" id="achievementXP">0</div>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; color: #4a9eff;">🎴 Tarot Cards Collection</h3>
+              <div class="filter-controls">
+                <button class="btn btn-small" onclick="app.showRedeemAchievementsModal()" style="background: linear-gradient(135deg, #4aff4a, #2db92d);">
+                  🎁 Redeem Achievements
+                </button>
+              </div>
+            </div>
+            <div class="achievements-grid" id="achievementsGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
+        <!-- Divinity Chart Section -->
+        <div class="content-section" id="divinity-section">
+          <div class="card">
+            <h2>🔮 Divinity Chart</h2>
+            <div class="stats-grid" style="margin-bottom: 30px;">
+              <div class="stat-card">
+                <h3>🌬️ Air</h3>
+                <div class="value" id="airTotal">0</div>
+              </div>
+              <div class="stat-card">
+                <h3>🔥 Fire</h3>
+                <div class="value" id="fireTotal">0</div>
+              </div>
+              <div class="stat-card">
+                <h3>💧 Water</h3>
+                <div class="value" id="waterTotal">0</div>
+              </div>
+              <div class="stat-card">
+                <h3>🌍 Earth</h3>
+                <div class="value" id="earthTotal">0</div>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+              <h3 style="margin: 0; color: #4a9eff;">🏆 Top Players</h3>
+              <div class="filter-controls">
+                <input type="text" class="search-input" id="divinitySearchInput" placeholder="Search by username..." style="width: 250px;">
+                <select class="filter-dropdown" id="divinitySignFilter">
+                  <option value="">All Signs</option>
+                  <option value="Aries">♈ Aries</option>
+                  <option value="Taurus">♉ Taurus</option>
+                  <option value="Gemini">♊ Gemini</option>
+                  <option value="Cancer">♋ Cancer</option>
+                  <option value="Leo">♌ Leo</option>
+                  <option value="Virgo">♍ Virgo</option>
+                  <option value="Libra">♎ Libra</option>
+                  <option value="Scorpio">♏ Scorpio</option>
+                  <option value="Sagittarius">♐ Sagittarius</option>
+                  <option value="Capricorn">♑ Capricorn</option>
+                  <option value="Aquarius">♒ Aquarius</option>
+                  <option value="Pisces">♓ Pisces</option>
+                </select>
+              </div>
+            </div>
+            <div class="scripts-grid" id="divinityGrid">
               <div class="spinner"></div>
             </div>
           </div>
@@ -655,6 +740,55 @@ Examples:
               </div>
               <pre id="scriptSourceCode" style="margin: 0; padding: 20px; color: #f8f8f2; font-family: 'Consolas', 'Monaco', 'Courier New', monospace; font-size: 14px; line-height: 1.5; overflow: auto; max-height: 60vh; background: transparent; white-space: pre-wrap; word-wrap: break-word;"></pre>
             </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Achievement Detail Modal -->
+    <div id="achievementModal" class="modal">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h2 id="achievementModalTitle">Achievement Details</h2>
+          <button class="close-button" onclick="app.closeAchievementModal()">×</button>
+        </div>
+        <div class="modal-body" style="text-align: center;">
+          <img id="achievementImage" src="" alt="Achievement" style="max-width: 300px; margin: 20px auto; border-radius: 8px;">
+          <h3 id="achievementName" style="color: #4a9eff; margin: 20px 0;"></h3>
+          <p id="achievementDescription" style="color: #ccc; margin: 20px 0; line-height: 1.6;"></p>
+          <div style="background: rgba(74, 158, 255, 0.1); padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <div style="color: #888; margin-bottom: 5px;">XP Reward</div>
+            <div style="font-size: 24px; font-weight: bold; color: #4aff4a;" id="achievementXPReward">0 XP</div>
+          </div>
+          <div id="achievementStatus" style="margin: 20px 0;"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Redeem Achievements Modal -->
+    <div id="redeemAchievementsModal" class="modal">
+      <div class="modal-content" style="max-width: 600px;">
+        <div class="modal-header">
+          <h2>🎁 Redeem Achievements</h2>
+          <button class="close-button" onclick="app.closeRedeemAchievementsModal()">×</button>
+        </div>
+        <div class="modal-body">
+          <div style="background: rgba(255, 193, 7, 0.1); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid rgba(255, 193, 7, 0.3);">
+            <div style="color: #ffc107; font-weight: bold; margin-bottom: 10px;">⚠️ Important Notice</div>
+            <p style="color: #ccc; margin: 0; line-height: 1.5;">
+              This will redeem your achievements data. Make sure you have your achievements.dat file ready.
+              Any inaccuracies in this process could lead to issues, so please ensure the content is exactly as it appears in the file.
+            </p>
+          </div>
+          <div style="margin-bottom: 20px;">
+            <label style="display: block; margin-bottom: 10px; color: #4a9eff; font-weight: bold;">
+              Paste your achievements.dat file content:
+            </label>
+            <textarea id="achievementsDataInput" style="width: 100%; height: 200px; background: #2d2d2d; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 8px; padding: 10px; color: #fff; font-family: 'Consolas', monospace; resize: vertical;" placeholder="Paste the entire content of your achievements.dat file here..."></textarea>
+          </div>
+          <div style="text-align: right;">
+            <button class="btn btn-danger" onclick="app.closeRedeemAchievementsModal()" style="margin-right: 10px;">Cancel</button>
+            <button class="btn" onclick="app.redeemAchievements()" style="background: linear-gradient(135deg, #4aff4a, #2db92d);">🎁 Redeem</button>
           </div>
         </div>
       </div>

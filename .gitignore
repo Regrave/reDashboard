@@ -160,3 +160,10 @@ __pycache__/
 # OS files
 .DS_Store
 Thumbs.db
+
+# Documentation files
+*.md
+!README.md
+
+# Text files
+*.txt
