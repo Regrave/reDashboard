@@ -93,7 +93,8 @@ Object.assign(app, {
     async toggleScript(scriptId, element) {
         try {
             await this.apiCall('toggleScriptStatus', {
-                id: scriptId
+                id: scriptId,
+                needs_update: ''
             });
             element.classList.toggle('active');
 
@@ -189,7 +190,8 @@ Object.assign(app, {
     async toggleProject(projectId, element) {
         try {
             await this.apiCall('toggleProjectStatus', {
-                id: projectId
+                id: projectId,
+                needs_update: ''
             });
             element.classList.toggle('active');
 
@@ -324,12 +326,10 @@ Object.assign(app, {
             let parsedConfig = {};
             
             if (!configText || configText === '' || configText === 'null' || configText === 'undefined') {
-                console.log('Configuration is empty/reset, using empty object');
                 parsedConfig = {};
             } else if (typeof configText === 'string') {
                 try {
                     parsedConfig = JSON.parse(configText);
-                    console.log('Successfully parsed configuration JSON');
                 } catch (parseError) {
                     console.error('Failed to parse configuration JSON:', parseError);
                     console.log('Using empty object due to parse error');
@@ -337,7 +337,6 @@ Object.assign(app, {
                 }
             } else if (typeof configText === 'object' && configText !== null) {
                 parsedConfig = configText;
-                console.log('Configuration is already an object');
             } else {
                 console.log('Unknown configuration format, using empty object');
                 parsedConfig = {};
@@ -358,13 +357,11 @@ Object.assign(app, {
             this.populateSoftwareDropdown();
             this.loadAutoSavePreference();
 
-            console.log('Configuration loaded successfully:', this.currentConfig);
 
         } catch (error) {
             console.error('Error loading configuration:', error);
             
             // On API error, still use empty config
-            console.log('API error occurred, using empty configuration');
             this.currentConfig = {};
             
             // Update display with empty config and highlighting
@@ -487,8 +484,6 @@ Object.assign(app, {
                 this.availableLanguages[langCode] = displayName;
             });
 
-            console.log('Extracted languages:', Object.keys(this.availableLanguages));
-            console.log('Available languages:', this.availableLanguages);
 
             this.populateLanguageDropdown();
 
@@ -1646,7 +1641,6 @@ Object.assign(app, {
         const jsonEditor = document.getElementById('configDisplay');
         if (!jsonEditor) return;
         
-        console.log('highlightJSONEditor called');
         
         // Get the plain text content
         const content = jsonEditor.textContent;
@@ -1676,7 +1670,6 @@ Object.assign(app, {
             JSON.parse(content);
         } catch (e) {
             // If JSON is invalid, don't highlight (but don't break either)
-            console.log('JSON invalid, skipping highlight');
             return;
         }
         
@@ -1708,7 +1701,6 @@ Object.assign(app, {
             }, 10);
         }
         
-        console.log('JSON highlighting completed');
     },
 
     getJSONCaretPosition(element) {
@@ -1769,14 +1761,12 @@ Object.assign(app, {
             
             // Set a new timer - highlight after 800ms of no typing
             typingTimer = setTimeout(() => {
-                console.log('JSON highlighting after typing stopped');
                 this.highlightJSONEditor();
             }, 800);
         });
 
         // Highlight immediately when clicking away
         jsonEditor.addEventListener('blur', () => {
-            console.log('JSON highlighting on blur');
             clearTimeout(typingTimer);
             this.highlightJSONEditor();
         });
@@ -1792,6 +1782,5 @@ Object.assign(app, {
         // Mark listeners as attached
         this.jsonEditorListenersAttached = true;
         
-        console.log('JSON editor event listeners attached');
     },
 });

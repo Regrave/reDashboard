@@ -197,9 +197,13 @@ body {
 }
 
 .login-section {
-	display: flex;
+	display: none;
 	gap: 10px;
 	align-items: center;
+}
+
+.login-section.active {
+	display: flex;
 }
 
 .api-key-input {

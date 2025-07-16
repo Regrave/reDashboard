@@ -172,7 +172,6 @@ const app = {
                 }
                 return value;
             });
-            console.log('✅ Parsed API Response:', JSON.parse(sanitizedResponse));
             
             return parsedResponse;
 
@@ -337,7 +336,6 @@ const app = {
                 this.memberScripts = response.scripts || [];
                 this.memberProjects = response.fc2t || [];
 
-                console.log('✅ Session restored successfully');
                 this.showMessage(`Welcome back, ${this.memberData.username}! Session restored successfully.`, 'success');
 
                 this.updateUIAfterLogin();
@@ -703,13 +701,11 @@ const app = {
                 setTimeout(() => {
                     const verification = this.getHandshakeToken();
                     if (verification === value) {
-                        console.log(`✅ Handshake token cookie verified successfully`);
                     } else {
                         console.warn(`⚠️ Cookie verification failed, but cookie was set (timing issue)`);
                     }
                 }, 10);
                 
-                console.log(`✅ Handshake token saved to cookie (online mode)`);
                 return true;
                 
             } catch (error) {
@@ -717,7 +713,6 @@ const app = {
                 // Fallback to localStorage if cookies fail
                 try {
                     localStorage.setItem('fc2_handshake', value);
-                    console.log(`✅ Handshake token saved to localStorage (fallback)`);
                     return true;
                 } catch (localError) {
                     console.warn('Could not save handshake token to localStorage either:', localError);
@@ -728,7 +723,6 @@ const app = {
             // Use localStorage for offline sessions
             try {
                 localStorage.setItem('fc2_handshake', value);
-                console.log(`✅ Handshake token saved to localStorage (offline mode)`);
                 return true;
             } catch (error) {
                 console.warn('Could not save handshake token to localStorage:', error);
@@ -888,7 +882,7 @@ const app = {
 
     updateUIAfterLogin() {
         // Hide login section and show main interface
-        document.getElementById('loginSection').style.display = 'none';
+        document.getElementById('loginSection').classList.remove('active');
         document.getElementById('advancedLogin').style.display = 'none';
         document.getElementById('connectedInfo').classList.add('active');
         document.getElementById('settingsButton').classList.add('active');
@@ -908,10 +902,15 @@ const app = {
     },
 
     resetUIAfterLogout() {
+        // Only show login if we're not connected
+        if (this.apiKey || this.sessionInitialized) {
+            return;
+        }
+        
         document.getElementById('apiKey').value = '';
         document.getElementById('handshakeToken').value = '';
         document.getElementById('rememberMe').checked = false;
-        document.getElementById('loginSection').style.display = 'flex';
+        document.getElementById('loginSection').classList.add('active');
         document.getElementById('advancedLogin').style.display = 'none';
         document.getElementById('connectedInfo').classList.remove('active');
         document.getElementById('navTabs').classList.remove('active');
@@ -952,7 +951,6 @@ const app = {
             
             // Handle successful image load
             avatarImg.onload = () => {
-                console.log('✅ Avatar loaded successfully:', memberData.avatar);
             };
             
             // Handle image load errors - fall back to letter
@@ -1023,7 +1021,6 @@ const app = {
             const cachingPref = localStorage.getItem('fc2_caching_enabled');
             this.cachingEnabled = cachingPref !== 'false'; // Default to true unless explicitly disabled
             
-            console.log(`💾 Caching preference loaded: ${this.cachingEnabled ? 'enabled' : 'disabled'}`);
             
             // Update UI if available
             setTimeout(() => {
@@ -1061,13 +1058,10 @@ const app = {
 
     // Load initial data after successful login
     async loadInitialData() {
-        console.log('🔄 Loading initial data with API consolidation...');
-        
         this.sessionInitialized = false;
         
         try {
             // STEP 1: Get comprehensive member data in ONE call (already done in connect, but get full data)
-            console.log('📊 Loading comprehensive member data...');
             const memberResponse = await this.apiCall('getMember', {
                 scripts: '',
                 bans: '',
@@ -1084,17 +1078,14 @@ const app = {
             this.memberProjects = memberResponse.fc2t || [];
             this.ownedPerks = memberResponse.perks || [];
             
-            console.log(`✅ Member data loaded: ${this.memberScripts.length} scripts, ${this.memberProjects.length} projects`);
             
             // STEP 2: Make parallel calls for data that requires different endpoints
-            console.log('🔄 Loading additional data in parallel...');
             const dataResults = await this.loadDataInParallel();
             
             // STEP 3: Process successful results
             this.processDataResults(dataResults);
             
             // STEP 4: Update displays
-            console.log('✅ All data processed, updating displays...');
             this.updateAllDisplays();
             
             // Load preferences
@@ -1102,7 +1093,13 @@ const app = {
             this.loadAutoSavePreference();
             
             this.sessionInitialized = true;
-            console.log(`✅ Optimized data loading complete. Caching now ${this.cachingEnabled ? 'enabled' : 'disabled'} for future requests.`);
+            
+            // Ensure login section stays hidden after successful data load
+            const loginSection = document.getElementById('loginSection');
+            if (loginSection) {
+                loginSection.classList.remove('active');
+                loginSection.style.display = '';
+            }
             
         } catch (error) {
             console.error('❌ Error during optimized data loading:', error);
@@ -1141,7 +1138,6 @@ const app = {
                 
                 try {
                     const result = await this.apiCall('getBuilds');
-                    console.log('✅ getBuilds succeeded on retry');
                     return result;
                 } catch (retryError) {
                     console.warn('getBuilds retry also failed:', retryError.message);
@@ -1198,7 +1194,6 @@ const app = {
             // At minimum, try to load scripts since that's most important
             try {
                 this.allScripts = await this.apiCall('getAllScripts');
-                console.log('✅ Fallback: Scripts loaded');
             } catch (e) {
                 console.warn('Fallback: Could not load scripts');
             }
@@ -1207,7 +1202,6 @@ const app = {
             try {
                 const config = await this.apiCall('getConfiguration');
                 this.processConfigurationData(config);
-                console.log('✅ Fallback: Configuration loaded');
             } catch (e) {
                 console.warn('Fallback: Could not load configuration');
             }
@@ -1255,12 +1249,10 @@ const app = {
             let parsedConfig = {};
             
             if (!configText || configText === '' || configText === 'null' || configText === 'undefined') {
-                console.log('Configuration is empty/reset, using empty object');
                 parsedConfig = {};
             } else if (typeof configText === 'string') {
                 try {
                     parsedConfig = JSON.parse(configText);
-                    console.log('Successfully parsed configuration JSON');
                 } catch (parseError) {
                     console.error('Failed to parse configuration JSON:', parseError);
                     console.log('Using empty object due to parse error');
@@ -1268,7 +1260,6 @@ const app = {
                 }
             } else if (typeof configText === 'object' && configText !== null) {
                 parsedConfig = configText;
-                console.log('Configuration is already an object');
             } else {
                 console.log('Unknown configuration format, using empty object');
                 parsedConfig = {};
@@ -1277,7 +1268,6 @@ const app = {
             // Update the current config
             this.currentConfig = parsedConfig;
             
-            console.log('✅ Configuration processed successfully');
             
         } catch (error) {
             console.error('Error processing configuration:', error);
@@ -1312,7 +1302,6 @@ const app = {
                 this.availableLanguages[langCode] = displayName;
             });
 
-            console.log(`✅ Processed ${Object.keys(this.availableLanguages).length} languages`);
             
         } catch (error) {
             console.error('Error processing languages:', error);
@@ -1341,7 +1330,6 @@ const app = {
             this.omegaVersion = omegaInfo.version || 'Latest Version';
             this.omegaLastUpdate = omegaInfo.elapsed || 'Recently';
             
-            console.log('✅ Omega info processed');
             
         } catch (error) {
             console.error('Error processing Omega info:', error);
@@ -1577,7 +1565,7 @@ const app = {
             </div>
         `;
         
-        loginSection.style.display = 'none';
+        loginSection.classList.remove('active');
         loginSection.parentNode.insertBefore(recoverySection, loginSection);
     },
 
@@ -1643,6 +1631,19 @@ const app = {
             console.log('✅ Handshake regenerated successfully');
             this.showMessage(`🎉 Session renewed successfully! Welcome back, ${this.memberData.username}!`, 'success');
             
+            // Remove the session recovery section if it exists
+            const recoverySection = document.getElementById('sessionRecovery');
+            if (recoverySection) {
+                recoverySection.remove();
+            }
+            
+            // Ensure login section is hidden before updating UI
+            const loginSection = document.getElementById('loginSection');
+            if (loginSection) {
+                loginSection.classList.remove('active');
+                loginSection.style.display = '';
+            }
+            
             this.updateUIAfterLogin();
             await this.loadInitialData();
             
@@ -1669,7 +1670,7 @@ const app = {
             recoverySection.remove();
         }
         if (loginSection) {
-            loginSection.style.display = 'flex';
+            loginSection.classList.add('active');
         }
     }
 };
