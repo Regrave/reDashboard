@@ -812,11 +812,6 @@ const app = {
     },
 
     resetUIAfterLogout() {
-        // Only show login if we're not connected
-        if (this.apiKey || this.sessionInitialized) {
-            return;
-        }
-        
         document.getElementById('apiKey').value = '';
         document.getElementById('handshakeToken').value = '';
         document.getElementById('rememberMe').checked = false;
@@ -842,6 +837,16 @@ const app = {
         this.memberData = null;
         this.memberScripts = [];
         this.memberProjects = [];
+        this.sessionInitialized = false;
+        this.allScripts = [];
+        this.allProjects = [];
+        this.allBuilds = [];
+        this.myBuilds = [];
+        this.allPerks = [];
+        this.ownedPerks = [];
+        this.currentConfig = {};
+        this.currentScriptConfig = {};
+        this.currentScriptKey = '';
     },
 
     setUserAvatar(memberData) {
