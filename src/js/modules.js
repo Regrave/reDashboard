@@ -896,6 +896,14 @@ Object.assign(app, {
             this.loadSessionInfo(); // Add this line
         }
 
+        if (tabName === 'divinity') {
+            this.loadDivinityChart();
+        }
+
+        if (tabName === 'achievements') {
+            this.loadAchievements();
+        }
+
         if (tabName === 'overview') {
             setTimeout(() => {
                 const terminalInput = document.getElementById('terminalInput');
