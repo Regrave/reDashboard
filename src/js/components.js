@@ -814,7 +814,6 @@ Object.assign(app, {
             // Use defaults when caching is disabled
             this.autoSaveEnabled = false;
             this.liveOmegaEnabled = false;
-            console.log('🔄 Using default preferences (caching disabled)');
         } else {
             try {
                 const autoSavePref = localStorage.getItem('fc2_auto_save');
@@ -823,7 +822,6 @@ Object.assign(app, {
                 const liveOmegaPref = localStorage.getItem('fc2_live_omega');
                 this.liveOmegaEnabled = liveOmegaPref === 'true';
                 
-                console.log('💾 Loaded preferences from cache');
             } catch (error) {
                 console.warn('Could not load preferences:', error);
                 this.autoSaveEnabled = false;
@@ -865,14 +863,12 @@ Object.assign(app, {
 
     saveAutoSavePreference() {
         if (!this.cachingEnabled) {
-            console.log('🔄 Not saving preferences (caching disabled)');
             return;
         }
         
         try {
             localStorage.setItem('fc2_auto_save', this.autoSaveEnabled.toString());
             localStorage.setItem('fc2_live_omega', this.liveOmegaEnabled.toString());
-            console.log('💾 Saved preferences to cache');
         } catch (error) {
             console.warn('Could not save preferences:', error);
         }
@@ -934,11 +930,9 @@ Object.assign(app, {
 
     triggerAutoSave() {
         if (!this.autoSaveEnabled) {
-            console.log('Auto-save not enabled, skipping');
             return;
         }
 
-        console.log('Triggering auto-save...');
 
         // Clear any existing timeout
         if (this.autoSaveTimeout) {
@@ -947,7 +941,6 @@ Object.assign(app, {
 
         // Set a delay to avoid too many rapid saves
         this.autoSaveTimeout = setTimeout(() => {
-            console.log('Executing delayed auto-save');
             // Use live Omega if enabled
             this.saveScriptConfig(true, this.liveOmegaEnabled);
         }, 500); // 500ms delay
@@ -1573,7 +1566,6 @@ Object.assign(app, {
 
             if (hasOmega) {
                 softwareSelect.value = 'omega';
-                console.log('Auto-selected omega as default software');
 
                 setTimeout(() => {
                     this.onSoftwareChange();
@@ -1591,7 +1583,6 @@ Object.assign(app, {
         const software = document.getElementById('softwareSelect').value;
         const scriptSelect = document.getElementById('scriptConfigSelect');
 
-        console.log('onSoftwareChange called with:', software);
 
         scriptSelect.value = '';
         document.getElementById('scriptConfigEditor').style.display = 'none';
@@ -1599,13 +1590,11 @@ Object.assign(app, {
         this.currentScriptConfig = {};
 
         if (software === 'bones') {
-            console.log('Bones selected, loading bones config...');
             scriptSelect.disabled = true;
             scriptSelect.innerHTML = '<option value="">Bones uses special configuration</option>';
             this.showMessage('Loading bones configuration...', 'success');
             setTimeout(() => this.loadBonesConfig(), 100);
         } else if (software) {
-            console.log('Regular software selected:', software);
             scriptSelect.disabled = false;
             this.populateScriptDropdownForSoftware(software);
         } else {
@@ -1623,9 +1612,6 @@ Object.assign(app, {
         // Combine configured and built-in scripts, removing duplicates
         const allAvailableScripts = [...new Set([...configuredScripts, ...builtInScripts])];
 
-        console.log(`Found ${allAvailableScripts.length} available scripts for ${software}:`, allAvailableScripts);
-        console.log(`- ${configuredScripts.length} configured scripts:`, configuredScripts);
-        console.log(`- ${builtInScripts.length} built-in scripts:`, builtInScripts);
 
         if (allAvailableScripts.length === 0) {
             scriptSelect.innerHTML = '<option value="">No script configurations available</option>';
@@ -1673,11 +1659,6 @@ Object.assign(app, {
         const software = document.getElementById('softwareSelect').value;
         const editor = document.getElementById('scriptConfigEditor');
 
-        console.log('=== loadScriptConfig Debug ===');
-        console.log('Software:', software);
-        console.log('Script selection:', scriptSelection);
-        console.log('Current script key:', this.currentScriptKey);
-        console.log('===============================');
 
         if (!software) {
             editor.style.display = 'none';
@@ -1706,13 +1687,11 @@ Object.assign(app, {
         editor.style.display = 'block';
 
         const scriptKey = scriptSelection;
-        console.log(`Loading config for script key: "${scriptKey}" in software: "${software}"`);
 
         let scriptConfig = this.currentConfig[software][scriptKey];
 
         // If no config exists but it's a built-in script, create it from the built-in defaults
         if (!scriptConfig && BUILTIN_SCRIPT_CONFIGS[software] && BUILTIN_SCRIPT_CONFIGS[software][scriptKey]) {
-            console.log(`Creating built-in config for ${scriptKey}`);
             scriptConfig = { ...BUILTIN_SCRIPT_CONFIGS[software][scriptKey] };
             
             // Add it to current config
@@ -1726,7 +1705,6 @@ Object.assign(app, {
                 this.apiPost('setConfiguration', {}, {
                     value: JSON.stringify(this.currentConfig)
                 });
-                console.log(`Auto-saved built-in config for ${scriptKey}`);
             } catch (error) {
                 console.warn(`Could not auto-save built-in config for ${scriptKey}:`, error);
             }
@@ -1746,14 +1724,12 @@ Object.assign(app, {
         this.currentScriptConfig = scriptConfig;
         this.currentScriptKey = scriptKey;
 
-        console.log('Loaded script config:', this.currentScriptConfig);
 
         this.renderConfigForm();
         this.showMessage(`Loaded configuration for ${scriptKey}`, 'success');
     },
 
     loadBonesConfig() {
-        console.log('loadBonesConfig called');
 
         const editor = document.getElementById('scriptConfigEditor');
         const formContainer = document.getElementById('scriptConfigForm');
@@ -1764,11 +1740,9 @@ Object.assign(app, {
             return;
         }
 
-        console.log('Showing bones config interface');
         editor.style.display = 'block';
 
         const bonesArray = this.currentConfig.bones || [];
-        console.log('Current bones:', bonesArray);
 
         formContainer.innerHTML = `
             <div style="background: linear-gradient(135deg, rgba(74, 158, 255, 0.1), rgba(74, 158, 255, 0.05)); border: 2px solid rgba(74, 158, 255, 0.3); border-radius: 12px; padding: 20px; margin: 10px 0;">
@@ -1823,7 +1797,6 @@ Object.assign(app, {
         this.currentScriptConfig = bonesArray;
         this.currentScriptKey = 'bones';
 
-        console.log('Bones interface created successfully');
         this.showMessage(`Bones configuration loaded (${bonesArray.length} bones)`, 'success');
     },
 
@@ -1905,10 +1878,8 @@ Object.assign(app, {
                     if (!this.currentConfig[softwareName][scriptKey]) {
                         this.currentConfig[softwareName][scriptKey] = { ...defaultConfig };
                         report.newBuiltInConfigs.push({ software: softwareName, script: scriptKey });
-                        console.log(`Generated built-in config for ${scriptKey}:`, defaultConfig);
                     } else {
                         report.existingConfigs.push({ software: softwareName, script: scriptKey, type: 'built-in' });
-                        console.log(`Built-in config already exists for ${scriptKey}, skipping`);
                     }
                 }
             }
@@ -1929,7 +1900,6 @@ Object.assign(app, {
 
                 // Generate configs for each software
                 for (const [softwareName, scripts] of Object.entries(scriptsBySoftware)) {
-                    console.log(`Processing ${scripts.length} cloud scripts for ${softwareName}`);
                     
                     if (!this.currentConfig[softwareName]) {
                         this.currentConfig[softwareName] = {};
@@ -1958,7 +1928,6 @@ Object.assign(app, {
                                     type: 'cloud',
                                     existingKey: existingKey 
                                 });
-                                console.log(`Config already exists for ${script.name} under key "${existingKey}", skipping`);
                                 continue;
                             }
 
@@ -2018,9 +1987,7 @@ Object.assign(app, {
                                     scriptKey: scriptKey,
                                     settingsCount: Object.keys(defaultConfig).length
                                 });
-                                console.log(`Generated config for ${scriptKey}:`, defaultConfig);
                             } else {
-                                console.log(`No configurable settings found in ${script.name}`);
                                 report.existingConfigs.push({ 
                                     software: softwareName, 
                                     script: script.name, 
@@ -2096,14 +2063,7 @@ Object.assign(app, {
                 this.showMessage(statusMessage, 'success');
             }
 
-            // Log detailed report for debugging
-            console.log('Configuration Generation Report:', {
-                newBuiltInConfigs: report.newBuiltInConfigs,
-                newCloudConfigs: report.newCloudConfigs,
-                existingConfigs: report.existingConfigs,
-                errors: report.errors,
-                totalScripts: this.memberScripts?.length || 0
-            });
+            // Save configuration after generating
 
         } catch (error) {
             console.error('Error generating default configs:', error);
@@ -2132,9 +2092,6 @@ Object.assign(app, {
         // Merge both approaches (property assignments take precedence over table defaults)
         const defaults = { ...tableDefaults, ...propertyDefaults };
         
-        console.log(`Parsed ${Object.keys(defaults).length} settings from ${scriptName}`);
-        console.log(`  - Table pattern: ${Object.keys(tableDefaults).length} settings`);
-        console.log(`  - Property pattern: ${Object.keys(propertyDefaults).length} settings`);
         
         return defaults;
     },
@@ -2299,7 +2256,6 @@ Object.assign(app, {
                     const parsedValue = this.parseSettingValue(settingValue.trim().replace(/,$/, ''));
                     if (parsedValue !== null) {
                         defaults[settingName] = parsedValue;
-                        console.log(`Found table setting: ${settingName} = ${parsedValue}`);
                     }
                 }
             }
@@ -2358,7 +2314,6 @@ Object.assign(app, {
                 const parsedValue = this.parseSettingValue(propertyValue.trim());
                 if (parsedValue !== null) {
                     defaults[propertyName] = parsedValue;
-                    console.log(`Found property setting: ${propertyName} = ${parsedValue}`);
                 }
             }
         }

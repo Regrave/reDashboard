@@ -973,7 +973,32 @@ Object.assign(app, {
             }
         });
         
-        console.log('Script editor event listeners attached');
+        // Handle paste event to convert to plain text
+        editor.addEventListener('paste', (e) => {
+            e.preventDefault();
+            
+            // Get the plain text from clipboard
+            const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+            
+            // Insert the plain text at the current cursor position
+            const selection = window.getSelection();
+            if (!selection.rangeCount) return;
+            
+            selection.deleteFromDocument();
+            const range = selection.getRangeAt(0);
+            const textNode = document.createTextNode(text);
+            range.insertNode(textNode);
+            
+            // Move cursor to end of inserted text
+            range.setStartAfter(textNode);
+            range.setEndAfter(textNode);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            // Trigger input event for draft saving
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+        
     },
 
     updateNotesCharCounter() {

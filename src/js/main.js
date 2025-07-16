@@ -5,11 +5,8 @@
 // GLOBAL EXPORTS & DEBUG
 // ========================
 
-// Make app available globally for HTML access
-window.app = app;
-
 // Export debug function for console access
-window.debugFC2 = () => app.debugHandshakeToken();
+window.debugFC2 = () => window.app.debugHandshakeToken();
 
 // ========================
 // PROTOCOL & BROWSER CHECKS
@@ -28,7 +25,7 @@ function checkBrowserCompatibility() {
 
     if (missingAPIs.length > 0) {
         console.error('Missing required APIs:', missingAPIs);
-        app.showMessage(`❌ Browser not supported. Missing: ${missingAPIs.join(', ')}`, 'error');
+        window.app.showMessage(`❌ Browser not supported. Missing: ${missingAPIs.join(', ')}`, 'error');
         return false;
     }
 
@@ -45,7 +42,7 @@ function setupKeyboardListeners() {
     if (apiKeyInput) {
         apiKeyInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                app.connect();
+                window.app.connect();
             }
         });
     }
@@ -55,7 +52,7 @@ function setupKeyboardListeners() {
     if (handshakeInput) {
         handshakeInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                app.connectWithHandshake();
+                window.app.connectWithHandshake();
             }
         });
     }
@@ -65,7 +62,7 @@ function setupKeyboardListeners() {
     if (wipeInput) {
         wipeInput.addEventListener('keypress', (e) => {
             if (e.key === 'Enter') {
-                app.wipeHandshake();
+                window.app.wipeHandshake();
             }
         });
     }
@@ -87,37 +84,37 @@ function setupKeyboardListeners() {
         if (e.key === 'Escape') {
             // Close script editor if open
             if (document.getElementById('scriptEditorModal').classList.contains('active')) {
-                app.closeScriptEditor();
+                window.app.closeScriptEditor();
             }
             
             // Close build preview if open
             if (document.getElementById('buildPreviewModal').classList.contains('active')) {
-                app.closeBuildPreview();
+                window.app.closeBuildPreview();
             }
             
             // Close build details if open
             if (document.getElementById('buildDetailsModal').classList.contains('active')) {
-                app.closeBuildDetails();
+                window.app.closeBuildDetails();
             }
             
             // Close roll result modal if open
             if (document.getElementById('rollResultModal').classList.contains('active')) {
-                app.closeRollModal();
+                window.app.closeRollModal();
             }
             
             // Close omega modal if open
             if (document.getElementById('omegaModal').classList.contains('active')) {
-                app.closeOmegaModal();
+                window.app.closeOmegaModal();
             }
 
             // Close settings modal if open
             if (document.getElementById('settingsModal').classList.contains('active')) {
-                app.closeSettingsModal();
+                window.app.closeSettingsModal();
             }
 
             // Close script source modal if open
             if (document.getElementById('scriptSourceModal').classList.contains('active')) {
-                app.closeScriptSource();
+                window.app.closeScriptSource();
             }
         }
     });
@@ -127,8 +124,8 @@ function setupWindowListeners() {
     // Handle page unload for cleanup
     window.addEventListener('beforeunload', (e) => {
         // Save any pending drafts
-        if (app.currentEditingScript && document.getElementById('scriptEditorModal').classList.contains('active')) {
-            app.saveDraft();
+        if (window.app.currentEditingScript && document.getElementById('scriptEditorModal').classList.contains('active')) {
+            window.app.saveDraft();
         }
         
         // Note: We don't terminate handshake on unload as user might just be refreshing
@@ -136,21 +133,21 @@ function setupWindowListeners() {
 
     // Handle online/offline status
     window.addEventListener('online', () => {
-        app.showMessage('Connection restored', 'success');
+        window.app.showMessage('Connection restored', 'success');
     });
 
     window.addEventListener('offline', () => {
-        app.showMessage('Connection lost - working offline', 'error');
+        window.app.showMessage('Connection lost - working offline', 'error');
     });
 
     // Handle tab visibility for auto-save optimization
     document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
             // Save any pending auto-saves immediately when tab becomes hidden
-            if (app.autoSaveTimeout) {
-                clearTimeout(app.autoSaveTimeout);
-                if (app.autoSaveEnabled && app.currentScriptKey) {
-                    app.saveScriptConfig(true, app.liveOmegaEnabled);
+            if (window.app.autoSaveTimeout) {
+                clearTimeout(window.app.autoSaveTimeout);
+                if (window.app.autoSaveEnabled && window.app.currentScriptKey) {
+                    window.app.saveScriptConfig(true, window.app.liveOmegaEnabled);
                 }
             }
         }
@@ -208,8 +205,6 @@ function validateRequiredElements() {
 // ========================
 
 async function initializeApplication() {
-    console.log('🚀 FC2 Dashboard initializing...');
-
     try {
         // Check browser compatibility
         if (!checkBrowserCompatibility()) {
@@ -218,7 +213,7 @@ async function initializeApplication() {
 
         // Validate required DOM elements
         if (!validateRequiredElements()) {
-            app.showMessage('❌ Missing required page elements. Please refresh the page.', 'error');
+            window.app.showMessage('❌ Missing required page elements. Please refresh the page.', 'error');
             return;
         }
 
@@ -227,42 +222,51 @@ async function initializeApplication() {
                 languages: ['lua', 'json'],
                 ignoreUnescapedHTML: true
             });
-            console.log('✅ Syntax highlighting initialized');
         }
 
         // Load caching preference first
-        app.loadCachingPreference();
-        console.log('✅ Caching preference loaded');
+        window.app.loadCachingPreference();
 
         // Setup event listeners
         setupKeyboardListeners();
         setupWindowListeners();
-        console.log('✅ Event listeners configured');
 
         // Initialize components
         initializeSyntaxHighlighting();
         initializeTooltips();
-        app.initializeTerminal();
-        console.log('✅ Components initialized');
+        window.app.initializeTerminal();
 
         // Try to restore session using handshake
-        console.log('🔍 Attempting session restoration...');
-        const sessionRestored = await app.tryHandshakeLogin();
+        const sessionRestored = await window.app.tryHandshakeLogin();
 
         // If session wasn't restored, show login form
         if (!sessionRestored) {
-            console.log('📝 Showing login form');
-            const loginSection = document.getElementById('loginSection');
-            if (loginSection) {
-                loginSection.style.display = 'flex';
+            // Check if recovery section exists - if it does, don't show login section
+            const recoverySection = document.getElementById('sessionRecovery');
+            if (!recoverySection) {
+                const loginSection = document.getElementById('loginSection');
+                if (loginSection) {
+                    loginSection.classList.add('active');
+                }
             }
         }
 
-        console.log('✅ FC2 Dashboard initialization complete');
+        
+        // Override classList.add to prevent adding 'active' when logged in
+        const loginSection = document.getElementById('loginSection');
+        if (loginSection) {
+            const originalAdd = loginSection.classList.add;
+            loginSection.classList.add = function(...args) {
+                if (args.includes('active') && window.app && (window.app.apiKey || window.app.sessionInitialized)) {
+                    return;
+                }
+                return originalAdd.apply(this, args);
+            };
+        }
 
     } catch (error) {
         console.error('❌ Initialization failed:', error);
-        app.showMessage('Failed to initialize application. Please refresh the page.', 'error');
+        window.app.showMessage('Failed to initialize application. Please refresh the page.', 'error');
     }
 }
 
@@ -296,7 +300,7 @@ function setupGlobalErrorHandling() {
         
         // Don't spam user with too many error messages
         if (!window.lastErrorTime || Date.now() - window.lastErrorTime > 5000) {
-            app.showMessage('An unexpected error occurred. Please try again.', 'error');
+            window.app.showMessage('An unexpected error occurred. Please try again.', 'error');
             window.lastErrorTime = Date.now();
         }
     });
@@ -307,7 +311,7 @@ function setupGlobalErrorHandling() {
         
         // Don't spam user with too many error messages
         if (!window.lastErrorTime || Date.now() - window.lastErrorTime > 5000) {
-            app.showMessage('An unexpected error occurred. Please try again.', 'error');
+            window.app.showMessage('An unexpected error occurred. Please try again.', 'error');
             window.lastErrorTime = Date.now();
         }
     });
@@ -349,11 +353,11 @@ function detectFeatures() {
 
     // Warn about missing critical features
     if (!features.localStorage) {
-        app.showMessage('⚠️ localStorage not available. Some features may not work properly.', 'error');
+        window.app.showMessage('⚠️ localStorage not available. Some features may not work properly.', 'error');
     }
 
     if (!features.cookies && location.protocol !== 'file:') {
-        app.showMessage('⚠️ Cookies not available. Session persistence may not work.', 'error');
+        window.app.showMessage('⚠️ Cookies not available. Session persistence may not work.', 'error');
     }
 
     return features;
@@ -399,17 +403,17 @@ if (isDevelopment) {
         },
 
         testNotification: (message = 'Test notification', type = 'success') => {
-            app.showMessage(message, type);
+            window.app.showMessage(message, type);
         },
         logState: () => {
             console.log('📊 Application State:', {
-                apiKey: app.apiKey ? 'SET' : 'NOT SET',
-                memberData: !!app.memberData,
-                memberScripts: app.memberScripts.length,
-                memberProjects: app.memberProjects.length,
-                autoSaveEnabled: app.autoSaveEnabled,
-                liveOmegaEnabled: app.liveOmegaEnabled,
-                hasHandshakeToken: !!app.getHandshakeToken()
+                apiKey: window.app.apiKey ? 'SET' : 'NOT SET',
+                memberData: !!window.app.memberData,
+                memberScripts: window.app.memberScripts.length,
+                memberProjects: window.app.memberProjects.length,
+                autoSaveEnabled: window.app.autoSaveEnabled,
+                liveOmegaEnabled: window.app.liveOmegaEnabled,
+                hasHandshakeToken: !!window.app.getHandshakeToken()
             });
         }
     };
@@ -432,4 +436,3 @@ if (typeof define === 'function' && define.amd) {
     });
 }
 
-console.log('📦 FC2 Dashboard modules loaded successfully');
