@@ -1,4 +1,4 @@
-// FC2 Dashboard - Main Initialization
+// Constelia Dashboard - Main Initialization
 // Contains: Application initialization, event setup, and global exports
 
 // ========================
@@ -6,7 +6,7 @@
 // ========================
 
 // Export debug function for console access
-window.debugFC2 = () => window.app.debugHandshakeToken();
+window.debugConstelia = () => window.app.debugHandshakeToken();
 
 // ========================
 // PROTOCOL & BROWSER CHECKS

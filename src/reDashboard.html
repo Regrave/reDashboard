@@ -11,7 +11,10 @@
       <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/lua.min.js"></script>
       <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/languages/json.min.js"></script>
       
-      <!-- FC2 Dashboard JavaScript Modules -->
+      <!-- Chart.js for XP History -->
+      <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+      
+      <!-- Constelia Dashboard JavaScript Modules -->
       <script src="js/core.js"></script>        <!-- Foundation & API -->
       <script src="js/modules.js"></script>     <!-- Feature modules -->
       <script src="js/components.js"></script>  <!-- UI components -->
@@ -31,10 +34,10 @@
           <button class="roll-button" id="rollButton" onclick="app.rollLoot()"> 🎲 Roll Loot </button>
           <button class="settings-button" id="settingsButton" onclick="app.showSettingsModal()"> ⚙️ Settings </button>
         </div>
-        <h1> fantasy.dashboard <span class="version-badge">v1.5.1</span>
+        <h1> fantasy.dashboard <span class="version-badge">v1.5.2</span>
         </h1>
         <div class="login-section" id="loginSection">
-          <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your FC2 license key...">
+          <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your Constelia API key...">
           <button class="btn" onclick="app.connect()">🚀 Connect</button>
           <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
             <input type="checkbox" id="rememberMe" style="width: 18px; height: 18px;">
@@ -80,8 +83,8 @@
         <button class="nav-tab" onclick="app.switchTab('builds')">🏗️ Builds</button>
         <button class="nav-tab" onclick="app.switchTab('sessions')">🔐 Sessions</button>
         <button class="nav-tab" onclick="app.switchTab('perks')">✨ Perks</button>
-        <button class="nav-tab" onclick="app.switchTab('achievements')">🏆 Achievements</button>
-        <button class="nav-tab" onclick="app.switchTab('divinity')">🔮 Divinity Chart</button>
+        <button class="nav-tab" onclick="app.switchTab('achievements')">🎴 Achievements</button>
+        <button class="nav-tab" onclick="app.switchTab('divinity')">🏆 Leaderboard</button>
         <button class="nav-tab" onclick="app.switchTab('config')">⚙️ Configuration</button>
       </div>
       <!-- Content Area -->
@@ -95,6 +98,25 @@
             </div>
           </div>
           <div class="card">
+            <h2>📈 XP History</h2>
+            <div id="xpHistoryContainer" style="position: relative; min-height: 300px;">
+              <canvas id="xpHistoryChart" style="max-height: 300px;"></canvas>
+            </div>
+            <div id="xpStreakInfo" style="margin-top: 20px; padding: 15px; background: rgba(74, 158, 255, 0.1); border-radius: 8px; display: none;">
+              <h3 style="margin: 0 0 10px 0; color: #4a9eff;">🔥 Lunar Rhythm Streak</h3>
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                  <div style="font-size: 24px; font-weight: bold; color: #4aff4a;"><span id="currentStreak">0</span> days</div>
+                  <div style="color: #888; font-size: 14px;">Current Bonus: <span id="streakBonus" style="color: #4aff4a;">0%</span></div>
+                </div>
+                <div style="text-align: right;">
+                  <div style="color: #888; font-size: 14px;">Next reward in</div>
+                  <div style="font-size: 18px; color: #4a9eff;" id="nextRewardTime">--:--:--</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="card">
             <h2>💻 Member's Panel Terminal</h2>
             <div class="terminal-container">
               <div class="terminal-header">
@@ -103,12 +125,12 @@
                   <div class="terminal-dot" style="background: #ffbd2e;"></div>
                   <div class="terminal-dot" style="background: #28ca42;"></div>
                 </div>
-                <div class="terminal-title" id="terminalTitle">FC2 Terminal</div>
+                <div class="terminal-title" id="terminalTitle">Constelia Terminal</div>
               </div>
               <div class="terminal-body">
                 <div class="terminal-output" id="terminalOutput">
                   <div class="terminal-welcome" id="terminalWelcome">
-                    <div style="color: #4a9eff; font-weight: bold;">FC2 Member's Panel Terminal</div>
+                    <div style="color: #4a9eff; font-weight: bold;">Constelia Member's Panel Terminal</div>
                     <div style="color: #888; font-size: 14px;">Type 'help' for available commands</div>
                   </div>
                 </div>
@@ -275,6 +297,7 @@
             <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
               <button class="btn" onclick="app.refreshSessionHistory()">🔄 Refresh History</button>
               <button class="btn btn-small" onclick="app.loadSessionHistory(true)" style="background: linear-gradient(135deg, #4aff4a, #357abd);">📊 Load Detailed History</button>
+              <button class="btn" id="freezeSessionButton" onclick="app.freezeSession()" style="display: none; background: linear-gradient(135deg, #00bfff, #0080ff);">❄️ Freeze Session</button>
             </div>
             <div id="sessionHistoryContainer">
               <div class="spinner"></div>
@@ -330,23 +353,23 @@
         <!-- Achievements Section -->
         <div class="content-section" id="achievements-section">
           <div class="card">
-            <h2>🏆 Achievements</h2>
-            <div class="stats-grid" style="margin-bottom: 30px;">
-              <div class="stat-card">
-                <h3>Total Achievements</h3>
-                <div class="value" id="totalAchievements">0</div>
+            <h2>🎴 Achievements</h2>
+            <div style="background: rgba(74, 158, 255, 0.1); padding: 25px; border-radius: 12px; margin-bottom: 30px; text-align: center;">
+              <div style="font-size: 48px; font-weight: bold; color: #fff; margin-bottom: 10px;">
+                <span id="unlockedAchievements" style="color: #4aff4a;">0</span>
+                <span style="color: #666; font-size: 36px;">/</span>
+                <span id="totalAchievements" style="color: #4a9eff;">0</span>
               </div>
-              <div class="stat-card">
-                <h3>Unlocked</h3>
-                <div class="value" id="unlockedAchievements">0</div>
+              <div style="color: #888; font-size: 16px;">
+                Achievements Unlocked
               </div>
-              <div class="stat-card">
-                <h3>Locked</h3>
-                <div class="value" id="lockedAchievements">0</div>
-              </div>
-              <div class="stat-card">
-                <h3>XP Available</h3>
-                <div class="value" id="achievementXP">0</div>
+              <div style="margin-top: 15px;">
+                <div style="background: rgba(255, 255, 255, 0.1); border-radius: 10px; height: 10px; overflow: hidden;">
+                  <div id="achievementProgressBar" style="background: linear-gradient(to right, #4aff4a, #4a9eff); height: 100%; width: 0%; transition: width 0.5s ease;"></div>
+                </div>
+                <div style="margin-top: 8px; color: #666; font-size: 14px;">
+                  <span id="lockedAchievements">0</span> achievements remaining
+                </div>
               </div>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
@@ -365,10 +388,10 @@
             </div>
           </div>
         </div>
-        <!-- Divinity Chart Section -->
+        <!-- Leaderboard Section -->
         <div class="content-section" id="divinity-section">
           <div class="card">
-            <h2>🔮 Divinity Chart</h2>
+            <h2>🏆 Leaderboard</h2>
             <div class="stats-grid" style="margin-bottom: 30px;">
               <div class="stat-card">
                 <h3>🌬️ Air</h3>
@@ -474,7 +497,7 @@
       <span style="color: #ff6b6b; font-size: 14px; margin: 0 3px;">♡</span>
       <span style="opacity: 0.7;">by</span>
       <a href="https://constelia.ai/forums/index.php?members/rucka.17146/" target="_blank" style="color: #4a9eff; font-weight: 600; margin-left: 4px; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.color='#6bb6ff'; this.style.textDecoration='underline';" onmouseout="this.style.color='#4a9eff'; this.style.textDecoration='none';">Rucka</a>
-      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.5.1</span>
+      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.5.2</span>
     </div>
     <!-- Bottom-Right Notification Container -->
     <div class="notification-container" id="notificationContainer">
@@ -508,9 +531,9 @@
     <div class="omega-modal" id="omegaVerificationModal">
       <div class="omega-modal-content">
         <div class="omega-modal-title">🔐 Verify License Key</div>
-        <div class="omega-modal-subtitle">Please enter your FC2 license key to download Omega.</div>
+        <div class="omega-modal-subtitle">Please enter your Constelia API key to download Omega.</div>
         <div style="margin: 20px 0;">
-          <input type="password" class="api-key-input" id="omegaVerificationKey" placeholder="Enter your FC2 license key..." style="width: 100%; margin-bottom: 15px;">
+          <input type="password" class="api-key-input" id="omegaVerificationKey" placeholder="Enter your Constelia API key..." style="width: 100%; margin-bottom: 15px;">
           <div style="display: flex; gap: 10px;">
             <button class="btn" onclick="app.verifyAndDownloadOmega()" style="flex: 1; background: linear-gradient(135deg, #4a9eff, #1e7bc9);">
               🔓 Verify & Continue
@@ -536,7 +559,7 @@
             <h3>🛡️ Protection Mode</h3>
             <div class="settings-field">
               <label class="settings-label">
-                FC2 Protection Method 
+                Constelia Protection Method 
                 <code class="settings-tag">System</code>
               </label>
               <select class="form-select" id="settingsProtectionModeSelect" onchange="app.setProtectionMode()" style="width: 250px;">
@@ -778,10 +801,6 @@ Examples:
           <img id="achievementImage" src="" alt="Achievement" style="max-width: 300px; margin: 20px auto; border-radius: 8px;">
           <h3 id="achievementName" style="color: #4a9eff; margin: 20px 0;"></h3>
           <p id="achievementDescription" style="color: #ccc; margin: 20px 0; line-height: 1.6;"></p>
-          <div style="background: rgba(74, 158, 255, 0.1); padding: 15px; border-radius: 8px; margin: 20px 0;">
-            <div style="color: #888; margin-bottom: 5px;">XP Reward</div>
-            <div style="font-size: 24px; font-weight: bold; color: #4aff4a;" id="achievementXPReward">0 XP</div>
-          </div>
           <div id="achievementStatus" style="margin: 20px 0;"></div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-// FC2 Dashboard - Components
+// Constelia Dashboard - Components
 // Contains: UI components, color picker, displays, forms, and interactive elements
 
 // ========================
@@ -1031,15 +1031,8 @@ Object.assign(app, {
 
             this.displayPerks();
             this.updatePerkStats();
-
-            // Check if user has Venus perk and load status
-            const hasVenus = this.ownedPerks.some(perk =>
-                this.allPerks.find(p => p.id === perk.id && p.name.toLowerCase().includes('venus'))
-            );
-
-            if (hasVenus) {
-                await this.loadVenusStatus();
-            }
+            
+            // Venus status will be loaded when the perks tab is actually shown
 
         } catch (error) {
             console.error('Error loading perks:', error);
@@ -1057,6 +1050,73 @@ Object.assign(app, {
         document.getElementById('perkPoints').textContent = perkPoints;
         document.getElementById('totalXP').textContent = totalXP.toLocaleString();
         document.getElementById('activePerks').textContent = activePerksCount;
+    },
+    
+    calculateCurrentStreak() {
+        const sessionHistory = this.memberData?.session_history;
+        if (!sessionHistory?.success || sessionHistory.success.length === 0) return 0;
+        
+        // Get successful Constelia connections sorted by time descending
+        const successfulSessions = [...sessionHistory.success]
+            .filter(session => session.software === 'Omega' || session.solution === 'Omega')
+            .sort((a, b) => b.time - a.time);
+        
+        if (successfulSessions.length === 0) return 0;
+        
+        let currentStreak = 0;
+        let lastDate = null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Group sessions by day
+        const sessionsByDay = new Map();
+        for (const session of successfulSessions) {
+            const sessionDate = new Date(session.time * 1000);
+            sessionDate.setHours(0, 0, 0, 0);
+            const dateKey = sessionDate.toISOString().split('T')[0];
+            
+            if (!sessionsByDay.has(dateKey)) {
+                sessionsByDay.set(dateKey, sessionDate);
+            }
+        }
+        
+        // Convert to sorted array of unique days
+        const uniqueDays = Array.from(sessionsByDay.values()).sort((a, b) => b - a);
+        
+        // Debug logging
+        console.log('Lunar Rhythm Streak Debug:');
+        console.log('Today:', today.toISOString().split('T')[0]);
+        console.log('Most recent session:', uniqueDays[0]?.toISOString().split('T')[0]);
+        console.log('Days since last session:', Math.floor((today - uniqueDays[0]) / (24 * 60 * 60 * 1000)));
+        
+        for (const sessionDate of uniqueDays) {
+            if (!lastDate) {
+                // First entry - check if it's today or yesterday
+                const daysDiff = Math.floor((today - sessionDate) / (24 * 60 * 60 * 1000));
+                if (daysDiff === 0 || daysDiff === 1) {
+                    currentStreak = 1;
+                    lastDate = sessionDate;
+                } else {
+                    // Streak broken - no session today or yesterday
+                    console.log('Streak broken: Last session was', daysDiff, 'days ago');
+                    break;
+                }
+            } else {
+                // Check if consecutive day
+                const dayDiff = Math.floor((lastDate - sessionDate) / (24 * 60 * 60 * 1000));
+                if (dayDiff === 1) {
+                    currentStreak++;
+                    lastDate = sessionDate;
+                } else {
+                    // Gap in days - streak broken
+                    console.log('Streak broken: Gap of', dayDiff, 'days between sessions');
+                    break;
+                }
+            }
+        }
+        
+        console.log('Final streak:', currentStreak);
+        return currentStreak;
     },
 
     displayPerks() {
@@ -1104,6 +1164,42 @@ Object.assign(app, {
                 `;
             }
 
+            // Calculate bonus for specific perks
+            let bonusBadge = '';
+            if (isOwned) {
+                switch(perk.id) {
+                    case 4: // Venus
+                        bonusBadge = '<span style="color: #ff69b4; font-size: 12px; background: rgba(255, 105, 180, 0.2); padding: 2px 8px; border-radius: 12px; margin-left: 5px;">25% XP Share</span>';
+                        break;
+                    case 5: // Blood of Mars
+                        bonusBadge = '<span style="color: #ff4a4a; font-size: 12px; background: rgba(255, 74, 74, 0.2); padding: 2px 8px; border-radius: 12px; margin-left: 5px;">10% Daily Chance</span>';
+                        break;
+                    case 14: // Astrotheology
+                        const tarotCount = this.memberData?.achievements?.length || 0;
+                        const tarotBonus = tarotCount;
+                        bonusBadge = `<span style="color: #9b59b6; font-size: 12px; background: rgba(155, 89, 182, 0.2); padding: 2px 8px; border-radius: 12px; margin-left: 5px;">+${tarotBonus}% XP</span>`;
+                        break;
+                    case 17: // Spacesuit
+                        const reduction = this.memberData?.groups?.includes('60') ? 20 : 10; // Check if VIP/Veteran
+                        bonusBadge = `<span style="color: #00bfff; font-size: 12px; background: rgba(0, 191, 255, 0.2); padding: 2px 8px; border-radius: 12px; margin-left: 5px;">-${reduction}% XP Loss</span>`;
+                        break;
+                    case 25: // Saturn's Favor
+                        const isTop50 = false; // You'd need to check leaderboard position
+                        const saturnBonus = isTop50 ? '-10%' : '+10%';
+                        const saturnColor = isTop50 ? '#ff4a4a' : '#4aff4a';
+                        bonusBadge = `<span style="color: ${saturnColor}; font-size: 12px; background: rgba(255, 215, 0, 0.2); padding: 2px 8px; border-radius: 12px; margin-left: 5px;">${saturnBonus} XP</span>`;
+                        break;
+                    case 26: // Lunar Rhythm
+                        // Calculate streak (simplified - would need actual calculation)
+                        const currentStreak = this.calculateCurrentStreak();
+                        const streakBonus = Math.min(currentStreak * 2, 100);
+                        if (streakBonus > 0) {
+                            bonusBadge = `<span style="color: #4a9eff; font-size: 12px; background: rgba(74, 158, 255, 0.2); padding: 2px 8px; border-radius: 12px; margin-left: 5px;">+${streakBonus}% XP</span>`;
+                        }
+                        break;
+                }
+            }
+
             return `
                 <div class="script-card ${isOwned ? 'owned' : ''}" 
                     data-perk-name="${perk.name.toLowerCase()}" 
@@ -1112,9 +1208,10 @@ Object.assign(app, {
                     data-matches-search="true">
                     <div class="script-header">
                         <div class="script-info">
-                            <div class="script-name" style="display: flex; align-items: center; gap: 10px;">
+                            <div class="script-name" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
                                 ${isVenus ? '💕' : '✨'} ${perk.name}
                                 ${isOwned ? '<span style="color: #4aff4a; font-size: 12px; background: rgba(74, 255, 74, 0.2); padding: 2px 8px; border-radius: 12px;">OWNED</span>' : ''}
+                                ${bonusBadge}
                             </div>
                             <div class="script-meta">
                                 <span>Cost: ${isPurchasable ? '1 perk point' : 'Not purchasable'}</span>
@@ -1399,7 +1496,8 @@ Object.assign(app, {
 
         const commandDiv = document.createElement('div');
         commandDiv.className = 'terminal-command';
-        commandDiv.textContent = command;
+        const username = this.memberData?.username || 'member';
+        commandDiv.innerHTML = `<span style="color: #4aff4a;">${username}@constelia:~$</span> ${command}`;
         output.appendChild(commandDiv);
 
         if (command.toLowerCase() === 'help') {
@@ -1862,6 +1960,8 @@ Object.assign(app, {
                 newBuiltInConfigs: [],
                 newCloudConfigs: [],
                 existingConfigs: [],
+                removedOptions: [],
+                typeChanges: [],
                 errors: []
             };
 
@@ -1879,7 +1979,64 @@ Object.assign(app, {
                         this.currentConfig[softwareName][scriptKey] = { ...defaultConfig };
                         report.newBuiltInConfigs.push({ software: softwareName, script: scriptKey });
                     } else {
-                        report.existingConfigs.push({ software: softwareName, script: scriptKey, type: 'built-in' });
+                        // Existing config - check for outdated options and type mismatches
+                        const existingConfig = this.currentConfig[softwareName][scriptKey];
+                        const updatedConfig = { ...existingConfig };
+                        let hasChanges = false;
+                        
+                        // Remove options that don't exist in the default config
+                        for (const option in existingConfig) {
+                            if (!defaultConfig.hasOwnProperty(option)) {
+                                delete updatedConfig[option];
+                                report.removedOptions.push({
+                                    software: softwareName,
+                                    script: scriptKey,
+                                    option: option,
+                                    oldValue: existingConfig[option]
+                                });
+                                hasChanges = true;
+                            }
+                        }
+                        
+                        // Check for type mismatches and add missing options
+                        for (const option in defaultConfig) {
+                            if (!updatedConfig.hasOwnProperty(option)) {
+                                // Missing option - add it
+                                updatedConfig[option] = defaultConfig[option];
+                                report.newBuiltInConfigs.push({
+                                    software: softwareName,
+                                    script: scriptKey,
+                                    option: option,
+                                    value: defaultConfig[option]
+                                });
+                                hasChanges = true;
+                            } else {
+                                // Check for type mismatch
+                                const existingType = this.getValueType(updatedConfig[option]);
+                                const defaultType = this.getValueType(defaultConfig[option]);
+                                
+                                if (existingType !== defaultType) {
+                                    report.typeChanges.push({
+                                        software: softwareName,
+                                        script: scriptKey,
+                                        option: option,
+                                        oldType: existingType,
+                                        newType: defaultType,
+                                        oldValue: updatedConfig[option],
+                                        newValue: defaultConfig[option]
+                                    });
+                                    updatedConfig[option] = defaultConfig[option];
+                                    hasChanges = true;
+                                }
+                            }
+                        }
+                        
+                        // Update the config if there were changes
+                        if (hasChanges) {
+                            this.currentConfig[softwareName][scriptKey] = updatedConfig;
+                        } else {
+                            report.existingConfigs.push({ software: softwareName, script: scriptKey, type: 'built-in' });
+                        }
                     }
                 }
             }
@@ -1920,20 +2077,7 @@ Object.assign(app, {
 
                             // Check if ANY of these keys already exist
                             const existingKey = possibleKeys.find(key => this.currentConfig[softwareName][key]);
-                            
-                            if (existingKey) {
-                                report.existingConfigs.push({ 
-                                    software: softwareName, 
-                                    script: script.name, 
-                                    type: 'cloud',
-                                    existingKey: existingKey 
-                                });
-                                continue;
-                            }
 
-                            // No existing config found, try to generate one
-                            console.log(`No existing config found for ${script.name}, generating...`);
-                            
                             // Fetch script source
                             const apiResponse = await this.apiCall('getScript', {
                                 id: script.id,
@@ -1976,10 +2120,70 @@ Object.assign(app, {
                             // Parse the source code for default values
                             const defaultConfig = this.parseScriptForDefaults(sourceCode, script.name);
                             
-                            if (defaultConfig && Object.keys(defaultConfig).length > 0) {
-                                // Use the primary script key (with .lua extension if not present)
-                                const scriptKey = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
+                            // Use the primary script key (with .lua extension if not present)
+                            const scriptKey = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
+                            
+                            if (existingKey) {
+                                // We have an existing config - check for outdated options and type mismatches
+                                const existingConfig = this.currentConfig[softwareName][existingKey];
+                                const updatedConfig = { ...existingConfig };
+                                let hasChanges = false;
                                 
+                                // Remove options that don't exist in the script anymore
+                                for (const option in existingConfig) {
+                                    if (defaultConfig && !defaultConfig.hasOwnProperty(option)) {
+                                        delete updatedConfig[option];
+                                        report.removedOptions.push({
+                                            software: softwareName,
+                                            script: script.name,
+                                            option: option,
+                                            oldValue: existingConfig[option]
+                                        });
+                                        hasChanges = true;
+                                    }
+                                }
+                                
+                                // Check for type mismatches and add missing options
+                                if (defaultConfig) {
+                                    for (const option in defaultConfig) {
+                                        if (!updatedConfig.hasOwnProperty(option)) {
+                                            // Missing option - add it
+                                            updatedConfig[option] = defaultConfig[option];
+                                            report.newCloudConfigs.push({
+                                                software: softwareName,
+                                                script: script.name,
+                                                option: option,
+                                                value: defaultConfig[option]
+                                            });
+                                            hasChanges = true;
+                                        } else {
+                                            // Check for type mismatch
+                                            const existingType = this.getValueType(updatedConfig[option]);
+                                            const defaultType = this.getValueType(defaultConfig[option]);
+                                            
+                                            if (existingType !== defaultType && defaultType !== 'null' && defaultType !== 'unknown') {
+                                                report.typeChanges.push({
+                                                    software: softwareName,
+                                                    script: script.name,
+                                                    option: option,
+                                                    oldType: existingType,
+                                                    newType: defaultType,
+                                                    oldValue: updatedConfig[option],
+                                                    newValue: defaultConfig[option]
+                                                });
+                                                updatedConfig[option] = defaultConfig[option];
+                                                hasChanges = true;
+                                            }
+                                        }
+                                    }
+                                }
+                                
+                                // Update the config if there were changes
+                                if (hasChanges) {
+                                    this.currentConfig[softwareName][existingKey] = updatedConfig;
+                                }
+                            } else if (defaultConfig && Object.keys(defaultConfig).length > 0) {
+                                // No existing config - create new one
                                 this.currentConfig[softwareName][scriptKey] = defaultConfig;
                                 report.newCloudConfigs.push({ 
                                     software: softwareName, 
@@ -2006,10 +2210,13 @@ Object.assign(app, {
                 }
             }
 
-            // Save the updated configuration if we have new configs
+            // Save the updated configuration if we have any changes
             const totalNewConfigs = report.newBuiltInConfigs.length + report.newCloudConfigs.length;
+            const totalRemovedOptions = report.removedOptions.length;
+            const totalTypeChanges = report.typeChanges.length;
+            const hasChanges = totalNewConfigs > 0 || totalRemovedOptions > 0 || totalTypeChanges > 0;
             
-            if (totalNewConfigs > 0) {
+            if (hasChanges) {
                 generateButton.textContent = '🔄 Saving configuration...';
                 
                 await this.apiPost('setConfiguration', {}, {
@@ -2021,21 +2228,39 @@ Object.assign(app, {
                 this.populateSoftwareDropdown();
 
                 // Create detailed success message
-                let successMessage = `✅ Added ${totalNewConfigs} new configurations!\n`;
+                let successMessage = `✅ Configuration update complete!\n`;
                 
-                if (report.newBuiltInConfigs.length > 0) {
-                    successMessage += `📦 Built-in: ${report.newBuiltInConfigs.length} scripts\n`;
+                if (totalNewConfigs > 0) {
+                    successMessage += `➕ Added ${totalNewConfigs} new configurations\n`;
+                    if (report.newBuiltInConfigs.length > 0) {
+                        successMessage += `  📦 Built-in: ${report.newBuiltInConfigs.length} scripts\n`;
+                    }
+                    if (report.newCloudConfigs.length > 0) {
+                        successMessage += `  ☁️ Cloud: ${report.newCloudConfigs.length} options\n`;
+                    }
                 }
                 
-                if (report.newCloudConfigs.length > 0) {
-                    successMessage += `☁️ Cloud: ${report.newCloudConfigs.length} scripts\n`;
+                if (totalRemovedOptions > 0) {
+                    successMessage += `🗑️ Removed ${totalRemovedOptions} outdated options\n`;
+                }
+                
+                if (totalTypeChanges > 0) {
+                    successMessage += `🔄 Updated ${totalTypeChanges} options with type changes\n`;
                 }
                 
                 if (report.existingConfigs.length > 0) {
-                    successMessage += `⚡ Skipped ${report.existingConfigs.length} existing configs`;
+                    successMessage += `⚡ Unchanged: ${report.existingConfigs.length} configs`;
                 }
                 
                 this.showMessage(successMessage, 'success');
+                
+                // Log detailed changes for debugging
+                if (report.removedOptions.length > 0) {
+                    console.log('Removed options:', report.removedOptions);
+                }
+                if (report.typeChanges.length > 0) {
+                    console.log('Type changes:', report.typeChanges);
+                }
                 
                 if (report.errors.length > 0) {
                     console.warn('Some scripts had errors:', report.errors);
@@ -2079,7 +2304,6 @@ Object.assign(app, {
             return {};
         }
 
-        console.log(`Parsing script source for ${scriptName}`);
 
         // Extract the base name without .lua extension
         const baseName = scriptName.replace('.lua', '').toLowerCase();
@@ -2142,6 +2366,17 @@ Object.assign(app, {
         return null;
     },
 
+    getValueType(value) {
+        // Determine the type of a value
+        if (value === null || value === undefined) return 'null';
+        if (typeof value === 'boolean') return 'boolean';
+        if (typeof value === 'number') return 'number';
+        if (typeof value === 'string') return 'string';
+        if (Array.isArray(value)) return 'array';
+        if (typeof value === 'object') return 'object';
+        return 'unknown';
+    },
+
     parseTableDefaults(lines, baseName, scriptName) {
         // This is the existing approach for: local config = { ... }
         const defaults = {};
@@ -2173,11 +2408,9 @@ Object.assign(app, {
         }
 
         if (startLine === -1) {
-            console.log(`No table pattern found for ${scriptName}`);
             return {};
         }
 
-        console.log(`Found table pattern starting at line ${startLine}`);
 
         let braceLevel = 1; // We start inside the main object
         let skipUntilBraceLevel = null;
@@ -2233,7 +2466,6 @@ Object.assign(app, {
             // If we're currently skipping a nested object
             if (skipUntilBraceLevel !== null) {
                 if (braceLevel <= skipUntilBraceLevel) {
-                    console.log(`Finished skipping nested object at line ${i}`);
                     skipUntilBraceLevel = null;
                 }
                 continue;
@@ -2241,7 +2473,6 @@ Object.assign(app, {
 
             // Check if this line starts a nested object (like cache = {})
             if (line.includes('=') && (line.includes('{') || (i + 1 < lines.length && lines[i + 1].trim().startsWith('{')))) {
-                console.log(`Starting to skip nested object at line ${i}: ${line}`);
                 skipUntilBraceLevel = braceLevel - 1; // Skip until we're back at this level
                 continue;
             }
@@ -2285,7 +2516,6 @@ Object.assign(app, {
         }
         
         if (!foundEmptyTable) {
-            console.log(`No empty table pattern found for ${scriptName}`);
             return {};
         }
         
@@ -2482,15 +2712,17 @@ Object.assign(app, {
             const unlockedCount = memberAchievements.length;
             const lockedCount = totalAchievements - unlockedCount;
             
-            // Calculate total XP from achievements (simplified - you may need to adjust based on actual XP values)
-            const xpPerAchievement = 100; // Adjust based on actual values
-            const totalXP = unlockedCount * xpPerAchievement;
-            
             // Update stats
             document.getElementById('totalAchievements').textContent = totalAchievements;
             document.getElementById('unlockedAchievements').textContent = unlockedCount;
             document.getElementById('lockedAchievements').textContent = lockedCount;
-            document.getElementById('achievementXP').textContent = totalXP.toLocaleString();
+            
+            // Update progress bar
+            const progressPercentage = totalAchievements > 0 ? (unlockedCount / totalAchievements) * 100 : 0;
+            const progressBar = document.getElementById('achievementProgressBar');
+            if (progressBar) {
+                progressBar.style.width = progressPercentage + '%';
+            }
             
             // Display achievements
             this.displayAchievements(allAchievements, memberAchievements);
@@ -2584,7 +2816,6 @@ Object.assign(app, {
                      onclick="app.showAchievementDetail(${index}, '${cardName.replace(/'/g, "\\'")}', '${description.replace(/'/g, "\\'")}', ${isUnlocked})">
                     <img src="${imageUrl}" alt="${cardName}" onerror="this.src='data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI4MCIgaGVpZ2h0PSI4MCIgdmlld0JveD0iMCAwIDgwIDgwIj48cmVjdCB3aWR0aD0iODAiIGhlaWdodD0iODAiIGZpbGw9IiMzMzMiLz48dGV4dCB4PSI0MCIgeT0iNDAiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGRvbWluYW50LWJhc2VsaW5lPSJtaWRkbGUiIGZpbGw9IiM2NjYiIGZvbnQtc2l6ZT0iMTQiPj88L3RleHQ+PC9zdmc+'">
                     <h4 class="achievement-name">${cardName}</h4>
-                    <div class="achievement-xp">100 XP</div>
                 </div>
             `;
         }).join('');
@@ -2595,7 +2826,6 @@ Object.assign(app, {
         document.getElementById('achievementImage').src = `https://gfx.tarot.com/images/site/decks/universal-waite/full_size/${id}.jpg`;
         document.getElementById('achievementName').textContent = name;
         document.getElementById('achievementDescription').textContent = description;
-        document.getElementById('achievementXPReward').textContent = '100 XP';
         
         const statusDiv = document.getElementById('achievementStatus');
         if (isUnlocked) {
