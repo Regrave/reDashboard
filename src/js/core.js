@@ -873,34 +873,43 @@ const app = {
     // ========================
 
     updateUIAfterLogin() {
-        // Hide login section and show main interface
+        // Show loading screen instead of immediately showing the dashboard
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'flex';
+        }
+        
+        // Hide login section
         document.getElementById('loginSection').classList.remove('active');
         document.getElementById('advancedLogin').style.display = 'none';
+        
+        // Don't show any dashboard elements yet - wait for data
+    },
+    
+    showDashboardAfterLoad() {
+        // Hide loading screen
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+        }
+        
+        // Now show the dashboard elements
         document.getElementById('connectedInfo').classList.add('active');
         document.getElementById('settingsButton').classList.add('active');
+        document.getElementById('navTabs').classList.add('active');
+        document.getElementById('contentArea').classList.add('active');
+        document.getElementById('omegaButton').classList.add('active');
         
-        // Only update member info if we have memberData
+        // Update member info
         if (this.memberData) {
             document.getElementById('connectedUsername').textContent = this.memberData.username || 'Unknown';
             document.getElementById('userLevel').textContent = this.memberData.level || '0';
             
-            // Add defensive check for XP
             const xpValue = this.memberData.xp || 0;
             document.getElementById('userXP').textContent = xpValue.toLocaleString();
             
             this.setUserAvatar(this.memberData);
-        } else {
-            // Show loading state
-            document.getElementById('connectedUsername').textContent = 'Loading...';
-            document.getElementById('userLevel').textContent = '...';
-            document.getElementById('userXP').textContent = '...';
         }
-
-        document.getElementById('navTabs').classList.add('active');
-        document.getElementById('contentArea').classList.add('active');
-        
-        // Only show Omega button by default, Roll Loot will be shown only if user has the perk
-        document.getElementById('omegaButton').classList.add('active');
     },
 
     resetUIAfterLogout() {
@@ -1003,6 +1012,12 @@ const app = {
 	},
 
     handleConnectionError(error) {
+        // Hide loading screen on error
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+        }
+        
         // Handle CORS errors specifically
         if (error.message === 'CORS_ERROR_FILE_PROTOCOL') {
             this.showMessage('❌ CORS Error: Cannot make API calls from file:// protocol.\n\nSolutions:\n• Serve this page over HTTP/HTTPS using a local web server\n• Use Python: python -m http.server 8000\n• Use Node.js: npx serve\n• Use VS Code Live Server extension', 'error');
@@ -1117,6 +1132,9 @@ const app = {
                     rollButton.classList.add('active');
                     rollButton.style.display = ''; // Override CSS display: none
                 }
+                
+                // Show the dashboard now that we have member data
+                this.showDashboardAfterLoad();
                 
                 // Show welcome message immediately when member data arrives
                 this.showMessage(`Welcome, ${this.memberData.username}!`, 'success');
@@ -1691,6 +1709,12 @@ const app = {
     },
 
     showHashMismatchScreen() {
+        // Hide loading screen
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+        }
+        
         // Ensure we're not on the dashboard
         const mainInterface = document.getElementById('mainInterface');
         if (mainInterface) {

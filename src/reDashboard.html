@@ -22,6 +22,15 @@
       <script src="js/main.js"></script>        <!-- Initialization & orchestration -->
   </head>
   <body>
+    <!-- Loading Screen -->
+    <div class="loading-screen" id="loadingScreen" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: #1a1a1a; z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column;">
+      <div style="text-align: center;">
+        <div class="loading-spinner" style="width: 60px; height: 60px; border: 4px solid rgba(74, 158, 255, 0.3); border-top: 4px solid #4a9eff; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+        <h2 style="color: #4a9eff; margin-bottom: 10px;">Loading Dashboard...</h2>
+        <p style="color: #aaa;">Connecting to Constelia servers</p>
+      </div>
+    </div>
+    
     <div class="container">
       <!-- Header -->
       <div class="header">
