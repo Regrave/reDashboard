@@ -31,7 +31,7 @@
           <button class="roll-button" id="rollButton" onclick="app.rollLoot()"> 🎲 Roll Loot </button>
           <button class="settings-button" id="settingsButton" onclick="app.showSettingsModal()"> ⚙️ Settings </button>
         </div>
-        <h1> fantasy.dashboard <span class="version-badge">v1.5.0</span>
+        <h1> fantasy.dashboard <span class="version-badge">v1.5.1</span>
         </h1>
         <div class="login-section" id="loginSection">
           <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your FC2 license key...">
@@ -352,6 +352,9 @@
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
               <h3 style="margin: 0; color: #4a9eff;">🎴 Tarot Cards Collection</h3>
               <div class="filter-controls">
+                <button class="btn btn-small" onclick="app.refreshAchievements()" style="margin-right: 10px;">
+                  🔄 Refresh
+                </button>
                 <button class="btn btn-small" onclick="app.showRedeemAchievementsModal()" style="background: linear-gradient(135deg, #4aff4a, #2db92d);">
                   🎁 Redeem Achievements
                 </button>
@@ -471,7 +474,7 @@
       <span style="color: #ff6b6b; font-size: 14px; margin: 0 3px;">♡</span>
       <span style="opacity: 0.7;">by</span>
       <a href="https://constelia.ai/forums/index.php?members/rucka.17146/" target="_blank" style="color: #4a9eff; font-weight: 600; margin-left: 4px; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.color='#6bb6ff'; this.style.textDecoration='underline';" onmouseout="this.style.color='#4a9eff'; this.style.textDecoration='none';">Rucka</a>
-      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.5.0</span>
+      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.5.1</span>
     </div>
     <!-- Bottom-Right Notification Container -->
     <div class="notification-container" id="notificationContainer">
@@ -499,6 +502,25 @@
           </button>
         </div>
         <button class="omega-close-btn" onclick="app.closeOmegaModal()">Cancel</button>
+      </div>
+    </div>
+    <!-- Omega Verification Modal -->
+    <div class="omega-modal" id="omegaVerificationModal">
+      <div class="omega-modal-content">
+        <div class="omega-modal-title">🔐 Verify License Key</div>
+        <div class="omega-modal-subtitle">Please enter your FC2 license key to download Omega.</div>
+        <div style="margin: 20px 0;">
+          <input type="password" class="api-key-input" id="omegaVerificationKey" placeholder="Enter your FC2 license key..." style="width: 100%; margin-bottom: 15px;">
+          <div style="display: flex; gap: 10px;">
+            <button class="btn" onclick="app.verifyAndDownloadOmega()" style="flex: 1; background: linear-gradient(135deg, #4a9eff, #1e7bc9);">
+              🔓 Verify & Continue
+            </button>
+            <button class="omega-close-btn" onclick="app.closeOmegaVerificationModal()" style="flex: 1;">Cancel</button>
+          </div>
+        </div>
+        <div style="font-size: 12px; color: #888; text-align: center; margin-top: 15px;">
+          Your license key will only be used for verification and will not be stored.
+        </div>
       </div>
     </div>
     <!-- Settings Modal -->

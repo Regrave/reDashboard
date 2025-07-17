@@ -2510,7 +2510,10 @@ Object.assign(app, {
             "The Hierophant", "The Lovers", "The Chariot", "Strength", "The Hermit",
             "Wheel of Fortune", "Justice", "The Hanged Man", "Death", "Temperance",
             "The Devil", "The Tower", "The Star", "The Moon", "The Sun",
-            "Judgement", "The World"
+            "Judgement", "The World",
+            // Wands cards (22-31)
+            "Ace of Wands", "Two of Wands", "Three of Wands", "Four of Wands", "Five of Wands",
+            "Six of Wands", "Seven of Wands", "Eight of Wands", "Nine of Wands", "Ten of Wands"
         ];
         
         // Generate tarot names for all achievements
@@ -2519,35 +2522,45 @@ Object.assign(app, {
             if (i < baseTarotNames.length) {
                 tarotNames.push(baseTarotNames[i]);
             } else {
-                // For additional cards beyond the standard 22
+                // For additional cards beyond the standard 27 defined
                 tarotNames.push(`Arcana ${i}`);
             }
         }
         
-        // Achievement descriptions (you can expand this based on actual data)
+        // Achievement descriptions mapping
         const descriptions = {
-            0: "Begin your journey with innocence and wonder",
-            1: "Master the art of manifestation",
-            2: "Unlock hidden knowledge and intuition",
-            3: "Embrace creativity and abundance",
-            4: "Command authority and leadership",
-            5: "Seek spiritual wisdom and guidance",
-            6: "Find harmony in relationships",
-            7: "Drive forward with determination",
-            8: "Discover your inner strength",
-            9: "Journey within for enlightenment",
-            10: "Accept the cycles of fate",
-            11: "Balance the scales of justice",
-            12: "See from a different perspective",
-            13: "Transform and begin anew",
-            14: "Find balance and moderation",
-            15: "Break free from limitations",
-            16: "Rebuild from destruction",
-            17: "Hope guides your path",
-            18: "Navigate through illusion",
-            19: "Bask in success and joy",
-            20: "Face your final reckoning",
-            21: "Complete the cycle of mastery"
+            0: "The Fool is young and vulnerable. Unlocked for triggering an error in the FC2 engine.",
+            1: "The Magician card is a reminder that you are unique. Unlocked for being a SDK Contributor or Media member.",
+            2: "The High Priestess is a card of awareness. Unlocked for heavy participation in XP/Perk system and reaching top 50.",
+            3: "The Empress is the most feminine card. Unlocked when Steam recognizes your display name as stereotypically feminine.",
+            4: "The Emperor is a card of leadership and power. Unlocked for launching Universe4 for the first time.",
+            5: "The Hierophant is a messenger from the heavens. Unlocked for having an HTTP client communicate with FC2's HTTP module.",
+            6: "The Lovers represents close relationships. Unlocked by running a team script, owning a team script, or having Venus perk.",
+            7: "The Chariot indicates determination and victory. Unlocked for successful IPC connection with ZombieFC2 or Kernel Driver.",
+            8: "Strength represents courage and fortitude. Unlocked for purchasing any perk.",
+            9: "The Hermit yearns to be alone. Unlocked for launching FC2 without any cloud community scripts.",
+            10: "Wheel of Fortune is constantly revolving. Unlocked for running Constellation4 with more than 1 iteration counter.",
+            11: "Justice reminds that every action has consequences. Unlocked for using i.constelia.ai at least 50 times.",
+            12: "The Hanged Man teaches about necessary sacrifices. Unlocked for purchasing the Galactic Team perk for FC2T access.",
+            13: "Death represents transformation and renewal. Achievement details not specified.",
+            14: "Temperance is a master of moderation. Unlocked for being a buddy.",
+            15: "The Devil represents restraint and powerlessness. Unlocked when Humanizer4 RNG rolls lowest assistance strength.",
+            16: "The Tower represents necessary destruction. Unlocked for using a Minecraft FC2 solution.",
+            17: "The Star embodies hope and healing. Unlocked for launching Constellation4 for the first time.",
+            18: "The Moon represents hidden thoughts and fears. Unlocked for running FC2 on Linux.",
+            19: "The Sun represents happiness and vitality. Unlocked for running FC2 on Windows.",
+            20: "Judgement is where past and future meet. Unlocked for completing Constelia's Humanizer test.",
+            21: "The World is about completion. Unlocked for having The Star, Moon, and Sun achievements.",
+            22: "Ace of Wands represents new beginnings. Unlocked for being a member for at least 1 year (FC2.5/Omega only).",
+            23: "Two of Wands represents vision and progress. Unlocked for being a member for at least 2 years (FC2.5/Omega only).",
+            24: "Three of Wands represents foresight and expansion. Unlocked for being a member for at least 3 years (FC2.5/Omega only).",
+            25: "Four of Wands represents celebration and stability. Unlocked for being a member for at least 4 years (FC2.5/Omega only).",
+            26: "Five of Wands represents competition and challenge. Unlocked for being a member for at least 5 years (FC2.5/Omega only).",
+            27: "Six of Wands represents public recognition. Unlocked for being a member for at least 6 years (FC2.5/Omega only).",
+            28: "Seven of Wands represents perseverance and defense. Unlocked for being a member for at least 7 years (FC2.5/Omega only).",
+            29: "Eight of Wands represents momentum and progress. Unlocked for being a member for at least 8 years (FC2.5/Omega only).",
+            30: "Nine of Wands represents resilience and inner strength. Unlocked for being a member for at least 9 years (FC2.5/Omega only).",
+            31: "Ten of Wands represents burdens and responsibility. Unlocked for being a member for at least 10 years (FC2.5/Omega only)."
         };
         
         // Generate descriptions for additional achievements
@@ -2560,8 +2573,9 @@ Object.assign(app, {
         };
         
         container.innerHTML = allAchievements.map((achievement, index) => {
-            const isUnlocked = userAchievements.includes(index);
             const cardName = tarotNames[index];
+            // Check if the achievement name is in the user's achievements array
+            const isUnlocked = userAchievements.includes(cardName);
             const description = getDescription(index, achievement);
             const imageUrl = `https://gfx.tarot.com/images/site/decks/universal-waite/full_size/${index}.jpg`;
             
@@ -2615,16 +2629,20 @@ Object.assign(app, {
         }
         
         try {
-            const result = await this.apiCall('redeemAchievements', {
-                value: achievementsData
-            }, 'POST');
+            // Use apiPost for POST request with 'value' parameter
+            const result = await this.apiPost('redeemAchievements', {}, { value: achievementsData });
             
             this.showMessage('Achievements redeemed successfully!', 'success');
             this.closeRedeemAchievementsModal();
             
-            // Reload member info and achievements
-            await this.loadMemberInfo();
-            await this.loadAchievements();
+            // Refresh achievements after successful redemption
+            if (this.modules && this.modules.refreshAchievements) {
+                await this.modules.refreshAchievements();
+            } else {
+                // Fallback to reloading member info and achievements
+                await this.loadMemberInfo();
+                await this.loadAchievements();
+            }
             
         } catch (error) {
             console.error('Error redeeming achievements:', error);

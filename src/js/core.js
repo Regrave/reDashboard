@@ -165,6 +165,22 @@ const app = {
 
             const parsedResponse = this.parseApiResponse(text);
             
+            // Check for invalid license key error
+            if (parsedResponse.message && parsedResponse.message === 'invalid license key') {
+                const error = new Error('INVALID_LICENSE_KEY');
+                error.details = parsedResponse;
+                throw error;
+            }
+            
+            // Check for hash mismatch error
+            if (response.status === 401 && parsedResponse.message && 
+                parsedResponse.message === 'this license key cannot authorize due to the hash not matching the current Web API requester.') {
+                // This is a critical error - the session is invalid
+                const error = new Error('HASH_MISMATCH');
+                error.details = parsedResponse;
+                throw error;
+            }
+            
             // Sanitize API key from parsed response debug output
             const sanitizedResponse = JSON.stringify(parsedResponse, (key, value) => {
                 if (typeof value === 'string' && value.includes(this.apiKey)) {
@@ -296,6 +312,22 @@ const app = {
         }
     },
 
+    async verifySessionBeforeUI() {
+        // Make a quick API call to check if session is valid
+        try {
+            const response = await this.apiCall('getMember', { beautify: '' });
+            // If we get here, the session is valid
+            return true;
+        } catch (error) {
+            if (error.message === 'HASH_MISMATCH') {
+                // Session has hash mismatch
+                return false;
+            }
+            // Other errors might be network issues, let them through
+            throw error;
+        }
+    },
+
     async tryHandshakeLogin() {
         console.log('🔍 Checking for saved handshake...');
         const handshakeToken = this.debugHandshakeToken();
@@ -313,6 +345,16 @@ const app = {
             
             if (licenseKey) {
                 this.apiKey = licenseKey;
+
+                // Verify session before updating UI
+                const isValidSession = await this.verifySessionBeforeUI();
+                if (!isValidSession) {
+                    // Hash mismatch detected
+                    this.deleteHandshakeToken();
+                    this.apiKey = '';
+                    this.showHashMismatchScreen();
+                    return false;
+                }
 
                 // Skip the getMember call here - we'll do it in loadInitialData
                 this.showMessage('Session restored, loading data...', 'success');
@@ -372,6 +414,16 @@ const app = {
                     // Try to use existing handshake
                     this.apiKey = await this.getHandshake(existingHandshake);
                     
+                    // Verify session before updating UI
+                    const isValidSession = await this.verifySessionBeforeUI();
+                    if (!isValidSession) {
+                        // Hash mismatch detected
+                        this.deleteHandshakeToken();
+                        this.apiKey = '';
+                        this.showHashMismatchScreen();
+                        return;
+                    }
+                    
                     // If we got a key, assume it works and let loadInitialData verify
                     this.showMessage('Connected successfully, loading data...', 'success');
                     this.updateUIAfterLogin();
@@ -394,6 +446,16 @@ const app = {
 
                     // Use handshake to get the actual key (verify it works)
                     this.apiKey = await this.getHandshake(handshakeToken);
+
+                    // Verify session before updating UI
+                    const isValidSession = await this.verifySessionBeforeUI();
+                    if (!isValidSession) {
+                        // Hash mismatch detected
+                        this.deleteHandshakeToken();
+                        this.apiKey = '';
+                        this.showHashMismatchScreen();
+                        return;
+                    }
 
                     // Save handshake token for future use
                     const tokenSaved = this.setHandshakeToken(handshakeToken);
@@ -420,6 +482,16 @@ const app = {
                             const newHandshakeToken = await this.authorizeHandshake(licenseKey);
                             this.apiKey = await this.getHandshake(newHandshakeToken);
 
+                            // Verify session before updating UI
+                            const isValidSession = await this.verifySessionBeforeUI();
+                            if (!isValidSession) {
+                                // Hash mismatch detected
+                                this.deleteHandshakeToken();
+                                this.apiKey = '';
+                                this.showHashMismatchScreen();
+                                return;
+                            }
+
                             // Save new handshake token
                             const tokenSaved = this.setHandshakeToken(newHandshakeToken);
                             
@@ -439,6 +511,15 @@ const app = {
                 // Direct connection without handshake for temporary sessions
                 this.showMessage('Connecting for this session...', 'success');
                 this.apiKey = licenseKey;
+
+                // Verify session before updating UI
+                const isValidSession = await this.verifySessionBeforeUI();
+                if (!isValidSession) {
+                    // Hash mismatch detected
+                    this.apiKey = '';
+                    this.showHashMismatchScreen();
+                    return;
+                }
 
                 this.showMessage('Connected successfully, loading data...', 'success');
             }
@@ -479,6 +560,16 @@ const app = {
             // Try to get the license key using the handshake token
             this.showMessage('Verifying handshake token...', 'success');
             this.apiKey = await this.getHandshake(handshakeToken);
+
+            // Verify session before updating UI
+            const isValidSession = await this.verifySessionBeforeUI();
+            if (!isValidSession) {
+                // Hash mismatch detected
+                this.deleteHandshakeToken();
+                this.apiKey = '';
+                this.showHashMismatchScreen();
+                return;
+            }
 
             // Save handshake token only if "Remember me" is checked
             const rememberMe = document.getElementById('rememberMe').checked;
@@ -847,6 +938,10 @@ const app = {
         this.currentConfig = {};
         this.currentScriptConfig = {};
         this.currentScriptKey = '';
+        // Reset omega verification cache
+        if (this.modules) {
+            this.modules.omegaVerified = false;
+        }
     },
 
     setUserAvatar(memberData) {
@@ -987,6 +1082,7 @@ const app = {
                     xp: '',
                     rolls: '',
                     hashes: '',
+                    achievements: '',
                     beautify: ''
                 }),
                 // All other data calls
@@ -1027,7 +1123,10 @@ const app = {
                 }
             }).catch(e => {
                 console.error('Failed to load member data:', e);
-                this.showMessage('Failed to load member data', 'error');
+                // Don't show generic error for hash mismatch - it will be handled by the main catch
+                if (e.message !== 'HASH_MISMATCH') {
+                    this.showMessage('Failed to load member data', 'error');
+                }
             });
             
             // Wait for all calls to complete
@@ -1035,6 +1134,10 @@ const app = {
             
             // Verify member data loaded successfully
             if (results[0].status !== 'fulfilled') {
+                // Check if it was a hash mismatch error
+                if (results[0].reason && results[0].reason.message === 'HASH_MISMATCH') {
+                    throw results[0].reason;
+                }
                 throw new Error('Failed to load member data');
             }
             
@@ -1059,6 +1162,55 @@ const app = {
             
         } catch (error) {
             console.error('❌ Error during optimized data loading:', error);
+            
+            // Check if this is an invalid license key error
+            if (error.message === 'INVALID_LICENSE_KEY') {
+                // Clear any stored handshake token since it's invalid
+                this.deleteHandshakeToken();
+                
+                // Reset state
+                this.apiKey = '';
+                this.memberData = null;
+                
+                // Show error and return to login
+                this.showMessage('❌ Invalid license key. Please check your key and try again.', 'error');
+                
+                // Return to login screen
+                const loginSection = document.getElementById('loginSection');
+                const mainInterface = document.getElementById('mainInterface');
+                if (loginSection) {
+                    loginSection.style.display = '';
+                    loginSection.classList.add('active');
+                }
+                if (mainInterface) {
+                    mainInterface.style.display = 'none';
+                }
+                
+                // Focus on API key input
+                const apiKeyInput = document.getElementById('apiKey');
+                if (apiKeyInput) {
+                    apiKeyInput.focus();
+                }
+                
+                // Don't attempt fallback loading
+                return;
+            }
+            
+            // Check if this is a hash mismatch error
+            if (error.message === 'HASH_MISMATCH') {
+                // Clear any stored handshake token since it's invalid
+                this.deleteHandshakeToken();
+                
+                // Reset state
+                this.apiKey = '';
+                this.memberData = null;
+                
+                // Show the hash mismatch screen
+                this.showHashMismatchScreen();
+                
+                // Don't attempt fallback loading for hash mismatch
+                return;
+            }
             
             // Instead of throwing, try fallback loading
             console.log('🔄 Attempting fallback data loading...');
@@ -1526,6 +1678,77 @@ const app = {
         loginSection.parentNode.insertBefore(recoverySection, loginSection);
     },
 
+    showHashMismatchScreen() {
+        // Ensure we're not on the dashboard
+        const mainInterface = document.getElementById('mainInterface');
+        if (mainInterface) {
+            mainInterface.style.display = 'none';
+        }
+        
+        // Remove any existing hash mismatch or recovery screens
+        const existingHashScreen = document.getElementById('hashMismatchScreen');
+        if (existingHashScreen) {
+            existingHashScreen.remove();
+        }
+        const existingRecovery = document.getElementById('sessionRecovery');
+        if (existingRecovery) {
+            existingRecovery.remove();
+        }
+        
+        const loginSection = document.getElementById('loginSection');
+        const hashMismatchSection = document.createElement('div');
+        hashMismatchSection.id = 'hashMismatchScreen';
+        hashMismatchSection.className = 'session-recovery';
+        hashMismatchSection.innerHTML = `
+            <div style="background: rgba(255, 60, 60, 0.1); border: 1px solid rgba(255, 60, 60, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #ff3c3c; margin-bottom: 15px;">⚠️ Hash Mismatch</h3>
+                <p style="color: #aaa; margin-bottom: 15px;">
+                    Your Web API session cannot be authorized due to a hash mismatch. This typically occurs when:
+                </p>
+                <ul style="color: #999; margin-bottom: 15px; padding-left: 20px;">
+                    <li>You're using a VPN or your network configuration has changed</li>
+                    <li>You haven't been active on the forum recently</li>
+                    <li>Your session needs to be refreshed</li>
+                </ul>
+                <div style="background: rgba(74, 158, 255, 0.1); border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                    <strong style="color: #4a9eff;">How to fix this:</strong>
+                    <ol style="color: #aaa; margin: 10px 0 0 20px;">
+                        <li>Visit the fantasy.cat forum and browse/post for a few minutes</li>
+                        <li>Wait a short while for your session to update</li>
+                        <li>Try logging in again</li>
+                    </ol>
+                </div>
+                <button class="btn" onclick="app.dismissHashMismatch()" style="width: 100%;">
+                    Back to Login
+                </button>
+            </div>
+        `;
+        
+        // Show the hash mismatch screen before the login section
+        loginSection.style.display = 'none';
+        loginSection.parentNode.insertBefore(hashMismatchSection, loginSection);
+    },
+
+    dismissHashMismatch() {
+        const hashMismatchScreen = document.getElementById('hashMismatchScreen');
+        if (hashMismatchScreen) {
+            hashMismatchScreen.remove();
+        }
+        
+        const loginSection = document.getElementById('loginSection');
+        if (loginSection) {
+            // Remove display style to let CSS handle it
+            loginSection.style.display = '';
+            loginSection.classList.add('active');
+            
+            // Focus on the API key input
+            const apiKeyInput = document.getElementById('apiKey');
+            if (apiKeyInput) {
+                apiKeyInput.focus();
+            }
+        }
+    },
+
     async recoverSession() {
         const recoveryInput = document.getElementById('recoveryApiKey');
         const licenseKey = recoveryInput.value.trim();
@@ -1561,6 +1784,23 @@ const app = {
             
             const newHandshakeToken = await this.authorizeHandshake(licenseKey);
             this.apiKey = await this.getHandshake(newHandshakeToken);
+
+            // Verify session before updating UI
+            const isValidSession = await this.verifySessionBeforeUI();
+            if (!isValidSession) {
+                // Hash mismatch detected
+                this.deleteHandshakeToken();
+                this.apiKey = '';
+                
+                // Remove the session recovery section if it exists
+                const existingRecoverySection = document.getElementById('sessionRecovery');
+                if (existingRecoverySection) {
+                    existingRecoverySection.remove();
+                }
+                
+                this.showHashMismatchScreen();
+                return false;
+            }
 
             this.setHandshakeToken(newHandshakeToken);
             
