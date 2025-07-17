@@ -1,4 +1,4 @@
-// FC2 Dashboard - Utils
+// Constelia Dashboard - Utils
 // Contains: Sorting/filtering, script editor, Venus perks, build system, advanced utilities
 
 // Extend the app object with utility functionality
@@ -1193,18 +1193,29 @@ Object.assign(app, {
             this.venusStatus = status;
             this.displayVenusStatus();
 
-            // Show Venus card
-            document.getElementById('venusCard').style.display = 'block';
+            // Show Venus card if it exists
+            const venusCard = document.getElementById('venusCard');
+            if (venusCard) {
+                venusCard.style.display = 'block';
+            }
 
         } catch (error) {
             console.error('Error loading Venus status:', error);
             // Don't show error for Venus - user might not have the perk
-            document.getElementById('venusCard').style.display = 'none';
+            const venusCard = document.getElementById('venusCard');
+            if (venusCard) {
+                venusCard.style.display = 'none';
+            }
         }
     },
 
     displayVenusStatus() {
         const container = document.getElementById('venusStatus');
+        
+        if (!container) {
+            console.log('Venus status container not found');
+            return;
+        }
 
         if (!this.venusStatus) {
             container.innerHTML = '<p style="color: #888;">Venus perk status unavailable</p>';

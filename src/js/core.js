@@ -1,4 +1,4 @@
-// FC2 Dashboard - Core Module
+// Constelia Dashboard - Core Module
 // Contains: App foundation, API communication, authentication, and core utilities
 
 // Main application object
@@ -898,7 +898,8 @@ const app = {
 
         document.getElementById('navTabs').classList.add('active');
         document.getElementById('contentArea').classList.add('active');
-        document.getElementById('rollButton').classList.add('active');
+        
+        // Only show Omega button by default, Roll Loot will be shown only if user has the perk
         document.getElementById('omegaButton').classList.add('active');
     },
 
@@ -1109,6 +1110,14 @@ const app = {
                 document.getElementById('userXP').textContent = xpValue.toLocaleString();
                 this.setUserAvatar(this.memberData);
                 
+                // Only show Roll Loot button if user has Abundance of Jupiter perk (ID 11)
+                const rollButton = document.getElementById('rollButton');
+                const hasAbundanceOfJupiter = this.ownedPerks.some(perk => perk.id === 11);
+                if (hasAbundanceOfJupiter) {
+                    rollButton.classList.add('active');
+                    rollButton.style.display = ''; // Override CSS display: none
+                }
+                
                 // Show welcome message immediately when member data arrives
                 this.showMessage(`Welcome, ${this.memberData.username}!`, 'success');
                 
@@ -1118,6 +1127,8 @@ const app = {
                     this.displayMyScripts();
                     this.displayMyProjects();
                     this.updatePersonalizedTerminal();
+                    // Display XP history chart
+                    setTimeout(() => this.displayXPHistoryChart(), 100);
                 } catch (e) {
                     console.warn('Some displays could not be updated immediately:', e);
                 }
@@ -1473,6 +1484,7 @@ const app = {
         
         const updates = [
             { name: 'Member Info', fn: () => this.updateMemberInfoDisplay() },
+            { name: 'XP History Chart', fn: () => this.displayXPHistoryChart() },
             { name: 'My Scripts', fn: () => this.displayMyScripts() },
             { name: 'Available Scripts', fn: () => this.displayAvailableScripts() },
             { name: 'Script Config', fn: () => this.populateScriptConfigSelect() },

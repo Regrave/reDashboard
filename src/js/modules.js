@@ -1,4 +1,4 @@
-// FC2 Dashboard - Modules
+// Constelia Dashboard - Modules
 // Contains: Feature modules, data loading, and business logic
 
 // Extend the app object with module functionality
@@ -967,6 +967,244 @@ Object.assign(app, {
     },
 
     // ========================
+    // XP HISTORY MODULE
+    // ========================
+    
+    displayXPHistoryChart() {
+        const xpHistory = this.memberData?.xp_history || [];
+        const canvas = document.getElementById('xpHistoryChart');
+        
+        if (!canvas || xpHistory.length === 0) {
+            return;
+        }
+        
+        // Sort by time and get last 30 days of data
+        const sortedHistory = [...xpHistory].sort((a, b) => a.time - b.time);
+        const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
+        const recentHistory = sortedHistory.filter(entry => entry.time >= thirtyDaysAgo);
+        
+        // Group by day
+        const dailyData = {};
+        recentHistory.forEach(entry => {
+            const date = new Date(entry.time * 1000);
+            const dateKey = date.toISOString().split('T')[0];
+            
+            if (!dailyData[dateKey]) {
+                dailyData[dateKey] = { gained: 0, lost: 0, net: 0 };
+            }
+            
+            if (entry.amount > 0) {
+                dailyData[dateKey].gained += entry.amount;
+            } else {
+                dailyData[dateKey].lost += Math.abs(entry.amount);
+            }
+            dailyData[dateKey].net += entry.amount;
+        });
+        
+        // Prepare data for Chart.js
+        const labels = Object.keys(dailyData).sort();
+        const gainedData = labels.map(date => dailyData[date].gained);
+        const lostData = labels.map(date => dailyData[date].lost);
+        const netData = labels.map(date => dailyData[date].net);
+        
+        // Destroy existing chart if it exists
+        if (this.xpChart) {
+            this.xpChart.destroy();
+        }
+        
+        // Create new chart
+        const ctx = canvas.getContext('2d');
+        this.xpChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels.map(date => {
+                    const d = new Date(date);
+                    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                }),
+                datasets: [
+                    {
+                        label: 'XP Gained',
+                        data: gainedData,
+                        borderColor: '#4aff4a',
+                        backgroundColor: 'rgba(74, 255, 74, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'XP Lost',
+                        data: lostData,
+                        borderColor: '#ff4a4a',
+                        backgroundColor: 'rgba(255, 74, 74, 0.1)',
+                        tension: 0.4
+                    },
+                    {
+                        label: 'Net XP',
+                        data: netData,
+                        borderColor: '#4a9eff',
+                        backgroundColor: 'rgba(74, 158, 255, 0.1)',
+                        tension: 0.4
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        labels: {
+                            color: '#ccc'
+                        }
+                    },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#888'
+                        }
+                    },
+                    y: {
+                        grid: {
+                            color: 'rgba(255, 255, 255, 0.1)'
+                        },
+                        ticks: {
+                            color: '#888'
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Calculate and display streak if user has Lunar Rhythm perk
+        this.calculateAndDisplayStreak();
+    },
+    
+    calculateAndDisplayStreak() {
+        const hasLunarRhythm = this.memberData?.perks?.some(perk => perk.id === 26);
+        if (!hasLunarRhythm) {
+            return;
+        }
+        
+        // Calculate streak based on Constelia session history
+        const sessionHistory = this.memberData?.session_history;
+        if (!sessionHistory?.success || sessionHistory.success.length === 0) {
+            const streakInfo = document.getElementById('xpStreakInfo');
+            if (streakInfo) {
+                streakInfo.style.display = 'block';
+                document.getElementById('currentStreak').textContent = '0';
+                document.getElementById('streakBonus').textContent = '0%';
+            }
+            return;
+        }
+        
+        // Get successful Constelia connections sorted by time descending
+        const successfulSessions = [...sessionHistory.success]
+            .filter(session => session.software === 'Omega' || session.solution === 'Omega')
+            .sort((a, b) => b.time - a.time);
+        
+        if (successfulSessions.length === 0) {
+            const streakInfo = document.getElementById('xpStreakInfo');
+            if (streakInfo) {
+                streakInfo.style.display = 'block';
+                document.getElementById('currentStreak').textContent = '0';
+                document.getElementById('streakBonus').textContent = '0%';
+            }
+            return;
+        }
+        
+        let currentStreak = 0;
+        let lastDate = null;
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        
+        // Group sessions by day
+        const sessionsByDay = new Map();
+        for (const session of successfulSessions) {
+            const sessionDate = new Date(session.time * 1000);
+            sessionDate.setHours(0, 0, 0, 0);
+            const dateKey = sessionDate.toISOString().split('T')[0];
+            
+            if (!sessionsByDay.has(dateKey)) {
+                sessionsByDay.set(dateKey, sessionDate);
+            }
+        }
+        
+        // Convert to sorted array of unique days
+        const uniqueDays = Array.from(sessionsByDay.values()).sort((a, b) => b - a);
+        
+        // Debug logging
+        console.log('Lunar Rhythm Streak Debug (Overview):');
+        console.log('Today:', today.toISOString().split('T')[0]);
+        console.log('Most recent session:', uniqueDays[0]?.toISOString().split('T')[0]);
+        console.log('Days since last session:', Math.floor((today - uniqueDays[0]) / (24 * 60 * 60 * 1000)));
+        
+        for (const sessionDate of uniqueDays) {
+            if (!lastDate) {
+                // First entry - check if it's today or yesterday
+                const daysDiff = Math.floor((today - sessionDate) / (24 * 60 * 60 * 1000));
+                if (daysDiff === 0 || daysDiff === 1) {
+                    currentStreak = 1;
+                    lastDate = sessionDate;
+                } else {
+                    // Streak broken - no session today or yesterday
+                    console.log('Streak broken: Last session was', daysDiff, 'days ago');
+                    break;
+                }
+            } else {
+                // Check if consecutive day
+                const dayDiff = Math.floor((lastDate - sessionDate) / (24 * 60 * 60 * 1000));
+                if (dayDiff === 1) {
+                    currentStreak++;
+                    lastDate = sessionDate;
+                } else {
+                    // Gap in days - streak broken
+                    console.log('Streak broken: Gap of', dayDiff, 'days between sessions');
+                    break;
+                }
+            }
+        }
+        
+        console.log('Final streak:', currentStreak)
+        
+        // Display streak info
+        const streakInfo = document.getElementById('xpStreakInfo');
+        if (streakInfo) {
+            streakInfo.style.display = 'block';
+            document.getElementById('currentStreak').textContent = currentStreak;
+            const bonus = Math.min(currentStreak * 2, 100); // 2% per day, max 100%
+            document.getElementById('streakBonus').textContent = `${bonus}%`;
+            
+            // Calculate time until next reward (0:00 UTC)
+            const now = new Date();
+            const tomorrow = new Date(now);
+            tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+            tomorrow.setUTCHours(0, 0, 0, 0);
+            
+            const updateCountdown = () => {
+                const now = new Date();
+                const diff = tomorrow - now;
+                if (diff > 0) {
+                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
+                    document.getElementById('nextRewardTime').textContent = 
+                        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+                } else {
+                    document.getElementById('nextRewardTime').textContent = '00:00:00';
+                }
+            };
+            
+            updateCountdown();
+            setInterval(updateCountdown, 1000);
+        }
+    },
+
+    // ========================
     // TAB MANAGEMENT MODULE
     // ========================
 
@@ -984,8 +1222,23 @@ Object.assign(app, {
         document.getElementById(`${tabName}-section`).classList.add('active');
 
         // Load data for specific tabs if needed
-        if (tabName === 'perks' && this.allPerks.length === 0) {
-            this.loadPerks();
+        if (tabName === 'perks') {
+            if (this.allPerks.length === 0) {
+                this.loadPerks();
+            } else {
+                // If perks are already loaded, check for Venus perk
+                setTimeout(() => {
+                    const hasVenus = this.ownedPerks.some(perk =>
+                        this.allPerks.find(p => p.id === perk.id && p.name.toLowerCase().includes('venus'))
+                    );
+                    
+                    if (hasVenus) {
+                        console.log('Checking Venus status on tab switch...');
+                        // Always try to load Venus status when switching to perks tab
+                        this.loadVenusStatus();
+                    }
+                }, 100); // Small delay to ensure DOM is ready
+            }
         }
 
         if (tabName === 'config' && Object.keys(this.availableLanguages).length === 0) {
@@ -997,7 +1250,14 @@ Object.assign(app, {
         }
 
         if (tabName === 'sessions') {
-            this.loadSessionInfo(); // Add this line
+            this.loadSessionInfo();
+            
+            // Show freeze button if user has Arctic of Uranus perk (ID 15)
+            const hasArcticOfUranus = this.memberData?.perks?.some(perk => perk.id === 15);
+            const freezeButton = document.getElementById('freezeSessionButton');
+            if (freezeButton) {
+                freezeButton.style.display = hasArcticOfUranus ? 'inline-block' : 'none';
+            }
         }
 
         if (tabName === 'divinity') {
@@ -1135,6 +1395,7 @@ Object.assign(app, {
                 history: '',
                 fc2t: '',
                 xp: '',
+                achievements: '',
                 beautify: ''
             });
             
@@ -1488,12 +1749,28 @@ Object.assign(app, {
             this.showMessage('Failed to refresh session history', 'error');
         }
     },
+    
+    async freezeSession() {
+        if (!confirm('Are you sure you want to freeze your session? While frozen, you cannot launch FC2 solutions and your hashes will be locked.')) {
+            return;
+        }
+        
+        try {
+            const result = await this.apiCall('freeze');
+            this.showMessage('❄️ Session frozen successfully!', 'success');
+            await this.loadSessionInfo(); // Refresh session info
+        } catch (error) {
+            console.error('Error freezing session:', error);
+            this.showMessage(`Failed to freeze session: ${error.message}`, 'error');
+        }
+    },
 
     async loadSessionHistory(detailed = false) {
         try {
             const flags = {
                 scripts: '',
                 history: '',
+                achievements: '',
                 beautify: ''
             };
             
