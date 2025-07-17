@@ -15,6 +15,7 @@ Object.assign(app, {
                 scripts: '',
                 bans: '',
                 fc2t: '',
+                achievements: '',
                 beautify: ''
             });
             this.memberData = response;
@@ -22,6 +23,36 @@ Object.assign(app, {
             this.memberProjects = response.fc2t || [];
         }
         this.updateMemberInfoDisplay();
+    },
+
+    async refreshAchievements() {
+        try {
+            this.showMessage('Refreshing achievements...', 'info');
+            
+            const response = await this.apiCall('getMember', {
+                achievements: '',
+                beautify: ''
+            });
+            
+            if (response && response.achievements) {
+                // Update member data with new achievements
+                if (this.memberData) {
+                    this.memberData.achievements = response.achievements;
+                }
+                
+                // Re-render achievements UI
+                if (this.components && this.components.loadAchievements) {
+                    await this.components.loadAchievements();
+                }
+                
+                this.showMessage('Achievements refreshed', 'success');
+            } else {
+                this.showMessage('Failed to refresh achievements', 'error');
+            }
+        } catch (error) {
+            console.error('Error refreshing achievements:', error);
+            this.showMessage('Error refreshing achievements', 'error');
+        }
     },
 
     showSettingsModal() {
@@ -844,12 +875,85 @@ Object.assign(app, {
     // OMEGA MODULE
     // ========================
 
+    // Session-based verification cache
+    omegaVerified: false,
+
     showOmegaModal() {
-        document.getElementById('omegaModal').classList.add('active');
+        // Check if we're logged in OR if we've already verified this session
+        if (this.apiKey || this.omegaVerified) {
+            // User is logged in or already verified, show OS selection directly
+            document.getElementById('omegaModal').classList.add('active');
+        } else {
+            // Not logged in and not verified, show verification modal
+            document.getElementById('omegaVerificationModal').classList.add('active');
+            // Focus on the input
+            setTimeout(() => {
+                document.getElementById('omegaVerificationKey').focus();
+            }, 100);
+        }
     },
 
     closeOmegaModal() {
         document.getElementById('omegaModal').classList.remove('active');
+    },
+
+    closeOmegaVerificationModal() {
+        document.getElementById('omegaVerificationModal').classList.remove('active');
+        document.getElementById('omegaVerificationKey').value = '';
+    },
+
+    async verifyAndDownloadOmega() {
+        const keyInput = document.getElementById('omegaVerificationKey');
+        const licenseKey = keyInput.value.trim();
+
+        if (!licenseKey) {
+            this.showMessage('Please enter your license key', 'error');
+            return;
+        }
+
+        const verifyButton = document.querySelector('#omegaVerificationModal button');
+        const originalText = verifyButton.textContent;
+        verifyButton.disabled = true;
+        verifyButton.textContent = '🔄 Verifying...';
+
+        try {
+            // Temporarily set the API key for verification
+            const originalApiKey = this.apiKey;
+            this.apiKey = licenseKey;
+            
+            try {
+                // Make a simple API call to verify the key
+                const result = await this.apiCall('getMember', { beautify: '' });
+                
+                // If we got a valid response, the key is valid
+                if (result && result.username) {
+                    this.omegaVerified = true; // Cache verification for this session
+                    this.showMessage('✅ License key verified!', 'success');
+                    
+                    // Close verification modal and show OS selection
+                    this.closeOmegaVerificationModal();
+                    document.getElementById('omegaModal').classList.add('active');
+                } else {
+                    throw new Error('Invalid response from server');
+                }
+            } finally {
+                // Restore the original API key (if any)
+                this.apiKey = originalApiKey;
+            }
+
+        } catch (error) {
+            console.error('Verification error:', error);
+            if (error.message === 'INVALID_LICENSE_KEY' || error.message.includes('invalid license key')) {
+                this.showMessage('❌ Invalid license key. Please check your key and try again.', 'error');
+            } else if (error.message === 'HASH_MISMATCH') {
+                this.showMessage('❌ Network change detected. Please use the login page instead.', 'error');
+            } else {
+                this.showMessage('❌ Verification failed. Please try again.', 'error');
+            }
+        } finally {
+            verifyButton.disabled = false;
+            verifyButton.textContent = originalText;
+        }
     },
 
     downloadOmega(os) {
