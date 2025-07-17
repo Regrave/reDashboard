@@ -875,22 +875,11 @@ Object.assign(app, {
     // OMEGA MODULE
     // ========================
 
-    // Session-based verification cache
-    omegaVerified: false,
+    // Omega download functions
 
     showOmegaModal() {
-        // Check if we're logged in OR if we've already verified this session
-        if (this.apiKey || this.omegaVerified) {
-            // User is logged in or already verified, show OS selection directly
-            document.getElementById('omegaModal').classList.add('active');
-        } else {
-            // Not logged in and not verified, show verification modal
-            document.getElementById('omegaVerificationModal').classList.add('active');
-            // Focus on the input
-            setTimeout(() => {
-                document.getElementById('omegaVerificationKey').focus();
-            }, 100);
-        }
+        // Always show OS selection directly - no verification needed
+        document.getElementById('omegaModal').classList.add('active');
     },
 
     closeOmegaModal() {

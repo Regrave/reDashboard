@@ -2208,6 +2208,12 @@ body {
 
 /* Prompt is now added dynamically with username */
 
+/* Loading Screen Animation */
+@keyframes spin {
+	0% { transform: rotate(0deg); }
+	100% { transform: rotate(360deg); }
+}
+
 .terminal-result {
 	color: #e0e0e0;
 	white-space: pre-wrap;
