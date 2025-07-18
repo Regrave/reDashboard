@@ -241,6 +241,18 @@ async function initializeApplication() {
 
         // If session wasn't restored, show login form
         if (!sessionRestored) {
+            // Hide loading screen since we're showing login
+            const loadingScreen = document.getElementById('loadingScreen');
+            if (loadingScreen) {
+                loadingScreen.style.display = 'none';
+            }
+            
+            // Show main interface
+            const mainInterface = document.getElementById('mainInterface');
+            if (mainInterface) {
+                mainInterface.style.display = '';
+            }
+            
             // Check if recovery section exists - if it does, don't show login section
             const recoverySection = document.getElementById('sessionRecovery');
             if (!recoverySection) {
