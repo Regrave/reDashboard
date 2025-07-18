@@ -884,9 +884,20 @@ const app = {
         document.getElementById('advancedLogin').style.display = 'none';
         
         // Don't show any dashboard elements yet - wait for data
+        
+        // Set up loading timeout (5 seconds)
+        this.loadingTimeout = setTimeout(() => {
+            this.handleLoadingTimeout();
+        }, 5000);
     },
     
     showDashboardAfterLoad() {
+        // Clear loading timeout since load succeeded
+        if (this.loadingTimeout) {
+            clearTimeout(this.loadingTimeout);
+            this.loadingTimeout = null;
+        }
+        
         // Hide loading screen
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen) {
@@ -993,6 +1004,58 @@ const app = {
             avatarElement.appendChild(fallback);
         }
     },
+    
+    handleLoadingTimeout() {
+        // Hide loading screen
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            // Update loading screen content to show timeout message
+            const loadingContent = loadingScreen.querySelector('div > div');
+            if (loadingContent) {
+                loadingContent.innerHTML = `
+                    <div style="text-align: center;">
+                        <h2 style="color: #ff6666; margin-bottom: 20px;">Connection Timeout</h2>
+                        <p style="color: #aaa; margin-bottom: 30px;">Unable to connect to Constelia servers. Your session may have expired.</p>
+                        <button class="btn" onclick="app.retryLogin()" style="margin-right: 15px;">🔄 Try Again</button>
+                        <button class="btn btn-danger" onclick="app.forceLogout()">🚪 Log Out</button>
+                    </div>
+                `;
+            }
+        }
+    },
+    
+    retryLogin() {
+        // Clear loading timeout
+        if (this.loadingTimeout) {
+            clearTimeout(this.loadingTimeout);
+            this.loadingTimeout = null;
+        }
+        
+        // Hide loading screen
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+        }
+        
+        // Reset state and show login
+        this.resetAppState();
+        this.resetUIAfterLogout();
+        this.showMessage('Please log in again', 'info');
+    },
+    
+    forceLogout() {
+        // Clear loading timeout
+        if (this.loadingTimeout) {
+            clearTimeout(this.loadingTimeout);
+            this.loadingTimeout = null;
+        }
+        
+        // Wipe handshake
+        this.deleteHandshakeToken();
+        
+        // Disconnect properly
+        this.disconnect();
+    },
 	
 	// Helper function to detect if we're in an online environment
 	isOnlineEnvironment() {
@@ -1012,6 +1075,12 @@ const app = {
 	},
 
     handleConnectionError(error) {
+        // Clear loading timeout to prevent double messages
+        if (this.loadingTimeout) {
+            clearTimeout(this.loadingTimeout);
+            this.loadingTimeout = null;
+        }
+        
         // Hide loading screen on error
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen) {

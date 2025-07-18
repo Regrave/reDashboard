@@ -2214,6 +2214,33 @@ body {
 	100% { transform: rotate(360deg); }
 }
 
+/* Loading Screen Styles */
+.loading-screen .btn {
+	padding: 12px 24px;
+	font-size: 16px;
+	font-weight: 600;
+	border: none;
+	border-radius: 8px;
+	cursor: pointer;
+	transition: all 0.3s ease;
+	background: linear-gradient(135deg, #4a9eff, #1e7bc9);
+	color: white;
+	min-width: 120px;
+}
+
+.loading-screen .btn:hover {
+	transform: translateY(-2px);
+	box-shadow: 0 4px 8px rgba(74, 158, 255, 0.3);
+}
+
+.loading-screen .btn-danger {
+	background: linear-gradient(135deg, #ff4444, #cc0000);
+}
+
+.loading-screen .btn-danger:hover {
+	box-shadow: 0 4px 8px rgba(255, 68, 68, 0.3);
+}
+
 .terminal-result {
 	color: #e0e0e0;
 	white-space: pre-wrap;
