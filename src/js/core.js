@@ -181,6 +181,15 @@ const app = {
                 throw error;
             }
             
+            // Check for no active session error
+            if (response.status === 401 && parsedResponse.message && 
+                parsedResponse.message === 'API is not available because there is not an active Session for this license key') {
+                // No active session - user needs to create one
+                const error = new Error('NO_ACTIVE_SESSION');
+                error.details = parsedResponse;
+                throw error;
+            }
+            
             // Sanitize API key from parsed response debug output
             const sanitizedResponse = JSON.stringify(parsedResponse, (key, value) => {
                 if (typeof value === 'string' && value.includes(this.apiKey)) {
@@ -317,14 +326,26 @@ const app = {
         try {
             const response = await this.apiCall('getMember', { beautify: '' });
             // If we get here, the session is valid
-            return true;
+            return { valid: true };
         } catch (error) {
             if (error.message === 'HASH_MISMATCH') {
                 // Session has hash mismatch
-                return false;
+                return { valid: false, error: 'HASH_MISMATCH' };
+            }
+            if (error.message === 'NO_ACTIVE_SESSION') {
+                // No active session
+                return { valid: false, error: 'NO_ACTIVE_SESSION' };
             }
             // Other errors might be network issues, let them through
             throw error;
+        }
+    },
+    
+    showAppropriateErrorScreen(errorType) {
+        if (errorType === 'HASH_MISMATCH') {
+            this.showHashMismatchScreen();
+        } else if (errorType === 'NO_ACTIVE_SESSION') {
+            this.showNoActiveSessionScreen();
         }
     },
 
@@ -347,12 +368,12 @@ const app = {
                 this.apiKey = licenseKey;
 
                 // Verify session before updating UI
-                const isValidSession = await this.verifySessionBeforeUI();
-                if (!isValidSession) {
-                    // Hash mismatch detected
+                const sessionCheck = await this.verifySessionBeforeUI();
+                if (!sessionCheck.valid) {
+                    // Session error detected
                     this.deleteHandshakeToken();
                     this.apiKey = '';
-                    this.showHashMismatchScreen();
+                    this.showAppropriateErrorScreen(sessionCheck.error);
                     return false;
                 }
 
@@ -415,12 +436,12 @@ const app = {
                     this.apiKey = await this.getHandshake(existingHandshake);
                     
                     // Verify session before updating UI
-                    const isValidSession = await this.verifySessionBeforeUI();
-                    if (!isValidSession) {
-                        // Hash mismatch detected
+                    const sessionCheck = await this.verifySessionBeforeUI();
+                    if (!sessionCheck.valid) {
+                        // Session error detected
                         this.deleteHandshakeToken();
                         this.apiKey = '';
-                        this.showHashMismatchScreen();
+                        this.showAppropriateErrorScreen(sessionCheck.error);
                         return;
                     }
                     
@@ -448,12 +469,12 @@ const app = {
                     this.apiKey = await this.getHandshake(handshakeToken);
 
                     // Verify session before updating UI
-                    const isValidSession = await this.verifySessionBeforeUI();
-                    if (!isValidSession) {
-                        // Hash mismatch detected
+                    const sessionCheck = await this.verifySessionBeforeUI();
+                    if (!sessionCheck.valid) {
+                        // Session error detected
                         this.deleteHandshakeToken();
                         this.apiKey = '';
-                        this.showHashMismatchScreen();
+                        this.showAppropriateErrorScreen(sessionCheck.error);
                         return;
                     }
 
@@ -513,11 +534,11 @@ const app = {
                 this.apiKey = licenseKey;
 
                 // Verify session before updating UI
-                const isValidSession = await this.verifySessionBeforeUI();
-                if (!isValidSession) {
-                    // Hash mismatch detected
+                const sessionCheck = await this.verifySessionBeforeUI();
+                if (!sessionCheck.valid) {
+                    // Session error detected
                     this.apiKey = '';
-                    this.showHashMismatchScreen();
+                    this.showAppropriateErrorScreen(sessionCheck.error);
                     return;
                 }
 
@@ -562,12 +583,12 @@ const app = {
             this.apiKey = await this.getHandshake(handshakeToken);
 
             // Verify session before updating UI
-            const isValidSession = await this.verifySessionBeforeUI();
-            if (!isValidSession) {
-                // Hash mismatch detected
+            const sessionCheck = await this.verifySessionBeforeUI();
+            if (!sessionCheck.valid) {
+                // Session error detected
                 this.deleteHandshakeToken();
                 this.apiKey = '';
-                this.showHashMismatchScreen();
+                this.showAppropriateErrorScreen(sessionCheck.error);
                 return;
             }
 
@@ -1310,6 +1331,22 @@ const app = {
                 return;
             }
             
+            // Check if this is a no active session error
+            if (error.message === 'NO_ACTIVE_SESSION') {
+                // Clear any stored handshake token since there's no session
+                this.deleteHandshakeToken();
+                
+                // Reset state
+                this.apiKey = '';
+                this.memberData = null;
+                
+                // Show the no active session screen
+                this.showNoActiveSessionScreen();
+                
+                // Don't attempt fallback loading
+                return;
+            }
+            
             // Instead of throwing, try fallback loading
             console.log('🔄 Attempting fallback data loading...');
             await this.fallbackDataLoading();
@@ -1834,10 +1871,92 @@ const app = {
         loginSection.parentNode.insertBefore(hashMismatchSection, loginSection);
     },
 
+    showNoActiveSessionScreen() {
+        // Hide loading screen
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+        }
+        
+        // Ensure we're not on the dashboard
+        const mainInterface = document.getElementById('mainInterface');
+        if (mainInterface) {
+            mainInterface.style.display = 'none';
+        }
+        
+        // Remove any existing error screens
+        const existingNoSessionScreen = document.getElementById('noActiveSessionScreen');
+        if (existingNoSessionScreen) {
+            existingNoSessionScreen.remove();
+        }
+        const existingHashScreen = document.getElementById('hashMismatchScreen');
+        if (existingHashScreen) {
+            existingHashScreen.remove();
+        }
+        const existingRecovery = document.getElementById('sessionRecovery');
+        if (existingRecovery) {
+            existingRecovery.remove();
+        }
+        
+        const loginSection = document.getElementById('loginSection');
+        const noSessionSection = document.createElement('div');
+        noSessionSection.id = 'noActiveSessionScreen';
+        noSessionSection.className = 'session-recovery';
+        noSessionSection.innerHTML = `
+            <div style="background: rgba(255, 60, 60, 0.1); border: 1px solid rgba(255, 60, 60, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="color: #ff3c3c; margin-bottom: 15px;">⚠️ No Active Session</h3>
+                <p style="color: #aaa; margin-bottom: 15px;">
+                    You don't have an active Constelia session. Sessions are required to use this license key.
+                </p>
+                <ul style="color: #999; margin-bottom: 15px; padding-left: 20px;">
+                    <li>Your session has expired (after 3 days of inactivity)</li>
+                    <li>You haven't created a session yet</li>
+                    <li>You're on a new device or directory</li>
+                </ul>
+                <div style="background: rgba(74, 158, 255, 0.1); border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                    <strong style="color: #4a9eff;">How to create a session:</strong>
+                    <ol style="color: #aaa; margin: 10px 0 0 20px;">
+                        <li>Launch Omega (or any fantasy.cat solution) with --sessions</li>
+                        <li>When prompted, create a new session</li>
+                        <li>Your session will be bound to your hardware and directory</li>
+                        <li>Once created, return here and try logging in again</li>
+                    </ol>
+                </div>
+                <button class="btn" onclick="app.dismissNoActiveSession()" style="width: 100%;">
+                    Back to Login
+                </button>
+            </div>
+        `;
+        
+        // Show the no active session screen before the login section
+        loginSection.style.display = 'none';
+        loginSection.parentNode.insertBefore(noSessionSection, loginSection);
+    },
+
     dismissHashMismatch() {
         const hashMismatchScreen = document.getElementById('hashMismatchScreen');
         if (hashMismatchScreen) {
             hashMismatchScreen.remove();
+        }
+        
+        const loginSection = document.getElementById('loginSection');
+        if (loginSection) {
+            // Remove display style to let CSS handle it
+            loginSection.style.display = '';
+            loginSection.classList.add('active');
+            
+            // Focus on the API key input
+            const apiKeyInput = document.getElementById('apiKey');
+            if (apiKeyInput) {
+                apiKeyInput.focus();
+            }
+        }
+    },
+
+    dismissNoActiveSession() {
+        const noActiveSessionScreen = document.getElementById('noActiveSessionScreen');
+        if (noActiveSessionScreen) {
+            noActiveSessionScreen.remove();
         }
         
         const loginSection = document.getElementById('loginSection');
@@ -1891,9 +2010,9 @@ const app = {
             this.apiKey = await this.getHandshake(newHandshakeToken);
 
             // Verify session before updating UI
-            const isValidSession = await this.verifySessionBeforeUI();
-            if (!isValidSession) {
-                // Hash mismatch detected
+            const sessionCheck = await this.verifySessionBeforeUI();
+            if (!sessionCheck.valid) {
+                // Session error detected
                 this.deleteHandshakeToken();
                 this.apiKey = '';
                 
@@ -1903,7 +2022,7 @@ const app = {
                     existingRecoverySection.remove();
                 }
                 
-                this.showHashMismatchScreen();
+                this.showAppropriateErrorScreen(sessionCheck.error);
                 return false;
             }
 
