@@ -925,6 +925,12 @@ const app = {
             loadingScreen.style.display = 'none';
         }
         
+        // Show main interface
+        const mainInterface = document.getElementById('mainInterface');
+        if (mainInterface) {
+            mainInterface.style.display = '';
+        }
+        
         // Now show the dashboard elements
         document.getElementById('connectedInfo').classList.add('active');
         document.getElementById('settingsButton').classList.add('active');
@@ -1294,15 +1300,23 @@ const app = {
                 // Show error and return to login
                 this.showMessage('❌ Invalid license key. Please check your key and try again.', 'error');
                 
+                // Hide loading screen
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (loadingScreen) {
+                    loadingScreen.style.display = 'none';
+                }
+                
+                // Show main interface with login
+                const mainInterface = document.getElementById('mainInterface');
+                if (mainInterface) {
+                    mainInterface.style.display = '';
+                }
+                
                 // Return to login screen
                 const loginSection = document.getElementById('loginSection');
-                const mainInterface = document.getElementById('mainInterface');
                 if (loginSection) {
                     loginSection.style.display = '';
                     loginSection.classList.add('active');
-                }
-                if (mainInterface) {
-                    mainInterface.style.display = 'none';
                 }
                 
                 // Focus on API key input
@@ -1453,10 +1467,16 @@ const app = {
             this.updateAllDisplays();
             this.showMessage('⚠️ Some features may be limited due to connection issues. Core functionality is available.', 'warning');
             
+            // Show dashboard even with limited data
+            this.showDashboardAfterLoad();
+            
         } catch (error) {
             console.error('❌ Even fallback loading failed:', error);
             this.showBasicInterface();
             this.showMessage('⚠️ Limited offline mode. Some features unavailable.', 'error');
+            
+            // Show dashboard even in basic mode
+            this.showDashboardAfterLoad();
         }
     },
 
@@ -1791,6 +1811,18 @@ const app = {
     },
     
     showInlineSessionRecovery() {
+        // Hide loading screen
+        const loadingScreen = document.getElementById('loadingScreen');
+        if (loadingScreen) {
+            loadingScreen.style.display = 'none';
+        }
+        
+        // Show main interface
+        const mainInterface = document.getElementById('mainInterface');
+        if (mainInterface) {
+            mainInterface.style.display = '';
+        }
+        
         const loginSection = document.getElementById('loginSection');
         const recoverySection = document.createElement('div');
         recoverySection.id = 'sessionRecovery';
@@ -1821,10 +1853,10 @@ const app = {
             loadingScreen.style.display = 'none';
         }
         
-        // Ensure we're not on the dashboard
+        // Show main interface
         const mainInterface = document.getElementById('mainInterface');
         if (mainInterface) {
-            mainInterface.style.display = 'none';
+            mainInterface.style.display = '';
         }
         
         // Remove any existing hash mismatch or recovery screens
@@ -1878,10 +1910,10 @@ const app = {
             loadingScreen.style.display = 'none';
         }
         
-        // Ensure we're not on the dashboard
+        // Show main interface
         const mainInterface = document.getElementById('mainInterface');
         if (mainInterface) {
-            mainInterface.style.display = 'none';
+            mainInterface.style.display = '';
         }
         
         // Remove any existing error screens
