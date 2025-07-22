@@ -729,11 +729,11 @@ Object.assign(app, {
         // Decode any escaped characters
         if (sourceCode && typeof sourceCode === 'string') {
             sourceCode = sourceCode
+                .replace(/\\\\/g, '\\')  // Process double backslashes first
                 .replace(/\\n/g, '\n')
                 .replace(/\\t/g, '\t')
                 .replace(/\\"/g, '"')
-                .replace(/\\'/g, "'")
-                .replace(/\\\\/g, '\\');
+                .replace(/\\'/g, "'");
         }
 
         // Set content and apply syntax highlighting
@@ -946,6 +946,20 @@ Object.assign(app, {
     setupCodeEditorFeatures(editor) {
         // Simple input handler - highlight after typing stops
         let typingTimer;
+        let isHighlighting = false;
+        
+        const safeHighlight = () => {
+            if (isHighlighting) {
+                console.log('Skipping highlight - already in progress');
+                return;
+            }
+            isHighlighting = true;
+            this.highlightCodeEditor();
+            // Reset flag after a short delay to ensure the highlight is complete
+            setTimeout(() => {
+                isHighlighting = false;
+            }, 100);
+        };
         
         editor.addEventListener('input', () => {
             // Clear the previous timer
@@ -954,7 +968,7 @@ Object.assign(app, {
             // Set a new timer - highlight after 800ms of no typing
             typingTimer = setTimeout(() => {
                 console.log('Highlighting after typing stopped');
-                this.highlightCodeEditor();
+                safeHighlight();
             }, 800);
         });
 
@@ -962,7 +976,7 @@ Object.assign(app, {
         editor.addEventListener('blur', () => {
             console.log('Highlighting on blur');
             clearTimeout(typingTimer);
-            this.highlightCodeEditor();
+            safeHighlight();
         });
 
         // Tab key support
@@ -1860,6 +1874,12 @@ Object.assign(app, {
                     <div id="category-${categoryName}" class="config-category-content">
             `;
 
+            // Sort settings alphabetically if preference is enabled for this script
+            const sortKey = `alphabeticalSort_${this.currentScriptKey}`;
+            if (localStorage.getItem(sortKey) === 'true') {
+                existingSettings.sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+            }
+            
             existingSettings.forEach(settingName => {
                 const value = this.currentScriptConfig[settingName];
                 const dropdownOptions = configMetadata.dropdowns[settingName] || null;
@@ -1927,11 +1947,17 @@ Object.assign(app, {
             else groups.other.push(key);
         });
 
-        // Remove empty groups and capitalize names
+        // Remove empty groups, capitalize names, and sort settings within each group
         Object.keys(groups).forEach(groupName => {
             if (groups[groupName].length === 0) {
                 delete groups[groupName];
             } else {
+                // Sort settings alphabetically within each group if preference is enabled for this script
+                const sortKey = `alphabeticalSort_${this.currentScriptKey}`;
+                if (localStorage.getItem(sortKey) === 'true') {
+                    groups[groupName].sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+                }
+                
                 const capitalizedName = groupName.charAt(0).toUpperCase() + groupName.slice(1);
                 if (groupName !== capitalizedName) {
                     groups[capitalizedName] = groups[groupName];
@@ -2797,11 +2823,11 @@ Object.assign(app, {
         // Decode any escaped characters
         if (sourceCode && typeof sourceCode === 'string') {
             sourceCode = sourceCode
+                .replace(/\\\\/g, '\\')  // Process double backslashes first
                 .replace(/\\n/g, '\n')
                 .replace(/\\t/g, '\t')
                 .replace(/\\"/g, '"')
-                .replace(/\\'/g, "'")
-                .replace(/\\\\/g, '\\');
+                .replace(/\\'/g, "'");
         }
 
         // Update source code display with highlighting

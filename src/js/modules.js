@@ -92,14 +92,7 @@ Object.assign(app, {
             this.allProjects = response;
         }
 
-        this.displayMyProjects();
-        this.displayAvailableProjects();
-
-        // Apply default sorting
-        setTimeout(() => {
-            this.sortMyProjects();
-            this.sortAvailableProjects();
-        }, 100);
+        // Teams functionality removed - no longer displaying projects
     },
 
     async loadOmegaInfo() {
@@ -243,10 +236,7 @@ Object.assign(app, {
             // Update counts
             this.loadMemberInfo();
 
-            // Apply current sorting
-            setTimeout(() => {
-                this.sortMyProjects();
-            }, 100);
+            // Teams functionality removed
 
             // Update ALL toggle switches for this project ID
             document.querySelectorAll(`.toggle-switch[onclick*="toggleProject(${projectId},"]`).forEach(toggle => {
@@ -277,16 +267,8 @@ Object.assign(app, {
             this.memberData = response;
             this.memberProjects = response.fc2t || [];
 
-            this.displayMyProjects();
-            await this.loadAllProjects();
-
-            // Apply current sorting after refresh
-            setTimeout(() => {
-                this.sortMyProjects();
-                this.sortAvailableProjects();
-            }, 100);
-
-            this.showMessage(`Projects refreshed! (${this.memberProjects.length} active)`, 'success');
+            // Teams functionality removed
+            this.showMessage(`Teams module has been discontinued`, 'info');
         } catch (error) {
             console.error('Error refreshing projects:', error);
         }

@@ -43,7 +43,7 @@
           <button class="roll-button" id="rollButton" onclick="app.rollLoot()"> 🎲 Roll Loot </button>
           <button class="settings-button" id="settingsButton" onclick="app.showSettingsModal()"> ⚙️ Settings </button>
         </div>
-        <h1> fantasy.dashboard <span class="version-badge">v1.5.5</span>
+        <h1> fantasy.dashboard <span class="version-badge">v1.5.6</span>
         </h1>
         <div class="login-section" id="loginSection">
           <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your Constelia API key...">
@@ -88,7 +88,6 @@
       <div class="nav-tabs" id="navTabs">
         <button class="nav-tab active" onclick="app.switchTab('overview')">📊 Overview</button>
         <button class="nav-tab" onclick="app.switchTab('scripts')">📜 Scripts</button>
-        <button class="nav-tab" onclick="app.switchTab('teams')">👥 Teams</button>
         <button class="nav-tab" onclick="app.switchTab('builds')">🏗️ Builds</button>
         <button class="nav-tab" onclick="app.switchTab('sessions')">🔐 Sessions</button>
         <button class="nav-tab" onclick="app.switchTab('perks')">✨ Perks</button>
@@ -199,47 +198,6 @@
               <div id="categoryFilters"></div>
             </div>
             <div class="scripts-grid" id="availableScriptsGrid">
-              <div class="spinner"></div>
-            </div>
-          </div>
-        </div>
-        <!-- Teams Section -->
-        <div class="content-section" id="teams-section">
-          <div class="card">
-            <h2>🚀 My Active Projects</h2>
-            <div class="filter-controls">
-              <label style="color: #aaa; font-size: 14px;">Sort by:</label>
-              <select class="form-select" id="myProjectSort" style="width: 175px;" onchange="app.sortMyProjects()">
-                <option value="name">Name (A-Z)</option>
-                <option value="name_desc">Name (Z-A)</option>
-                <option value="author">Author</option>
-                <option value="updated" selected>Recently Updated</option>
-              </select>
-              <button class="btn btn-small" onclick="app.refreshProjects()">🔄 Refresh</button>
-            </div>
-            <div class="scripts-grid" id="myProjectsGrid">
-              <div class="spinner"></div>
-            </div>
-          </div>
-          <div class="card">
-            <h2>📦 Available Projects</h2>
-            <div class="filter-controls">
-              <input type="text" class="form-input" id="projectSearch" placeholder="Search projects..." onkeyup="app.filterProjects()" style="width: 300px;">
-              <label style="color: #aaa; font-size: 14px;">Sort by:</label>
-              <select class="form-select" id="availableProjectSort" style="width: 175px;" onchange="app.handleAvailableProjectSortChange()">
-                <option value="name">Name (A-Z)</option>
-                <option value="name_desc">Name (Z-A)</option>
-                <option value="author">Author</option>
-                <option value="updated" selected>Recently Updated</option>
-              </select>
-              <button class="btn btn-small" onclick="app.clearAvailableProjectFilters()">🗑️ Clear Filters</button>
-            </div>
-            <!-- Filter Panels for Projects -->
-            <div id="availableProjectAuthorFilter" class="filter-panel">
-              <h4 style="color: #4a9eff; margin-bottom: 15px;">Filter by Author:</h4>
-              <div id="projectAuthorFilters"></div>
-            </div>
-            <div class="scripts-grid" id="availableProjectsGrid">
               <div class="spinner"></div>
             </div>
           </div>
@@ -471,6 +429,12 @@
                 </div>
                 <label style="color: #ccc; font-size: 14px; cursor: pointer; white-space: nowrap;" onclick="app.toggleLiveOmega()">🚀 Live Omega</label>
               </div>
+              <div style="display: flex; align-items: center; gap: 8px; margin-left: 15px;">
+                <div class="toggle-switch" id="alphabeticalToggle" onclick="app.toggleAlphabeticalSort()" title="Sort settings alphabetically">
+                  <div class="toggle-slider"></div>
+                </div>
+                <label style="color: #ccc; font-size: 14px; cursor: pointer; white-space: nowrap;" onclick="app.toggleAlphabeticalSort()">🔤 A-Z Sort</label>
+              </div>
             </div>
             <div id="scriptConfigEditor" style="display: none;">
               <div class="script-config-form" id="scriptConfigForm">
@@ -506,7 +470,7 @@
       <span style="color: #ff6b6b; font-size: 14px; margin: 0 3px;">♡</span>
       <span style="opacity: 0.7;">by</span>
       <a href="https://constelia.ai/forums/index.php?members/rucka.17146/" target="_blank" style="color: #4a9eff; font-weight: 600; margin-left: 4px; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.color='#6bb6ff'; this.style.textDecoration='underline';" onmouseout="this.style.color='#4a9eff'; this.style.textDecoration='none';">Rucka</a>
-      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.5.5</span>
+      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.5.6</span>
     </div>
     <!-- Bottom-Right Notification Container -->
     <div class="notification-container" id="notificationContainer">
