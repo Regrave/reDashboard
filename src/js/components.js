@@ -834,6 +834,7 @@ Object.assign(app, {
             const autoSaveToggle = document.getElementById('autoSaveToggle');
             const liveOmegaToggle = document.getElementById('liveOmegaToggle');
             const liveOmegaContainer = document.getElementById('liveOmegaContainer');
+            const alphabeticalToggle = document.getElementById('alphabeticalToggle');
 
             if (autoSaveToggle) {
                 if (this.autoSaveEnabled) {
@@ -857,6 +858,11 @@ Object.assign(app, {
                 } else {
                     liveOmegaContainer.classList.remove('visible');
                 }
+            }
+
+            // Initialize alphabetical toggle state (will be updated when a script is selected)
+            if (alphabeticalToggle) {
+                alphabeticalToggle.classList.remove('active');
             }
         }, 100);
     },
@@ -926,6 +932,33 @@ Object.assign(app, {
                 this.showMessage('Live Omega updates disabled', 'success');
             }
         }
+    },
+
+    toggleAlphabeticalSort() {
+        if (!this.currentScriptKey) {
+            this.showMessage('Please select a script first', 'error');
+            return;
+        }
+
+        // Create a unique key for this script's sorting preference
+        const sortKey = `alphabeticalSort_${this.currentScriptKey}`;
+        const currentState = localStorage.getItem(sortKey) === 'true';
+        const newState = !currentState;
+        localStorage.setItem(sortKey, newState.toString());
+
+        const toggle = document.getElementById('alphabeticalToggle');
+        if (toggle) {
+            if (newState) {
+                toggle.classList.add('active');
+                this.showMessage(`🔤 Alphabetical sorting enabled for ${this.currentScriptKey}`, 'success');
+            } else {
+                toggle.classList.remove('active');
+                this.showMessage(`Settings will display in original order for ${this.currentScriptKey}`, 'success');
+            }
+        }
+
+        // Reload the current script config to apply the sorting preference
+        this.loadScriptConfig();
     },
 
     triggerAutoSave() {
@@ -1822,6 +1855,17 @@ Object.assign(app, {
         this.currentScriptConfig = scriptConfig;
         this.currentScriptKey = scriptKey;
 
+        // Update alphabetical toggle state for this script
+        const alphabeticalToggle = document.getElementById('alphabeticalToggle');
+        if (alphabeticalToggle) {
+            const sortKey = `alphabeticalSort_${scriptKey}`;
+            const alphabeticalSort = localStorage.getItem(sortKey) === 'true';
+            if (alphabeticalSort) {
+                alphabeticalToggle.classList.add('active');
+            } else {
+                alphabeticalToggle.classList.remove('active');
+            }
+        }
 
         this.renderConfigForm();
         this.showMessage(`Loaded configuration for ${scriptKey}`, 'success');
@@ -1847,7 +1891,7 @@ Object.assign(app, {
                 <div class="config-group">
                     <h4 style="color: #4a9eff; margin-bottom: 15px; font-size: 18px;">🦴 Bones Configuration</h4>
                     <p style="color: #aaa; margin-bottom: 20px; font-size: 14px; line-height: 1.5;">
-                        Configure which bone IDs to target. Common bones: Head (8), Chest (6), Stomach (3), Pelvis (1).<br>
+                        Configure which bone IDs to target. CS2 bones: Head (6), Neck (5), Upper Chest (4), Lower Chest (3), Stomach (2), Pelvis (0).<br>
                         <strong>Current configuration has ${bonesArray.length} bone(s).</strong>
                     </p>
                     
@@ -1882,10 +1926,12 @@ Object.assign(app, {
                             <strong>Quick Add Common Bones:</strong>
                         </div>
                         <div class="config-control" style="display: flex; gap: 8px; flex-wrap: wrap;">
-                            <button class="btn btn-small" onclick="app.addBone(8)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Head (8)</button>
-                            <button class="btn btn-small" onclick="app.addBone(6)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Chest (6)</button>
-                            <button class="btn btn-small" onclick="app.addBone(3)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Stomach (3)</button>
-                            <button class="btn btn-small" onclick="app.addBone(1)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Pelvis (1)</button>
+                            <button class="btn btn-small" onclick="app.addBone(6)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Head (6)</button>
+                            <button class="btn btn-small" onclick="app.addBone(5)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Neck (5)</button>
+                            <button class="btn btn-small" onclick="app.addBone(4)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Upper Chest (4)</button>
+                            <button class="btn btn-small" onclick="app.addBone(3)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Lower Chest (3)</button>
+                            <button class="btn btn-small" onclick="app.addBone(2)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Stomach (2)</button>
+                            <button class="btn btn-small" onclick="app.addBone(0)" style="background: linear-gradient(135deg, #ff6b35, #ff8e53);">Pelvis (0)</button>
                         </div>
                     </div>
                 </div>
@@ -1894,6 +1940,18 @@ Object.assign(app, {
 
         this.currentScriptConfig = bonesArray;
         this.currentScriptKey = 'bones';
+
+        // Update alphabetical toggle state for bones config
+        const alphabeticalToggle = document.getElementById('alphabeticalToggle');
+        if (alphabeticalToggle) {
+            const sortKey = `alphabeticalSort_bones`;
+            const alphabeticalSort = localStorage.getItem(sortKey) === 'true';
+            if (alphabeticalSort) {
+                alphabeticalToggle.classList.add('active');
+            } else {
+                alphabeticalToggle.classList.remove('active');
+            }
+        }
 
         this.showMessage(`Bones configuration loaded (${bonesArray.length} bones)`, 'success');
     },
@@ -2110,11 +2168,11 @@ Object.assign(app, {
                             // Decode escaped characters
                             if (sourceCode && typeof sourceCode === 'string') {
                                 sourceCode = sourceCode
+                                    .replace(/\\\\/g, '\\')  // Process double backslashes first
                                     .replace(/\\n/g, '\n')
                                     .replace(/\\t/g, '\t')
                                     .replace(/\\"/g, '"')
-                                    .replace(/\\'/g, "'")
-                                    .replace(/\\\\/g, '\\');
+                                    .replace(/\\'/g, "'");
                             }
 
                             // Parse the source code for default values
@@ -2208,6 +2266,14 @@ Object.assign(app, {
                         }
                     }
                 }
+            }
+
+            // Add default CS2 bones configuration if missing
+            if (!this.currentConfig.bones || !Array.isArray(this.currentConfig.bones) || this.currentConfig.bones.length === 0) {
+                // CS2 default bones: 6=head, 5=neck, 4=upper chest, 3=lower chest, 2=stomach, 0=pelvis
+                this.currentConfig.bones = [6, 5, 4, 3, 2, 0];
+                report.newBuiltInConfigs.push({ software: 'bones', script: 'default CS2 bones' });
+                this.showMessage('Added default CS2 bones configuration', 'success');
             }
 
             // Save the updated configuration if we have any changes
@@ -2768,7 +2834,7 @@ Object.assign(app, {
             4: "The Emperor is a card of leadership and power. Unlocked for launching Universe4 for the first time.",
             5: "The Hierophant is a messenger from the heavens. Unlocked for having an HTTP client communicate with FC2's HTTP module.",
             6: "The Lovers represents close relationships. Unlocked by running a team script, owning a team script, or having Venus perk.",
-            7: "The Chariot indicates determination and victory. Unlocked for successful IPC connection with ZombieFC2 or Kernel Driver.",
+            7: "The Chariot indicates determination and victory. Unlocked for successful IPC connection with Kernel Driver.",
             8: "Strength represents courage and fortitude. Unlocked for purchasing any perk.",
             9: "The Hermit yearns to be alone. Unlocked for launching FC2 without any cloud community scripts.",
             10: "Wheel of Fortune is constantly revolving. Unlocked for running Constellation4 with more than 1 iteration counter.",

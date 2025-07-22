@@ -70,10 +70,7 @@ const app = {
     // Protection modes
     protectionModes: {
         0: 'Standard (usermode)',
-        1: 'IPC/Zombie',
         2: 'Kernel Mode Protection (default)',
-        3: 'Minimum (Usermode)',
-        4: 'Minimum (Kernel)',
         5: 'Rootlink'
     },
 
@@ -1239,7 +1236,6 @@ const app = {
                 try {
                     this.updateMemberInfoDisplay();
                     this.displayMyScripts();
-                    this.displayMyProjects();
                     this.updatePersonalizedTerminal();
                     // Display XP history chart
                     setTimeout(() => this.displayXPHistoryChart(), 100);
@@ -1632,8 +1628,6 @@ const app = {
             { name: 'My Scripts', fn: () => this.displayMyScripts() },
             { name: 'Available Scripts', fn: () => this.displayAvailableScripts() },
             { name: 'Script Config', fn: () => this.populateScriptConfigSelect() },
-            { name: 'My Projects', fn: () => this.displayMyProjects() },
-            { name: 'Available Projects', fn: () => this.displayAvailableProjects() },
             { name: 'My Builds', fn: () => this.displayMyBuilds() },
             { name: 'Available Builds', fn: () => this.displayAvailableBuilds() },
             { name: 'Configuration', fn: () => this.updateConfigurationDisplay() },
