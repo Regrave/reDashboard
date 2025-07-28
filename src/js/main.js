@@ -226,6 +226,19 @@ async function initializeApplication() {
 
         // Load caching preference first
         window.app.loadCachingPreference();
+        
+        // Load and setup Remember Me preference
+        const rememberMeCheckbox = document.getElementById('rememberMe');
+        if (rememberMeCheckbox) {
+            // Load saved preference (default to true if not set)
+            const savedPreference = localStorage.getItem('rememberMePreference');
+            rememberMeCheckbox.checked = savedPreference === null ? true : savedPreference === 'true';
+            
+            // Save preference when changed
+            rememberMeCheckbox.addEventListener('change', () => {
+                localStorage.setItem('rememberMePreference', rememberMeCheckbox.checked);
+            });
+        }
 
         // Setup event listeners
         setupKeyboardListeners();

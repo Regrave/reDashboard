@@ -950,7 +950,7 @@ const app = {
     resetUIAfterLogout() {
         document.getElementById('apiKey').value = '';
         document.getElementById('handshakeToken').value = '';
-        document.getElementById('rememberMe').checked = false;
+        // Don't reset the Remember Me checkbox - keep user's preference
         document.getElementById('loginSection').classList.add('active');
         document.getElementById('advancedLogin').style.display = 'none';
         document.getElementById('connectedInfo').classList.remove('active');
