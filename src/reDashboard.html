@@ -48,10 +48,6 @@
         <div class="login-section" id="loginSection">
           <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your Constelia API key...">
           <button class="btn" onclick="app.connect()">🚀 Connect</button>
-          <div style="display: flex; align-items: center; gap: 8px; margin-left: 10px;">
-            <input type="checkbox" id="rememberMe" style="width: 18px; height: 18px;">
-            <label for="rememberMe" style="color: #ccc; font-size: 14px; cursor: pointer;">Remember me</label>
-          </div>
           <button class="btn btn-small" onclick="app.toggleAdvanced()" style="margin-left: 10px; background: linear-gradient(135deg, #666, #555);">⚙️ Advanced</button>
         </div>
         <!-- Advanced Login Section -->
@@ -73,6 +69,17 @@
               <button class="btn btn-danger" onclick="app.wipeHandshake()" style="background: linear-gradient(135deg, #ff4444, #cc0000); white-space: nowrap;"> 🗑️ Wipe Handshake </button>
             </div>
             <div style="margin-top: 8px; font-size: 11px; color: #ff8c00;"> ⚠️ This will destroy your session token and log you out from all devices immediately. </div>
+          </div>
+          <!-- Remember Me Option -->
+          <div style="margin-top: 20px; padding-top: 15px; border-top: 1px solid rgba(255, 255, 255, 0.1);">
+            <h4 style="color: #4a9eff; margin-bottom: 10px; font-size: 14px;">🔐 Session Preferences</h4>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <input type="checkbox" id="rememberMe" style="width: 18px; height: 18px;" checked>
+              <label for="rememberMe" style="color: #ccc; font-size: 14px; cursor: pointer;">Remember me (save session for 30 days)</label>
+            </div>
+            <div style="margin-top: 8px; font-size: 12px; color: #888;">
+              When enabled, your session will be saved for 30 days. Disable this if you're using a shared computer.
+            </div>
           </div>
         </div>
         <div class="connected-info" id="connectedInfo">
