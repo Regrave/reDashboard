@@ -3073,38 +3073,24 @@ Object.assign(app, {
                 <p>The configuration form will appear below once you select a script.</p>
                 <p><strong>Note:</strong> The "bones" option lets you configure CS2 bone IDs for targeting.</p>
             `,
-            position: 'bottom'
-        },
-        {
-            element: '#saveConfigBtn',
-            title: '🔴 Unsaved Changes Indicator',
-            content: `
-                <p>When you make changes to your configuration, a <strong>red dot</strong> will appear on the Save button.</p>
-                <p>This means you have unsaved changes!</p>
-                <p><strong>Remember:</strong> You must save your changes AND restart Omega for them to take effect.</p>
-            `,
-            position: 'top',
+            position: 'bottom',
             onShow: () => {
-                // Make the unsaved badge visible for the tutorial
-                const badge = document.getElementById('configUnsavedBadge');
-                if (badge) {
-                    badge.style.display = 'block';
+                // Auto-select first available script for tutorial
+                const scriptSelect = document.getElementById('scriptConfigSelect');
+                if (scriptSelect && scriptSelect.options.length > 1) {
+                    // Select first non-empty option
+                    scriptSelect.selectedIndex = 1;
+                    // Trigger change event to load config
+                    const event = new Event('change', { bubbles: true });
+                    scriptSelect.dispatchEvent(event);
+                }
+                
+                // Also ensure the config editor is visible
+                const editor = document.getElementById('scriptConfigEditor');
+                if (editor) {
+                    editor.style.display = 'block';
                 }
             }
-        },
-        {
-            element: '.live-omega-container',
-            title: '🚀 Live Omega Feature',
-            content: `
-                <p>The <strong>Live Omega</strong> toggle is a powerful feature!</p>
-                <ul>
-                    <li>When enabled, configuration changes are pushed to Omega <strong>instantly</strong></li>
-                    <li>No need to restart Omega when Live mode is on</li>
-                    <li>Perfect for testing and quick adjustments</li>
-                </ul>
-                <p>Toggle it on to enable real-time updates!</p>
-            `,
-            position: 'left'
         },
         {
             element: '#autoSaveToggle',
@@ -3114,10 +3100,50 @@ Object.assign(app, {
                 <ul>
                     <li>Automatically saves your configuration as you type</li>
                     <li>No need to manually click Save Config</li>
-                    <li>Works great with Live Omega for seamless updates</li>
+                    <li>When enabled, it unlocks the <strong>Live Omega</strong> feature</li>
                 </ul>
+                <p>Enable this to see the Live Omega option appear!</p>
             `,
             position: 'left'
+        },
+        {
+            element: '#liveOmegaContainer',
+            title: '🚀 Live Omega Feature',
+            content: `
+                <p>The <strong>Live Omega</strong> toggle appears when Auto-save is enabled!</p>
+                <ul>
+                    <li>Configuration changes are pushed to Omega <strong>instantly</strong></li>
+                    <li>No need to restart Omega when Live mode is on</li>
+                    <li>Perfect for testing and quick adjustments</li>
+                </ul>
+                <p><strong>Note:</strong> You must have Auto-save enabled to use this feature!</p>
+            `,
+            position: 'left',
+            onShow: () => {
+                // Temporarily show Live Omega container for tutorial
+                const liveOmegaContainer = document.getElementById('liveOmegaContainer');
+                if (liveOmegaContainer) {
+                    // Force immediate visibility
+                    liveOmegaContainer.style.display = 'flex !important';
+                    liveOmegaContainer.classList.add('visible');
+                    liveOmegaContainer.style.opacity = '1';
+                    
+                    // Force layout recalculation
+                    void liveOmegaContainer.offsetHeight;
+                }
+            },
+            onHide: () => {
+                // Hide it again if auto-save is not actually enabled
+                const app = window.app;
+                if (app && !app.autoSaveEnabled) {
+                    const liveOmegaContainer = document.getElementById('liveOmegaContainer');
+                    if (liveOmegaContainer) {
+                        liveOmegaContainer.classList.remove('visible');
+                        liveOmegaContainer.style.opacity = '';
+                        liveOmegaContainer.style.display = '';
+                    }
+                }
+            }
         },
         {
             element: '#omegaButton',
@@ -3125,7 +3151,7 @@ Object.assign(app, {
             content: `
                 <p>Click this button to download the Omega launcher for your operating system.</p>
                 <p>Omega is the client that runs your scripts and applies your configurations.</p>
-                <p><strong>Tip:</strong> Make sure Omega is running before you start your game!</p>
+                <p><strong>Tip:</strong> Make sure to start CS2 first, then launch Omega!</p>
             `,
             position: 'bottom'
         }
@@ -3148,13 +3174,10 @@ Object.assign(app, {
         
         // Show tutorial on first visit if not dismissed or completed
         if (!this.isConnected) {
-            // Wait for loading screen to be completely hidden
-            setTimeout(() => {
-                const loadingScreen = document.getElementById('loadingScreen');
-                if (!loadingScreen || loadingScreen.style.display === 'none') {
-                    this.startTutorial(false); // Start pre-login tutorial
-                }
-            }, 2000); // Give more time for loading animation
+            // Start tutorial immediately with a minimal delay for DOM updates
+            requestAnimationFrame(() => {
+                this.startTutorial(false); // Start pre-login tutorial
+            });
         }
     },
 
@@ -3169,10 +3192,10 @@ Object.assign(app, {
         // Log out the user
         this.disconnect();
         
-        // Start tutorial after a short delay
-        setTimeout(() => {
+        // Start tutorial immediately
+        requestAnimationFrame(() => {
             this.startTutorial(false);
-        }, 500);
+        });
     },
     
     startTutorial(isPostLogin = false) {
@@ -3204,10 +3227,10 @@ Object.assign(app, {
         // Called after successful login to continue with post-login tutorial
         if (this.tutorialPaused && !localStorage.getItem('fc2_tutorial_completed')) {
             this.tutorialPaused = false;
-            // Give time for the UI to update after login
-            setTimeout(() => {
+            // Start post-login tutorial immediately
+            requestAnimationFrame(() => {
                 this.startTutorial(true); // Start post-login tutorial
-            }, 1000);
+            });
         }
     },
 
@@ -3235,8 +3258,18 @@ Object.assign(app, {
             nextBtn.className = 'tutorial-btn tutorial-btn-next';
         }
 
-        // Position highlight and tooltip
-        this.positionTutorialElements(step);
+        // Position elements with retry for animations
+        const attemptPosition = (attempts = 0) => {
+            const element = document.querySelector(step.element);
+            if (!element && attempts < 10) {
+                // Retry after a short delay if element not found
+                setTimeout(() => attemptPosition(attempts + 1), 100);
+            } else {
+                // Always try to position, even if element not found initially
+                this.positionTutorialElements(step);
+            }
+        };
+        attemptPosition();
     },
 
     positionTutorialElements(step) {
@@ -3246,6 +3279,7 @@ Object.assign(app, {
         
         if (!element) {
             // If element doesn't exist, show tooltip in center
+            tooltip.style.position = 'fixed';
             tooltip.style.left = '50%';
             tooltip.style.top = '50%';
             tooltip.style.transform = 'translate(-50%, -50%)';
@@ -3253,15 +3287,23 @@ Object.assign(app, {
             return;
         }
 
+        // Scroll element into view first
+        element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+        
+        // Update positioning on scroll complete
+        const updatePosition = () => {
+            const rect = element.getBoundingClientRect();
+        
         // Show and position highlight
-        const rect = element.getBoundingClientRect();
         highlight.style.display = 'block';
+        highlight.style.position = 'fixed';
         highlight.style.left = `${rect.left - 10}px`;
         highlight.style.top = `${rect.top - 10}px`;
         highlight.style.width = `${rect.width + 20}px`;
         highlight.style.height = `${rect.height + 20}px`;
 
-        // Position tooltip based on step position preference
+        // Position tooltip
+        tooltip.style.position = 'fixed';
         const tooltipRect = tooltip.getBoundingClientRect();
         let left, top;
 
@@ -3294,9 +3336,20 @@ Object.assign(app, {
         tooltip.style.left = `${left}px`;
         tooltip.style.top = `${top}px`;
         tooltip.style.transform = 'none';
+        };
+        
+        // Update position immediately and after scroll
+        updatePosition();
+        setTimeout(updatePosition, 300);
     },
 
     nextTutorialStep() {
+        // Call onHide for current step if it exists
+        const currentStep = this.tutorialSteps[this.currentTutorialStep];
+        if (currentStep && currentStep.onHide) {
+            currentStep.onHide();
+        }
+        
         this.currentTutorialStep++;
         
         if (this.currentTutorialStep >= this.tutorialSteps.length) {
@@ -3316,12 +3369,24 @@ Object.assign(app, {
     },
 
     skipTutorial() {
+        // Call onHide for current step if it exists
+        const currentStep = this.tutorialSteps[this.currentTutorialStep];
+        if (currentStep && currentStep.onHide) {
+            currentStep.onHide();
+        }
+        
         localStorage.setItem('fc2_tutorial_dismissed', 'true');
         this.closeTutorial();
         this.showMessage('Tutorial skipped. You can restart it anytime from Settings > Tutorial.', 'info');
     },
 
     completeTutorial() {
+        // Call onHide for current step if it exists
+        const currentStep = this.tutorialSteps[this.currentTutorialStep];
+        if (currentStep && currentStep.onHide) {
+            currentStep.onHide();
+        }
+        
         localStorage.setItem('fc2_tutorial_completed', 'true');
         this.closeTutorial();
         this.showMessage('🎉 Tutorial completed! You\'re ready to use the dashboard.', 'success');
