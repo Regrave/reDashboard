@@ -3729,3 +3729,222 @@ body {
 	            0 0 40px rgba(74, 255, 74, 0.2),
 	            inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
+
+/* ========================
+   TUTORIAL SYSTEM
+   ======================== */
+
+/* Tutorial overlay that covers entire screen */
+.tutorial-overlay {
+	position: fixed;
+	top: 0;
+	left: 0;
+	width: 100%;
+	height: 100%;
+	background: rgba(0, 0, 0, 0.3);
+	z-index: 9998;
+	display: none;
+	animation: fadeIn 0.3s ease-in;
+}
+
+.tutorial-overlay.active {
+	display: block;
+}
+
+/* Tutorial highlight box */
+.tutorial-highlight {
+	position: fixed;
+	border: 3px solid #4a9eff;
+	border-radius: 8px;
+	box-shadow: 0 0 0 2000px rgba(0, 0, 0, 0.3),
+	            0 0 30px rgba(74, 158, 255, 1),
+	            inset 0 0 30px rgba(74, 158, 255, 0.4);
+	pointer-events: none;
+	animation: pulse 2s infinite;
+	z-index: 9999;
+	display: none;
+}
+
+/* Tutorial tooltip */
+.tutorial-tooltip {
+	position: fixed;
+	background: linear-gradient(135deg, #2a2a3e 0%, #1a1a2e 100%);
+	border: 2px solid #4a9eff;
+	border-radius: 12px;
+	padding: 25px;
+	max-width: 400px;
+	z-index: 10000;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8),
+	            0 0 40px rgba(74, 158, 255, 0.4);
+	animation: slideIn 0.5s ease-out;
+	display: none;
+}
+
+.tutorial-tooltip h3 {
+	color: #4a9eff;
+	margin: 0 0 15px 0;
+	font-size: 20px;
+	display: flex;
+	align-items: center;
+	gap: 10px;
+}
+
+.tutorial-tooltip p {
+	color: #e0e0e0;
+	line-height: 1.6;
+	margin: 0 0 20px 0;
+	font-size: 15px;
+}
+
+.tutorial-tooltip ul {
+	color: #e0e0e0;
+	margin: 0 0 20px 0;
+	padding-left: 20px;
+}
+
+.tutorial-tooltip li {
+	margin-bottom: 8px;
+	line-height: 1.5;
+}
+
+.tutorial-tooltip strong {
+	color: #4aff4a;
+	font-weight: 600;
+}
+
+/* Tutorial navigation */
+.tutorial-nav {
+	display: flex;
+	justify-content: space-between;
+	align-items: center;
+	gap: 15px;
+}
+
+.tutorial-progress {
+	color: #888;
+	font-size: 14px;
+	flex: 1;
+	text-align: center;
+}
+
+.tutorial-btn {
+	padding: 10px 20px;
+	border: none;
+	border-radius: 8px;
+	font-size: 14px;
+	font-weight: 600;
+	cursor: pointer;
+	transition: all 0.3s;
+}
+
+.tutorial-btn-skip {
+	background: rgba(255, 255, 255, 0.1);
+	color: #aaa;
+	border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.tutorial-btn-skip:hover {
+	background: rgba(255, 255, 255, 0.15);
+	color: #fff;
+	border-color: rgba(255, 255, 255, 0.3);
+}
+
+.tutorial-btn-next {
+	background: linear-gradient(135deg, #4a9eff, #357abd);
+	color: white;
+	box-shadow: 0 4px 15px rgba(74, 158, 255, 0.3);
+}
+
+.tutorial-btn-next:hover {
+	background: linear-gradient(135deg, #5aafff, #4588cd);
+	transform: translateY(-1px);
+	box-shadow: 0 6px 20px rgba(74, 158, 255, 0.4);
+}
+
+.tutorial-btn-finish {
+	background: linear-gradient(135deg, #4aff4a, #2db92d);
+	color: white;
+	box-shadow: 0 4px 15px rgba(74, 255, 74, 0.3);
+}
+
+.tutorial-btn-finish:hover {
+	background: linear-gradient(135deg, #5aff5a, #3dc93d);
+	transform: translateY(-1px);
+	box-shadow: 0 6px 20px rgba(74, 255, 74, 0.4);
+}
+
+/* Tutorial trigger button */
+.tutorial-trigger {
+	position: fixed;
+	bottom: 20px;
+	right: 20px;
+	width: 50px;
+	height: 50px;
+	border-radius: 50%;
+	background: linear-gradient(135deg, #4a9eff, #357abd);
+	border: none;
+	color: white;
+	font-size: 24px;
+	cursor: pointer;
+	box-shadow: 0 4px 15px rgba(74, 158, 255, 0.4);
+	transition: all 0.3s;
+	z-index: 1000;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+}
+
+.tutorial-trigger:hover {
+	transform: scale(1.1);
+	box-shadow: 0 6px 20px rgba(74, 158, 255, 0.6);
+}
+
+/* Unsaved changes indicator */
+.config-unsaved-badge {
+	display: none;
+	position: absolute;
+	top: -5px;
+	right: -5px;
+	width: 12px;
+	height: 12px;
+	background: #ff6666;
+	border-radius: 50%;
+	box-shadow: 0 0 10px rgba(255, 102, 102, 0.8);
+	animation: pulse 2s infinite;
+}
+
+.config-unsaved-badge.active {
+	display: block;
+}
+
+/* Animations */
+@keyframes fadeIn {
+	from { opacity: 0; }
+	to { opacity: 1; }
+}
+
+@keyframes slideIn {
+	from {
+		opacity: 0;
+		transform: translateY(-20px);
+	}
+	to {
+		opacity: 1;
+		transform: translateY(0);
+	}
+}
+
+@keyframes pulse {
+	0% {
+		transform: scale(1);
+		opacity: 1;
+	}
+	50% {
+		transform: scale(1.05);
+		opacity: 0.8;
+	}
+	100% {
+		transform: scale(1);
+		opacity: 1;
+	}
+}

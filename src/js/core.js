@@ -945,6 +945,9 @@ const app = {
             
             this.setUserAvatar(this.memberData);
         }
+        
+        // Resume tutorial if it was paused for login
+        this.resumeTutorial();
     },
 
     resetUIAfterLogout() {
@@ -1871,20 +1874,13 @@ const app = {
             <div style="background: rgba(255, 60, 60, 0.1); border: 1px solid rgba(255, 60, 60, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
                 <h3 style="color: #ff3c3c; margin-bottom: 15px;">⚠️ Hash Mismatch</h3>
                 <p style="color: #aaa; margin-bottom: 15px;">
-                    Your Web API session cannot be authorized due to a hash mismatch. This typically occurs when:
+                    Your Web API session cannot be authorized due to a hash mismatch. This occurs when your IP address or network doesn't match the one in the database.
                 </p>
-                <ul style="color: #999; margin-bottom: 15px; padding-left: 20px;">
-                    <li>You're using a VPN or your network configuration has changed</li>
-                    <li>You haven't been active on the forum recently</li>
-                    <li>Your session needs to be refreshed</li>
-                </ul>
                 <div style="background: rgba(74, 158, 255, 0.1); border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                    <strong style="color: #4a9eff;">How to fix this:</strong>
-                    <ol style="color: #aaa; margin: 10px 0 0 20px;">
-                        <li>Visit the fantasy.cat forum and browse/post for a few minutes</li>
-                        <li>Wait a short while for your session to update</li>
-                        <li>Try logging in again</li>
-                    </ol>
+                    <strong style="color: #4a9eff;">Note:</strong>
+                    <p style="color: #aaa; margin: 10px 0 0 0;">
+                        This error should rarely occur with recent updates. If you're seeing this, you may have directly accessed the .html file or performed suspicious activity.
+                    </p>
                 </div>
                 <button class="btn" onclick="app.dismissHashMismatch()" style="width: 100%;">
                     Back to Login
@@ -1932,19 +1928,18 @@ const app = {
             <div style="background: rgba(255, 60, 60, 0.1); border: 1px solid rgba(255, 60, 60, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
                 <h3 style="color: #ff3c3c; margin-bottom: 15px;">⚠️ No Active Session</h3>
                 <p style="color: #aaa; margin-bottom: 15px;">
-                    You don't have an active Constelia session. Sessions are required to use this license key.
+                    You don't have an active Constelia Session. Sessions are required to use this license key.
                 </p>
                 <ul style="color: #999; margin-bottom: 15px; padding-left: 20px;">
-                    <li>Your session has expired (after 3 days of inactivity)</li>
-                    <li>You haven't created a session yet</li>
-                    <li>You're on a new device or directory</li>
+                    <li>Your Session expired (no solution activity)</li>
+                    <li>You haven't created a Session yet</li>
                 </ul>
                 <div style="background: rgba(74, 158, 255, 0.1); border: 1px solid rgba(74, 158, 255, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
-                    <strong style="color: #4a9eff;">How to create a session:</strong>
+                    <strong style="color: #4a9eff;">How to create a Session:</strong>
                     <ol style="color: #aaa; margin: 10px 0 0 20px;">
-                        <li>Launch Omega (or any fantasy.cat solution) with --sessions</li>
-                        <li>When prompted, create a new session</li>
-                        <li>Your session will be bound to your hardware and directory</li>
+                        <li>Launch omega.bat (Windows) or omega.sh (Linux)</li>
+                        <li>When prompted, create a new Session</li>
+                        <li>Your Session will be bound to your hardware and directory</li>
                         <li>Once created, return here and try logging in again</li>
                     </ol>
                 </div>
