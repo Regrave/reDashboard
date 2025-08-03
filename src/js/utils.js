@@ -2048,6 +2048,9 @@ Object.assign(app, {
     },
 
     updateConfigValue(key, value) {
+        // Mark configuration as unsaved
+        this.markConfigUnsaved();
+        
         // Smart type conversion - try to parse to appropriate type
         let parsedValue = value;
         
@@ -2178,6 +2181,9 @@ Object.assign(app, {
                 }
                 this.showMessage(message, 'success');
                 document.getElementById('configDisplay').textContent = JSON.stringify(this.currentConfig, null, 2);
+                
+                // Mark configuration as saved
+                this.markConfigSaved();
                 return;
             }
 
@@ -2219,6 +2225,9 @@ Object.assign(app, {
             }
 
             this.showMessage(message, 'success');
+            
+            // Mark configuration as saved
+            this.markConfigSaved();
 
         } catch (error) {
             console.error('Error saving script config:', error);
@@ -3000,6 +3009,355 @@ Object.assign(app, {
         } catch (error) {
             console.error('Error refreshing builds:', error);
             this.showMessage('Failed to refresh builds. Please try again later.', 'error');
+        }
+    },
+
+    // ========================
+    // TUTORIAL SYSTEM
+    // ========================
+
+    // Split tutorial into pre-login and post-login steps
+    preLoginSteps: [
+        {
+            element: '#apiKey',
+            title: '🔑 Welcome to Constelia Dashboard!',
+            content: `
+                <p>Welcome! This dashboard is your control center for managing Constelia scripts and configurations.</p>
+                <p>To get started, you'll need your <strong>license key</strong>.</p>
+                <ul>
+                    <li>Your key should look like: <strong>XXXX-XXXX-XXXX-XXXX</strong></li>
+                    <li>Enter it in the field below</li>
+                    <li>Click <strong>Connect</strong> to log in</li>
+                </ul>
+                <p><em>After logging in, the tutorial will continue to show you around!</em></p>
+            `,
+            position: 'bottom'
+        }
+    ],
+    
+    postLoginSteps: [
+        {
+            element: '.nav-tabs',
+            title: '📊 Navigation Tabs',
+            content: `
+                <p>Great! You're logged in. Let's explore the dashboard.</p>
+                <p>Use these tabs to navigate between different sections:</p>
+                <ul>
+                    <li><strong>Overview</strong> - Your stats and terminal</li>
+                    <li><strong>Scripts</strong> - Manage your scripts</li>
+                    <li><strong>Configuration</strong> - Configure script settings</li>
+                    <li>And many more features!</li>
+                </ul>
+            `,
+            position: 'bottom'
+        },
+        {
+            element: '#config-section',
+            title: '⚙️ Script Configuration',
+            content: `
+                <p>This is where you configure your scripts. Here's what you need to know:</p>
+                <ul>
+                    <li>Choose a script to configure from the dropdown</li>
+                    <li>Modify the settings as needed</li>
+                    <li><strong>IMPORTANT: Always save your changes!</strong></li>
+                </ul>
+            `,
+            position: 'top',
+            onShow: () => app.switchTab('config')
+        },
+        {
+            element: '#scriptConfigSelect',
+            title: '📝 Selecting Scripts',
+            content: `
+                <p>Choose the script you want to configure from this dropdown.</p>
+                <p>The configuration form will appear below once you select a script.</p>
+                <p><strong>Note:</strong> The "bones" option lets you configure CS2 bone IDs for targeting.</p>
+            `,
+            position: 'bottom'
+        },
+        {
+            element: '#saveConfigBtn',
+            title: '🔴 Unsaved Changes Indicator',
+            content: `
+                <p>When you make changes to your configuration, a <strong>red dot</strong> will appear on the Save button.</p>
+                <p>This means you have unsaved changes!</p>
+                <p><strong>Remember:</strong> You must save your changes AND restart Omega for them to take effect.</p>
+            `,
+            position: 'top',
+            onShow: () => {
+                // Make the unsaved badge visible for the tutorial
+                const badge = document.getElementById('configUnsavedBadge');
+                if (badge) {
+                    badge.style.display = 'block';
+                }
+            }
+        },
+        {
+            element: '.live-omega-container',
+            title: '🚀 Live Omega Feature',
+            content: `
+                <p>The <strong>Live Omega</strong> toggle is a powerful feature!</p>
+                <ul>
+                    <li>When enabled, configuration changes are pushed to Omega <strong>instantly</strong></li>
+                    <li>No need to restart Omega when Live mode is on</li>
+                    <li>Perfect for testing and quick adjustments</li>
+                </ul>
+                <p>Toggle it on to enable real-time updates!</p>
+            `,
+            position: 'left'
+        },
+        {
+            element: '#autoSaveToggle',
+            title: '💾 Auto-Save Feature',
+            content: `
+                <p>The <strong>Auto-Save</strong> toggle helps prevent losing changes:</p>
+                <ul>
+                    <li>Automatically saves your configuration as you type</li>
+                    <li>No need to manually click Save Config</li>
+                    <li>Works great with Live Omega for seamless updates</li>
+                </ul>
+            `,
+            position: 'left'
+        },
+        {
+            element: '#omegaButton',
+            title: '💾 Download Omega',
+            content: `
+                <p>Click this button to download the Omega launcher for your operating system.</p>
+                <p>Omega is the client that runs your scripts and applies your configurations.</p>
+                <p><strong>Tip:</strong> Make sure Omega is running before you start your game!</p>
+            `,
+            position: 'bottom'
+        }
+    ],
+    
+    tutorialSteps: [], // Will be set to either preLoginSteps or postLoginSteps
+
+    currentTutorialStep: 0,
+    tutorialPaused: false,
+
+    initTutorial() {
+        // Check if tutorial has been completed
+        const tutorialCompleted = localStorage.getItem('fc2_tutorial_completed') === 'true';
+        const tutorialDismissed = localStorage.getItem('fc2_tutorial_dismissed') === 'true';
+        
+        // Don't show tutorial if already completed or dismissed
+        if (tutorialCompleted || tutorialDismissed) {
+            return;
+        }
+        
+        // Show tutorial on first visit if not dismissed or completed
+        if (!this.isConnected) {
+            // Wait for loading screen to be completely hidden
+            setTimeout(() => {
+                const loadingScreen = document.getElementById('loadingScreen');
+                if (!loadingScreen || loadingScreen.style.display === 'none') {
+                    this.startTutorial(false); // Start pre-login tutorial
+                }
+            }, 2000); // Give more time for loading animation
+        }
+    },
+
+    restartTutorialFromBeginning() {
+        // Close settings modal
+        this.closeSettingsModal();
+        
+        // Clear tutorial completion status
+        localStorage.removeItem('fc2_tutorial_completed');
+        localStorage.removeItem('fc2_tutorial_dismissed');
+        
+        // Log out the user
+        this.disconnect();
+        
+        // Start tutorial after a short delay
+        setTimeout(() => {
+            this.startTutorial(false);
+        }, 500);
+    },
+    
+    startTutorial(isPostLogin = false) {
+        this.currentTutorialStep = 0;
+        this.tutorialPaused = false;
+        
+        // Set the appropriate steps
+        this.tutorialSteps = isPostLogin ? this.postLoginSteps : this.preLoginSteps;
+        
+        // Make sure the tutorial modal is visible
+        const overlay = document.getElementById('tutorialOverlay');
+        const tooltip = document.getElementById('tutorialTooltip');
+        if (overlay) overlay.classList.add('active');
+        if (tooltip) tooltip.style.display = 'block';
+        
+        // Add scroll and resize listeners to update highlight position
+        this.tutorialScrollHandler = () => {
+            if (this.tutorialSteps && this.tutorialSteps[this.currentTutorialStep]) {
+                this.positionTutorialElements(this.tutorialSteps[this.currentTutorialStep]);
+            }
+        };
+        window.addEventListener('scroll', this.tutorialScrollHandler, true);
+        window.addEventListener('resize', this.tutorialScrollHandler);
+        
+        this.showTutorialStep(0);
+    },
+    
+    resumeTutorial() {
+        // Called after successful login to continue with post-login tutorial
+        if (this.tutorialPaused && !localStorage.getItem('fc2_tutorial_completed')) {
+            this.tutorialPaused = false;
+            // Give time for the UI to update after login
+            setTimeout(() => {
+                this.startTutorial(true); // Start post-login tutorial
+            }, 1000);
+        }
+    },
+
+    showTutorialStep(stepIndex) {
+        const step = this.tutorialSteps[stepIndex];
+        if (!step) return;
+
+        // Execute onShow callback if exists
+        if (step.onShow) {
+            step.onShow();
+        }
+
+        // Update content
+        document.getElementById('tutorialTitle').innerHTML = step.title;
+        document.getElementById('tutorialContent').innerHTML = step.content;
+        document.getElementById('tutorialProgress').textContent = `Step ${stepIndex + 1} of ${this.tutorialSteps.length}`;
+        
+        // Update button text
+        const nextBtn = document.getElementById('tutorialNextBtn');
+        if (stepIndex === this.tutorialSteps.length - 1) {
+            nextBtn.textContent = 'Finish';
+            nextBtn.className = 'tutorial-btn tutorial-btn-finish';
+        } else {
+            nextBtn.textContent = 'Next';
+            nextBtn.className = 'tutorial-btn tutorial-btn-next';
+        }
+
+        // Position highlight and tooltip
+        this.positionTutorialElements(step);
+    },
+
+    positionTutorialElements(step) {
+        const element = document.querySelector(step.element);
+        const highlight = document.getElementById('tutorialHighlight');
+        const tooltip = document.getElementById('tutorialTooltip');
+        
+        if (!element) {
+            // If element doesn't exist, show tooltip in center
+            tooltip.style.left = '50%';
+            tooltip.style.top = '50%';
+            tooltip.style.transform = 'translate(-50%, -50%)';
+            highlight.style.display = 'none';
+            return;
+        }
+
+        // Show and position highlight
+        const rect = element.getBoundingClientRect();
+        highlight.style.display = 'block';
+        highlight.style.left = `${rect.left - 10}px`;
+        highlight.style.top = `${rect.top - 10}px`;
+        highlight.style.width = `${rect.width + 20}px`;
+        highlight.style.height = `${rect.height + 20}px`;
+
+        // Position tooltip based on step position preference
+        const tooltipRect = tooltip.getBoundingClientRect();
+        let left, top;
+
+        switch (step.position) {
+            case 'bottom':
+                left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+                top = rect.bottom + 20;
+                break;
+            case 'top':
+                left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+                top = rect.top - tooltipRect.height - 20;
+                break;
+            case 'left':
+                left = rect.left - tooltipRect.width - 20;
+                top = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+                break;
+            case 'right':
+                left = rect.right + 20;
+                top = rect.top + (rect.height / 2) - (tooltipRect.height / 2);
+                break;
+            default:
+                left = rect.left + (rect.width / 2) - (tooltipRect.width / 2);
+                top = rect.bottom + 20;
+        }
+
+        // Keep tooltip within viewport
+        left = Math.max(20, Math.min(left, window.innerWidth - tooltipRect.width - 20));
+        top = Math.max(20, Math.min(top, window.innerHeight - tooltipRect.height - 20));
+
+        tooltip.style.left = `${left}px`;
+        tooltip.style.top = `${top}px`;
+        tooltip.style.transform = 'none';
+    },
+
+    nextTutorialStep() {
+        this.currentTutorialStep++;
+        
+        if (this.currentTutorialStep >= this.tutorialSteps.length) {
+            // Check if we're completing pre-login tutorial
+            if (this.tutorialSteps === this.preLoginSteps) {
+                // Pause tutorial and wait for login
+                this.tutorialPaused = true;
+                this.closeTutorial();
+                this.showMessage('Tutorial paused. It will continue after you log in!', 'info');
+            } else {
+                // Completing post-login tutorial
+                this.completeTutorial();
+            }
+        } else {
+            this.showTutorialStep(this.currentTutorialStep);
+        }
+    },
+
+    skipTutorial() {
+        localStorage.setItem('fc2_tutorial_dismissed', 'true');
+        this.closeTutorial();
+        this.showMessage('Tutorial skipped. You can restart it anytime from Settings > Tutorial.', 'info');
+    },
+
+    completeTutorial() {
+        localStorage.setItem('fc2_tutorial_completed', 'true');
+        this.closeTutorial();
+        this.showMessage('🎉 Tutorial completed! You\'re ready to use the dashboard.', 'success');
+    },
+
+    closeTutorial() {
+        const overlay = document.getElementById('tutorialOverlay');
+        const highlight = document.getElementById('tutorialHighlight');
+        const tooltip = document.getElementById('tutorialTooltip');
+        
+        if (overlay) overlay.classList.remove('active');
+        if (highlight) highlight.style.display = 'none';
+        if (tooltip) tooltip.style.display = 'none';
+        
+        // Remove scroll and resize listeners
+        if (this.tutorialScrollHandler) {
+            window.removeEventListener('scroll', this.tutorialScrollHandler, true);
+            window.removeEventListener('resize', this.tutorialScrollHandler);
+            this.tutorialScrollHandler = null;
+        }
+        
+        this.currentTutorialStep = 0;
+    },
+
+    // Track unsaved configuration changes
+    markConfigUnsaved() {
+        const badge = document.getElementById('configUnsavedBadge');
+        if (badge) {
+            badge.classList.add('active');
+        }
+    },
+
+    markConfigSaved() {
+        const badge = document.getElementById('configUnsavedBadge');
+        if (badge) {
+            badge.classList.remove('active');
         }
     },
 });

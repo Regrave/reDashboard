@@ -43,7 +43,7 @@
           <button class="roll-button" id="rollButton" onclick="app.rollLoot()"> 🎲 Roll Loot </button>
           <button class="settings-button" id="settingsButton" onclick="app.showSettingsModal()"> ⚙️ Settings </button>
         </div>
-        <h1> fantasy.dashboard <span class="version-badge">v1.5.7</span>
+        <h1> fantasy.dashboard <span class="version-badge">v1.5.12</span>
         </h1>
         <div class="login-section" id="loginSection">
           <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your Constelia API key...">
@@ -413,10 +413,7 @@
         <!-- Configuration Section -->
         <div class="content-section" id="config-section">
           <div class="card">
-            <h2 style="display: flex; justify-content: space-between; align-items: center;">
-              📝 Script Configuration
-              <button class="btn btn-small" onclick="app.generateDefaultConfigs()" title="Generate default configurations for enabled scripts" style="background: linear-gradient(135deg, #4aff4a, #357abd);">🎛️ Generate Defaults</button>
-            </h2>
+            <h2>📝 Script Configuration</h2>
             <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 20px;">
               <select class="form-select" id="scriptConfigSelect" onchange="app.loadScriptConfig()" style="flex: 1;">
                 <option value="">Select a software first...</option>
@@ -448,7 +445,10 @@
                 <!-- Dynamic form fields will be inserted here -->
               </div>
               <div style="margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap;">
-                <button class="btn" onclick="app.saveScriptConfig()">💾 Save Config</button>
+                <button class="btn" onclick="app.saveScriptConfig()" style="position: relative;">
+                  💾 Save Config
+                  <div class="config-unsaved-badge" id="configUnsavedBadge"></div>
+                </button>
                 <button class="btn" onclick="app.saveScriptConfig(false, true)" style="background: linear-gradient(135deg, #4aff4a, #357abd);">🚀 Save & Push to Omega</button>
                 <button class="btn btn-danger" onclick="app.resetScriptConfig()">🗑️ Reset to Default</button>
               </div>
@@ -477,7 +477,7 @@
       <span style="color: #ff6b6b; font-size: 14px; margin: 0 3px;">♡</span>
       <span style="opacity: 0.7;">by</span>
       <a href="https://constelia.ai/forums/index.php?members/rucka.17146/" target="_blank" style="color: #4a9eff; font-weight: 600; margin-left: 4px; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.color='#6bb6ff'; this.style.textDecoration='underline';" onmouseout="this.style.color='#4a9eff'; this.style.textDecoration='none';">Rucka</a>
-      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.5.7</span>
+      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.5.12</span>
     </div>
     <!-- Bottom-Right Notification Container -->
     <div class="notification-container" id="notificationContainer">
@@ -600,6 +600,22 @@
                       🔍 Debug Cache
                   </button>
               </div>
+          </div>
+          <!-- Tutorial Section -->
+          <div class="settings-section">
+              <h3>📖 Tutorial</h3>
+              <div class="settings-field">
+                  <label class="settings-label">
+                      Dashboard Tutorial
+                      <code class="settings-tag">Help</code>
+                  </label>
+                  <button class="btn" onclick="app.restartTutorialFromBeginning();" style="background: linear-gradient(135deg, #9b59b6, #8e44ad);">
+                      🚀 Start Tutorial
+                  </button>
+              </div>
+              <p class="settings-description">
+                  Launch the interactive tutorial that guides you through the dashboard features. The tutorial will walk you through logging in and using the main features of the dashboard.
+              </p>
           </div>
         </div>
       </div>
@@ -812,6 +828,21 @@ Examples:
             <button class="btn" onclick="app.redeemAchievements()" style="background: linear-gradient(135deg, #4aff4a, #2db92d);">🎁 Redeem</button>
           </div>
         </div>
+      </div>
+    </div>
+    
+    <!-- Tutorial System -->
+    <div class="tutorial-overlay" id="tutorialOverlay"></div>
+    <div class="tutorial-highlight" id="tutorialHighlight"></div>
+    <div class="tutorial-tooltip" id="tutorialTooltip">
+      <h3 id="tutorialTitle">Welcome to Constelia Dashboard!</h3>
+      <div id="tutorialContent">
+        <p>This tutorial will guide you through the essential features.</p>
+      </div>
+      <div class="tutorial-nav">
+        <button class="tutorial-btn tutorial-btn-skip" onclick="app.skipTutorial()">Skip Tutorial</button>
+        <span class="tutorial-progress" id="tutorialProgress">Step 1 of 8</span>
+        <button class="tutorial-btn tutorial-btn-next" onclick="app.nextTutorialStep()" id="tutorialNextBtn">Next</button>
       </div>
     </div>
   </body>

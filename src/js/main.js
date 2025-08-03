@@ -274,6 +274,9 @@ async function initializeApplication() {
                     loginSection.classList.add('active');
                 }
             }
+            
+            // Initialize tutorial after UI is visible
+            window.app.initTutorial();
         }
 
         

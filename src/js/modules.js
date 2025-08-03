@@ -927,14 +927,66 @@ Object.assign(app, {
         }
     },
 
-    downloadOmega(os) {
+    async downloadOmega(os) {
         const url = os === 'windows' ? 'https://constelia.ai/omega.bat' : 'https://constelia.ai/omega.sh';
+        const filename = os === 'windows' ? 'omega.bat' : 'omega.sh';
 
-        // Open in new tab (cross-origin downloads don't work)
-        window.open(url, '_blank', 'noopener,noreferrer');
-
-        this.showMessage(`Opening Omega for ${os === 'windows' ? 'Windows' : 'Linux'} in new tab...`, 'success');
-        this.closeOmegaModal();
+        try {
+            // Check if we're on the same domain
+            const isSameDomain = window.location.hostname === 'constelia.ai' || 
+                                window.location.hostname === 'www.constelia.ai';
+            
+            if (isSameDomain) {
+                // Show loading message
+                this.showMessage(`Fetching Omega for ${os === 'windows' ? 'Windows' : 'Linux'}...`, 'info');
+                
+                // Direct fetch if on same domain
+                const response = await fetch(url);
+                
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch: ${response.status} ${response.statusText}`);
+                }
+                
+                // Get the text content
+                const content = await response.text();
+                
+                // Verify we got actual script content (not an error page)
+                if (!content.includes('constelia.ai') || content.includes('<html')) {
+                    throw new Error('Invalid content received');
+                }
+                
+                // Create a blob with the content
+                const blob = new Blob([content], { type: 'text/plain' });
+                
+                // Create a temporary download link
+                const downloadLink = document.createElement('a');
+                downloadLink.href = URL.createObjectURL(blob);
+                downloadLink.download = filename;
+                
+                // Trigger the download
+                document.body.appendChild(downloadLink);
+                downloadLink.click();
+                document.body.removeChild(downloadLink);
+                
+                // Clean up the object URL
+                URL.revokeObjectURL(downloadLink.href);
+                
+                this.showMessage(`Downloaded ${filename} successfully!`, 'success');
+                this.closeOmegaModal();
+            } else {
+                // Local hosting - show message about manual download
+                this.showMessage(`Opening ${filename} in a new tab. Please right-click and select "Save as..." to download.`, 'info');
+                window.open(url, '_blank', 'noopener,noreferrer');
+                this.closeOmegaModal();
+            }
+            
+        } catch (error) {
+            console.error('Error downloading Omega:', error);
+            
+            // If fetch fails, fall back to opening in new tab
+            this.showMessage('Opening in new tab. Please right-click and select "Save as..." to download.', 'warning');
+            window.open(url, '_blank', 'noopener,noreferrer');
+        }
     },
 
     // ========================
