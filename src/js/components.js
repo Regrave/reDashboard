@@ -570,6 +570,7 @@ Object.assign(app, {
                         <div class="script-info">
                             <div class="script-name" style="display: flex; align-items: center; gap: 10px;">
                                 ${script.name}
+                                <span onclick="app.downloadScript(${script.id})" style="cursor: pointer; font-size: 18px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'" title="Download script">📥</span>
                                 ${isOwned ? `<button class="btn btn-small" onclick="app.editScript(${script.id})" style="font-size: 12px; padding: 4px 8px;">✏️ Edit</button>` : ''}
                             </div>
                             <div class="script-meta">
@@ -638,6 +639,7 @@ Object.assign(app, {
                         <div class="script-info">
                             <div class="script-name" style="display: flex; align-items: center; gap: 10px;">
                                 ${script.name}
+                                <span onclick="app.downloadScript(${script.id})" style="cursor: pointer; font-size: 18px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'" title="Download script">📥</span>
                                 ${isOwned ? `<button class="btn btn-small" onclick="app.editScript(${script.id})" style="font-size: 12px; padding: 4px 8px;">✏️ Edit</button>` : ''}
                             </div>
                             <div class="script-meta">
@@ -961,6 +963,59 @@ Object.assign(app, {
         this.loadScriptConfig();
     },
 
+    loadPreviewScriptConfig() {
+        const editor = document.getElementById('scriptConfigEditor');
+        
+        if (!this.previewScriptData) {
+            editor.style.display = 'none';
+            return;
+        }
+
+        editor.style.display = 'block';
+        this.currentScriptKey = '__preview__';
+
+        // Extract default configuration values from the script using existing parser
+        const scriptContent = localStorage.getItem(`preview_script_content`);
+        if (scriptContent) {
+            this.currentScriptConfig = this.parseScriptForDefaults(scriptContent, this.previewScriptData.name);
+            console.log('Parsed config values:', Object.keys(this.currentScriptConfig));
+            console.log('Full config:', this.currentScriptConfig);
+        } else {
+            this.currentScriptConfig = {};
+        }
+        
+        // Store preview metadata temporarily for renderConfigForm to use
+        this.previewConfigMetadata = {
+            categories: this.previewScriptData.categories,
+            dropdowns: this.previewScriptData.dropdowns,
+            ranges: this.previewScriptData.ranges,
+            multiselects: this.previewScriptData.multiselects,
+            descriptions: this.previewScriptData.descriptions,
+            requires: this.previewScriptData.requires
+        };
+        
+        // Use the existing renderConfigForm system
+        this.renderConfigForm();
+
+        // Add preview indicator
+        const existingIndicator = editor.querySelector('.preview-indicator');
+        if (!existingIndicator) {
+            const indicator = document.createElement('div');
+            indicator.className = 'preview-indicator';
+            indicator.innerHTML = `
+                <div style="background: rgba(255, 193, 7, 0.1); border: 1px solid rgba(255, 193, 7, 0.3); border-radius: 8px; padding: 10px; margin-bottom: 20px;">
+                    <div style="color: #ffc107; font-weight: bold; margin-bottom: 5px;">🧪 Preview Mode</div>
+                    <div style="color: #aaa; font-size: 14px;">
+                        Viewing configuration preview for "${this.previewScriptData.fileName}". 
+                        This is for testing purposes only and will not be saved.
+                    </div>
+                </div>
+            `;
+            editor.insertBefore(indicator, editor.firstChild);
+        }
+    },
+
+
     triggerAutoSave() {
         if (!this.autoSaveEnabled) {
             return;
@@ -1085,71 +1140,36 @@ Object.assign(app, {
         document.getElementById('activePerks').textContent = activePerksCount;
     },
     
-    calculateCurrentStreak() {
-        const sessionHistory = this.memberData?.session_history;
-        if (!sessionHistory?.success || sessionHistory.success.length === 0) return 0;
-        
-        // Get successful Constelia connections sorted by time descending
-        const successfulSessions = [...sessionHistory.success]
-            .filter(session => session.software === 'Omega' || session.solution === 'Omega')
-            .sort((a, b) => b.time - a.time);
-        
-        if (successfulSessions.length === 0) return 0;
-        
-        let currentStreak = 0;
-        let lastDate = null;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        // Group sessions by day
-        const sessionsByDay = new Map();
-        for (const session of successfulSessions) {
-            const sessionDate = new Date(session.time * 1000);
-            sessionDate.setHours(0, 0, 0, 0);
-            const dateKey = sessionDate.toISOString().split('T')[0];
-            
-            if (!sessionsByDay.has(dateKey)) {
-                sessionsByDay.set(dateKey, sessionDate);
-            }
-        }
-        
-        // Convert to sorted array of unique days
-        const uniqueDays = Array.from(sessionsByDay.values()).sort((a, b) => b - a);
-        
-        // Debug logging
-        console.log('Lunar Rhythm Streak Debug:');
-        console.log('Today:', today.toISOString().split('T')[0]);
-        console.log('Most recent session:', uniqueDays[0]?.toISOString().split('T')[0]);
-        console.log('Days since last session:', Math.floor((today - uniqueDays[0]) / (24 * 60 * 60 * 1000)));
-        
-        for (const sessionDate of uniqueDays) {
-            if (!lastDate) {
-                // First entry - check if it's today or yesterday
-                const daysDiff = Math.floor((today - sessionDate) / (24 * 60 * 60 * 1000));
-                if (daysDiff === 0 || daysDiff === 1) {
-                    currentStreak = 1;
-                    lastDate = sessionDate;
-                } else {
-                    // Streak broken - no session today or yesterday
-                    console.log('Streak broken: Last session was', daysDiff, 'days ago');
-                    break;
-                }
-            } else {
-                // Check if consecutive day
-                const dayDiff = Math.floor((lastDate - sessionDate) / (24 * 60 * 60 * 1000));
-                if (dayDiff === 1) {
-                    currentStreak++;
-                    lastDate = sessionDate;
-                } else {
-                    // Gap in days - streak broken
-                    console.log('Streak broken: Gap of', dayDiff, 'days between sessions');
-                    break;
-                }
-            }
-        }
-        
-        console.log('Final streak:', currentStreak);
-        return currentStreak;
+    getPerkIcon(perkId) {
+        const iconMap = {
+            1: '🎨',   // Artist
+            2: '👥',   // Squad
+            3: '🤖',   // Bond Between Human and AI
+            4: '💕',   // Venus
+            5: '🩸',   // Blood of Mars
+            6: '✍️',   // Autograph
+            7: '🌍',   // World Within Us
+            8: '🌌',   // Different Dimension Traveler
+            9: '🚀',   // Space Crew
+            10: '🌟',  // Supernova
+            11: '🎁',  // Abundance of Jupiter
+            12: '🔧',  // Space Engineer
+            13: '🌠',  // Galactic Team (discontinued)
+            14: '✨',  // Astrotheology
+            15: '❄️',  // Arctic of Uranus
+            16: '📊',  // Star Registry
+            17: '🛡️',  // Spacesuit
+            18: '📸',  // Universe Photographer
+            19: '⏰',  // Chronograph
+            20: '📜',  // Spacecraft Historian
+            21: '🧮',  // Mathematician
+            22: '👁️',  // All-Seeing Eye
+            23: '🌀',  // Astral Voyager
+            24: '💫',  // Galactic Altruist
+            25: '🪐',  // Saturn's Favor
+            26: '🌙'   // Lunar Rhythm
+        };
+        return iconMap[perkId] || '✨';
     },
 
     displayPerks() {
@@ -1222,13 +1242,8 @@ Object.assign(app, {
                         const saturnColor = isTop50 ? '#ff4a4a' : '#4aff4a';
                         bonusBadge = `<span style="color: ${saturnColor}; font-size: 12px; background: rgba(255, 215, 0, 0.2); padding: 2px 8px; border-radius: 12px; margin-left: 5px;">${saturnBonus} XP</span>`;
                         break;
-                    case 26: // Lunar Rhythm
-                        // Calculate streak (simplified - would need actual calculation)
-                        const currentStreak = this.calculateCurrentStreak();
-                        const streakBonus = Math.min(currentStreak * 2, 100);
-                        if (streakBonus > 0) {
-                            bonusBadge = `<span style="color: #4a9eff; font-size: 12px; background: rgba(74, 158, 255, 0.2); padding: 2px 8px; border-radius: 12px; margin-left: 5px;">+${streakBonus}% XP</span>`;
-                        }
+                    case 21: // Mathematician
+                        bonusBadge = '<span style="color: #8a2be2; font-size: 12px; background: rgba(138, 43, 226, 0.2); padding: 2px 8px; border-radius: 12px; margin-left: 5px;">XP Bonus Tracking</span>';
                         break;
                 }
             }
@@ -1242,7 +1257,7 @@ Object.assign(app, {
                     <div class="script-header">
                         <div class="script-info">
                             <div class="script-name" style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                                ${isVenus ? '💕' : '✨'} ${perk.name}
+                                ${this.getPerkIcon(perk.id)} ${perk.name}
                                 ${isOwned ? '<span style="color: #4aff4a; font-size: 12px; background: rgba(74, 255, 74, 0.2); padding: 2px 8px; border-radius: 12px;">OWNED</span>' : ''}
                                 ${bonusBadge}
                             </div>
@@ -1790,6 +1805,17 @@ Object.assign(app, {
         const software = document.getElementById('softwareSelect').value;
         const editor = document.getElementById('scriptConfigEditor');
 
+        // Handle preview script
+        if (scriptSelection === '__preview__' && this.previewScriptData) {
+            this.loadPreviewScriptConfig();
+            return;
+        }
+
+        // Remove any existing preview indicator when loading a non-preview script
+        const previewIndicator = document.querySelector('.preview-indicator');
+        if (previewIndicator) {
+            previewIndicator.remove();
+        }
 
         if (!software) {
             editor.style.display = 'none';
@@ -2537,14 +2563,32 @@ Object.assign(app, {
                 continue;
             }
 
-            // Check if this line starts a nested object (like cache = {})
-            if (line.includes('=') && (line.includes('{') || (i + 1 < lines.length && lines[i + 1].trim().startsWith('{')))) {
-                skipUntilBraceLevel = braceLevel - 1; // Skip until we're back at this level
+            // Check if this line starts a nested object (like cache = {} or multiline objects)
+            // Don't skip single-line array assignments like detection_types = {"movement", "shooting"}
+            if (line.includes('=') && line.includes('{')) {
+                // If it's just an empty object assignment like cache = {}, skip it
+                if (line.trim().endsWith('{}') || line.trim().endsWith('{},')) {
+                    skipUntilBraceLevel = braceLevel - 1;
+                    continue;
+                }
+                // If opening brace is on this line but closing brace is NOT, it's a multiline object
+                if (!line.includes('}')) {
+                    skipUntilBraceLevel = braceLevel - 1;
+                    continue;
+                }
+                // Otherwise it's a single-line assignment with braces (like an array), let it through
+            }
+            // Check if next line starts a multiline object
+            else if (line.includes('=') && i + 1 < lines.length && lines[i + 1].trim().startsWith('{')) {
+                skipUntilBraceLevel = braceLevel - 1;
                 continue;
             }
 
-            // Only parse simple assignments with NO braces and NOT functions
-            if (!line.includes('{') && !line.includes('}') && line.includes('=') && !line.includes('function')) {
+            // Parse simple assignments and single-line array assignments
+            // Allow lines with both { and } (single-line arrays) but not just { or just }
+            if (line.includes('=') && !line.includes('function') && 
+                (!line.includes('{') && !line.includes('}') || // Simple assignments
+                 (line.includes('{') && line.includes('}')))) { // Single-line arrays
                 // Handle both regular assignments and trailing commas
                 const settingMatch = line.match(/^(\w+)\s*=\s*(.+?)(?:,\s*)?$/);
                 if (settingMatch) {

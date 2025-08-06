@@ -1830,22 +1830,27 @@ Object.assign(app, {
         // Try to get configuration categories from script metadata
         let configMetadata = { categories: {}, dropdowns: {} };
 
-        // Get the current script being edited
-        const currentScript = this.memberScripts.find(script => {
-            const scriptName = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
-            const scriptBaseName = script.name.replace('.lua', '');
-            return this.currentScriptKey === scriptName ||
-                this.currentScriptKey === scriptBaseName ||
-                this.currentScriptKey.toLowerCase().includes(script.name.toLowerCase()) ||
-                script.name.toLowerCase().includes(this.currentScriptKey.toLowerCase().replace('.lua', ''));
-        });
+        // Check if we're in preview mode
+        if (this.currentScriptKey === '__preview__' && this.previewConfigMetadata) {
+            configMetadata = this.previewConfigMetadata;
+        } else {
+            // Get the current script being edited
+            const currentScript = this.memberScripts.find(script => {
+                const scriptName = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
+                const scriptBaseName = script.name.replace('.lua', '');
+                return this.currentScriptKey === scriptName ||
+                    this.currentScriptKey === scriptBaseName ||
+                    this.currentScriptKey.toLowerCase().includes(script.name.toLowerCase()) ||
+                    script.name.toLowerCase().includes(this.currentScriptKey.toLowerCase().replace('.lua', ''));
+            });
 
-        if (currentScript) {
-            try {
-                configMetadata = await this.parseConfigurationMetadata(currentScript.id);
-            } catch (error) {
-                console.error('Error loading config metadata:', error);
-                configMetadata = { categories: {}, dropdowns: {} };
+            if (currentScript) {
+                try {
+                    configMetadata = await this.parseConfigurationMetadata(currentScript.id);
+                } catch (error) {
+                    console.error('Error loading config metadata:', error);
+                    configMetadata = { categories: {}, dropdowns: {} };
+                }
             }
         }
 
@@ -1883,7 +1888,14 @@ Object.assign(app, {
             existingSettings.forEach(settingName => {
                 const value = this.currentScriptConfig[settingName];
                 const dropdownOptions = configMetadata.dropdowns[settingName] || null;
-                formHTML += this.createConfigField(settingName, value, dropdownOptions);
+                const metadata = {
+                    dropdown: dropdownOptions,
+                    range: configMetadata.ranges ? configMetadata.ranges[settingName] : null,
+                    multiselect: configMetadata.multiselects ? configMetadata.multiselects[settingName] : null,
+                    description: configMetadata.descriptions ? configMetadata.descriptions[settingName] : null,
+                    requires: configMetadata.requires ? configMetadata.requires[settingName] : null
+                };
+                formHTML += this.createConfigField(settingName, value, dropdownOptions, metadata);
             });
 
             formHTML += '</div></div>';
@@ -1891,6 +1903,9 @@ Object.assign(app, {
 
         formContainer.innerHTML = formHTML;
 
+        // Update field visibility based on requires conditions
+        this.updateFieldVisibility();
+        
         // Initialize color pickers
         setTimeout(() => {
             document.querySelectorAll('.color-picker-placeholder').forEach(placeholder => {
@@ -1969,6 +1984,70 @@ Object.assign(app, {
         return groups;
     },
 
+    checkRequiresCondition(requiresString) {
+        if (!requiresString || !this.currentScriptConfig) return true;
+        
+        // Parse requires string - format can be:
+        // "field_name" - for boolean fields (must be true)
+        // "field_name:value" - for specific value match (multiselect, dropdown)
+        // "field_name:!value" - for NOT having specific value
+        
+        const parts = requiresString.split(':');
+        const fieldName = parts[0].trim();
+        const requiredValue = parts[1] ? parts[1].trim() : null;
+        
+        const currentValue = this.currentScriptConfig[fieldName];
+        
+        if (requiredValue === null) {
+            // Boolean check - field must be truthy
+            return !!currentValue;
+        } else if (requiredValue.startsWith('!')) {
+            // Negation check
+            const checkValue = requiredValue.substring(1);
+            if (typeof currentValue === 'string') {
+                // For multiselect/string fields, check if value is NOT included
+                // Handle both "a, b, c" and "[a, b, c]" formats
+                const trimmed = currentValue.trim();
+                if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                    // Parse bracket format
+                    const values = trimmed.slice(1, -1).split(',').map(v => v.trim());
+                    return !values.includes(checkValue);
+                } else {
+                    // Parse comma-separated format
+                    const values = trimmed.split(',').map(v => v.trim());
+                    return !values.includes(checkValue);
+                }
+            }
+            return currentValue !== checkValue;
+        } else {
+            // Positive check
+            if (typeof currentValue === 'string') {
+                // For multiselect/string fields, check if value is included
+                // Handle both "a, b, c" and "[a, b, c]" formats
+                const trimmed = currentValue.trim();
+                if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                    // Parse bracket format
+                    const values = trimmed.slice(1, -1).split(',').map(v => v.trim());
+                    return values.includes(requiredValue);
+                } else {
+                    // Parse comma-separated format
+                    const values = trimmed.split(',').map(v => v.trim());
+                    return values.includes(requiredValue);
+                }
+            }
+            return currentValue === requiredValue;
+        }
+    },
+    
+    updateFieldVisibility() {
+        // Update visibility of all fields with requires conditions
+        document.querySelectorAll('[data-requires]').forEach(field => {
+            const requiresCondition = field.getAttribute('data-requires');
+            const isVisible = this.checkRequiresCondition(requiresCondition);
+            field.style.display = isVisible ? '' : 'none';
+        });
+    },
+
     toggleConfigCategory(categoryName) {
         const content = document.getElementById(`category-${categoryName}`);
         const icon = document.getElementById(`category-icon-${categoryName}`);
@@ -1982,19 +2061,55 @@ Object.assign(app, {
         }
     },
 
-    createConfigField(key, value, dropdownOptions = null) {
+    createConfigField(key, value, dropdownOptions = null, metadata = null) {
         const fieldType = this.getFieldType(value);
         const fieldId = `config_${key}`.replace(/\./g, '_');
+        
+        // Check if field should be visible based on requires
+        const hasRequires = metadata && metadata.requires;
+        let isVisible = true;
+        let requiresAttribute = '';
+        
+        if (hasRequires) {
+            isVisible = this.checkRequiresCondition(metadata.requires);
+            requiresAttribute = `data-requires="${metadata.requires}"`;
+        }
 
-        let fieldHTML = `<div class="config-field">`;
+        // Check for metadata
+        const hasRange = metadata && metadata.range;
+        const hasMultiselect = metadata && metadata.multiselect;
+        const hasDescription = metadata && metadata.description;
 
-        fieldHTML += `<div class="config-label">
-            ${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
-            ${fieldType === 'color' ? '<code style="background: rgba(74, 158, 255, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #4a9eff;">Color</code>' : ''}
-            ${dropdownOptions ? '<code style="background: rgba(255, 140, 0, 0.1); padding: 2px 6px; border-radius: 4px; font-size: 12px; color: #ff8c00;">Dropdown</code>' : ''}
-        </div>`;
+        let fieldHTML = `<div class="config-field horizontal-layout" ${requiresAttribute} style="border: 1px solid #333; border-radius: 6px; padding: 12px; margin-bottom: 12px; background: rgba(255, 255, 255, 0.02); ${isVisible ? '' : 'display: none;'}">`;
 
+        // Label and description container (flex: 1 to take remaining space)
+        fieldHTML += `<div class="config-label" style="flex: 1;">`;
+        
+        if (hasDescription) {
+            // Title and description on same line with separator
+            fieldHTML += `<div style="display: flex; align-items: center; gap: 12px;">
+                <div style="font-weight: 500;">
+                    ${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+                </div>
+                <div style="color: #666; margin: 0 8px;">•</div>
+                <div class="config-description" style="font-size: 12px; color: #999; flex: 1;">
+                    ${metadata.description}
+                </div>
+            </div>`;
+        } else {
+            // Just the title
+            fieldHTML += `<div>
+                ${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}
+            </div>`;
+        }
+        
+        fieldHTML += `</div>`; // Close config-label
+
+        // Control wrapper (aligned to the right)
         fieldHTML += `<div class="config-control">`;
+        
+        // Add consistent wrapper for all control types
+        fieldHTML += `<div class="config-control-inner" style="width: 200px; display: flex; justify-content: flex-end; align-items: center;">`;
 
         if (fieldType === 'boolean') {
             fieldHTML += `
@@ -2008,9 +2123,87 @@ Object.assign(app, {
             fieldHTML += `
                 <div class="color-picker-placeholder" id="${fieldId}" data-key="${key}" data-value="${value}"></div>
             `;
+        } else if (hasRange) {
+            // Create range slider
+            const { min, max, step } = metadata.range;
+            fieldHTML += `
+                <div class="range-slider-container" style="display: flex; align-items: center; gap: 10px; width: 100%;">
+                    <input type="range" 
+                        class="range-slider" 
+                        id="${fieldId}_slider" 
+                        min="${min}" 
+                        max="${max}" 
+                        step="${step}" 
+                        value="${value}"
+                        style="flex: 1; height: 6px; background: #333; outline: none; border-radius: 3px;"
+                        oninput="app.updateRangeValue('${key}', this.value, '${fieldId}')">
+                    <input type="number" 
+                        class="range-input" 
+                        id="${fieldId}_input" 
+                        min="${min}" 
+                        max="${max}" 
+                        step="${step}" 
+                        value="${value}"
+                        style="width: 60px; padding: 4px 8px; background: #2a2a2a; border: 1px solid #555; border-radius: 4px; color: #fff; text-align: center;"
+                        onchange="app.updateRangeValue('${key}', this.value, '${fieldId}')">
+                </div>
+            `;
+        } else if (hasMultiselect) {
+            // Create multiselect dropdown
+            // Parse both formats: "a, b, c" and "[a, b, c]"
+            let currentValues = [];
+            if (typeof value === 'string') {
+                const trimmed = value.trim();
+                if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
+                    // Handle bracket format: "[a, b, c]"
+                    const inner = trimmed.slice(1, -1);
+                    currentValues = inner.split(',').map(v => v.trim()).filter(v => v);
+                } else {
+                    // Handle comma-separated format: "a, b, c"
+                    currentValues = trimmed.split(',').map(v => v.trim()).filter(v => v);
+                }
+            }
+            
+            fieldHTML += `
+                <div class="multiselect-dropdown" style="position: relative; width: 100%;">
+                    <div class="multiselect-display" 
+                        id="${fieldId}_display"
+                        onclick="app.toggleMultiselectDropdown('${fieldId}')"
+                        style="padding: 6px 12px; background: #2a2a2a; border: 1px solid #555; border-radius: 4px; cursor: pointer; user-select: none; display: flex; justify-content: space-between; align-items: center;">
+                        <span id="${fieldId}_selected">${currentValues.length > 0 ? currentValues.length + ' selected' : 'None selected'}</span>
+                        <span style="font-size: 10px;">▼</span>
+                    </div>
+                    <div class="multiselect-options" 
+                        id="${fieldId}_options"
+                        style="display: none; position: absolute; top: 100%; left: 0; right: 0; background: #1a1a1a; border: 1px solid #555; border-radius: 4px; margin-top: 2px; max-height: 200px; overflow-y: auto; z-index: 1000;">
+            `;
+            
+            metadata.multiselect.forEach(option => {
+                const isChecked = currentValues.includes(option);
+                fieldHTML += `
+                    <div class="multiselect-option" 
+                        onclick="app.toggleMultiselectOption('${key}', '${fieldId}', '${option}')"
+                        style="padding: 8px 12px; cursor: pointer; user-select: none; display: flex; align-items: center; gap: 8px; hover: background: #2a2a2a;"
+                        onmouseover="this.style.background='#2a2a2a'" 
+                        onmouseout="this.style.background='transparent'">
+                        <input type="checkbox" 
+                            id="${fieldId}_${option}"
+                            value="${option}"
+                            ${isChecked ? 'checked' : ''}
+                            style="pointer-events: none;"
+                            data-multiselect-key="${key}">
+                        <label style="pointer-events: none; cursor: pointer; flex: 1;">${option}</label>
+                    </div>
+                `;
+            });
+            
+            fieldHTML += `
+                    </div>
+                </div>
+            `;
         } else if (dropdownOptions && dropdownOptions.length > 0) {
             // Create dropdown
-            fieldHTML += `<select class="config-input" id="${fieldId}" onchange="app.updateConfigValue('${key}', this.value); app.triggerAutoSave();" style="width: 200px;">`;
+            fieldHTML += `<select class="config-input" id="${fieldId}" onchange="app.updateConfigValue('${key}', this.value); app.triggerAutoSave();" style="width: 100%;">`;
             
             // Add current value if it's not in the dropdown options
             let hasCurrentValue = dropdownOptions.includes(String(value));
@@ -2030,11 +2223,17 @@ Object.assign(app, {
             const displayValue = value;
             fieldHTML += `
                 <input type="text" class="config-input" id="${fieldId}" value="${displayValue}" 
-                    onchange="app.updateConfigValue('${key}', this.value); app.triggerAutoSave();">
+                    onchange="app.updateConfigValue('${key}', this.value); app.triggerAutoSave();" style="width: 100%;">
             `;
         }
 
-        fieldHTML += `</div></div>`;
+        // Close the inner wrapper div
+        fieldHTML += `</div>`; // Close config-control-inner
+        
+        // Close the control wrapper div
+        fieldHTML += `</div>`; // Close config-control
+        
+        fieldHTML += `</div>`; // Close config-field
         return fieldHTML;
     },
 
@@ -2045,6 +2244,107 @@ Object.assign(app, {
         
         // Everything else is treated as text input to allow any value
         return 'text';
+    },
+
+    toggleMultiselectDropdown(fieldId) {
+        const options = document.getElementById(`${fieldId}_options`);
+        const isOpen = options.style.display === 'block';
+        
+        // Close all other multiselect dropdowns first
+        document.querySelectorAll('.multiselect-options').forEach(el => {
+            el.style.display = 'none';
+        });
+        
+        // Toggle this dropdown
+        options.style.display = isOpen ? 'none' : 'block';
+        
+        // Add click outside handler
+        if (!isOpen) {
+            const closeHandler = (e) => {
+                if (!e.target.closest(`#${fieldId}_options`) && !e.target.closest(`#${fieldId}_display`)) {
+                    options.style.display = 'none';
+                    document.removeEventListener('click', closeHandler);
+                }
+            };
+            setTimeout(() => document.addEventListener('click', closeHandler), 0);
+        }
+    },
+
+    toggleMultiselectOption(key, fieldId, option) {
+        const checkbox = document.getElementById(`${fieldId}_${option}`);
+        checkbox.checked = !checkbox.checked;
+        
+        // Update the value
+        this.updateMultiselectValue(key, fieldId);
+    },
+
+    updateMultiselectValue(key, fieldId) {
+        // Get all checkboxes for this multiselect
+        const checkboxes = document.querySelectorAll(`[id^="${fieldId}_"][type="checkbox"][data-multiselect-key="${key}"]`);
+        
+        // Collect all checked values
+        const selectedValues = [];
+        checkboxes.forEach(checkbox => {
+            if (checkbox.checked) {
+                selectedValues.push(checkbox.value);
+            }
+        });
+        
+        // Update display text
+        const display = document.getElementById(`${fieldId}_selected`);
+        if (display) {
+            display.textContent = selectedValues.length > 0 ? 
+                `${selectedValues.length} selected` : 'None selected';
+        }
+        
+        // Check original format - if it had brackets, keep brackets
+        const originalValue = this.currentScriptConfig[key];
+        let newValue;
+        if (typeof originalValue === 'string' && originalValue.trim().startsWith('[')) {
+            // Preserve bracket format
+            newValue = `[${selectedValues.join(', ')}]`;
+        } else {
+            // Use comma-separated format
+            newValue = selectedValues.join(', ');
+        }
+        
+        // Update the config value
+        this.updateConfigValue(key, newValue);
+    },
+
+    updateRangeValue(key, value, fieldId) {
+        // Get the range metadata to get min, max, and step
+        const slider = document.getElementById(`${fieldId}_slider`);
+        const input = document.getElementById(`${fieldId}_input`);
+        
+        if (slider) {
+            const min = parseFloat(slider.min);
+            const max = parseFloat(slider.max);
+            const step = parseFloat(slider.step);
+            
+            // Parse the value
+            let numValue = parseFloat(value);
+            
+            // Clamp to min/max
+            numValue = Math.max(min, Math.min(max, numValue));
+            
+            // Round to nearest step
+            numValue = Math.round(numValue / step) * step;
+            
+            // Handle floating point precision issues
+            const decimals = (step.toString().split('.')[1] || '').length;
+            numValue = parseFloat(numValue.toFixed(decimals));
+            
+            // Update both slider and input
+            slider.value = numValue;
+            if (input) input.value = numValue;
+            
+            // Update the config value
+            this.updateConfigValue(key, numValue);
+        } else {
+            // Fallback if slider not found
+            this.updateConfigValue(key, parseFloat(value));
+        }
     },
 
     updateConfigValue(key, value) {
@@ -2082,6 +2382,9 @@ Object.assign(app, {
         }
         
         this.currentScriptConfig[key] = parsedValue;
+        
+        // Update visibility of dependent fields
+        this.updateFieldVisibility();
     },
 
     updateMainConfigDisplay() {
@@ -2342,10 +2645,14 @@ Object.assign(app, {
     },
 
     extractConfigCategories(scriptSource) {
-        if (!scriptSource) return { categories: {}, dropdowns: {} };
+        if (!scriptSource) return { categories: {}, dropdowns: {}, ranges: {}, multiselects: {}, descriptions: {}, requires: {} };
 
         const categories = {};
         const dropdowns = {};
+        const ranges = {};
+        const multiselects = {};
+        const descriptions = {};
+        const requires = {};
         const lines = scriptSource.split('\n');
         let currentCategory = null;
 
@@ -2377,16 +2684,52 @@ Object.assign(app, {
                     categories[currentCategory].push(settingName);
                 }
 
-                // Look for dropdown metadata in the same line or nearby lines
-                const currentLineWithComment = lines[i];
-                const dropdownMatch = currentLineWithComment.match(/--.*@dropdown:\s*(.+)/i);
-                if (dropdownMatch) {
-                    const dropdownOptions = dropdownMatch[1]
-                        .split(',')
-                        .map(option => option.trim())
-                        .filter(option => option.length > 0);
-                    if (dropdownOptions.length > 0) {
-                        dropdowns[settingName] = dropdownOptions;
+                // Look backwards from current line to collect all metadata for this setting
+                for (let j = i - 1; j >= 0; j--) {
+                    const metaLine = lines[j].trim();
+                    
+                    // Stop if we hit another setting or non-comment line
+                    if (!metaLine.startsWith('--') || metaLine.match(/^\s*\w+\s*=/)) {
+                        break;
+                    }
+                    
+                    // Parse different metadata types
+                    const dropdownMatch = metaLine.match(/--\s*@dropdown:\s*(.+)/i);
+                    if (dropdownMatch) {
+                        const dropdownOptions = dropdownMatch[1]
+                            .split(',')
+                            .map(option => option.trim())
+                            .filter(option => option.length > 0);
+                        if (dropdownOptions.length > 0) {
+                            dropdowns[settingName] = dropdownOptions;
+                        }
+                    }
+                    
+                    const rangeMatch = metaLine.match(/--\s*@range:\s*([^,]+),\s*([^,]+),\s*(.+)/i);
+                    if (rangeMatch) {
+                        ranges[settingName] = {
+                            min: parseFloat(rangeMatch[1].trim()),
+                            max: parseFloat(rangeMatch[2].trim()),
+                            step: parseFloat(rangeMatch[3].trim())
+                        };
+                    }
+                    
+                    const multiselectMatch = metaLine.match(/--\s*@multiselect:\s*(.+)/i);
+                    if (multiselectMatch) {
+                        multiselects[settingName] = multiselectMatch[1]
+                            .split(',')
+                            .map(option => option.trim())
+                            .filter(option => option.length > 0);
+                    }
+                    
+                    const descMatch = metaLine.match(/--\s*@description:\s*(.+)/i);
+                    if (descMatch) {
+                        descriptions[settingName] = descMatch[1].trim();
+                    }
+                    
+                    const requiresMatch = metaLine.match(/--\s*@requires:\s*(.+)/i);
+                    if (requiresMatch) {
+                        requires[settingName] = requiresMatch[1].trim();
                     }
                 }
             }
@@ -2397,7 +2740,7 @@ Object.assign(app, {
             }
         }
 
-        return { categories, dropdowns };
+        return { categories, dropdowns, ranges, multiselects, descriptions, requires };
     },
 
     // Helper function to analyze configuration structure
@@ -2898,6 +3241,404 @@ Object.assign(app, {
                 this.showMessage('Could not copy to clipboard', 'error');
             }
         }
+    },
+
+    downloadScriptSource() {
+        try {
+            const sourceElement = document.getElementById('scriptSourceCode');
+            const sourceCode = sourceElement.textContent;
+            
+            if (!sourceCode || sourceCode.trim() === '') {
+                this.showMessage('No source code to download', 'error');
+                return;
+            }
+
+            // Get the script name from the stored data or the title
+            let filename = 'script.lua';
+            if (this.currentSourceData && this.currentSourceData.name) {
+                // Sanitize filename by removing invalid characters
+                filename = this.currentSourceData.name.replace(/[^a-zA-Z0-9-_\.]/g, '_');
+                // Add .lua extension if not already present
+                if (!filename.endsWith('.lua')) {
+                    filename += '.lua';
+                }
+            }
+
+            // Create a blob with the script content
+            const blob = new Blob([sourceCode], { type: 'text/plain' });
+            
+            // Create a temporary download link
+            const downloadLink = document.createElement('a');
+            downloadLink.href = URL.createObjectURL(blob);
+            downloadLink.download = filename;
+            
+            // Trigger the download
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // Clean up the object URL
+            URL.revokeObjectURL(downloadLink.href);
+            
+            // Visual feedback
+            const downloadBtn = document.getElementById('downloadSourceBtn');
+            const originalText = downloadBtn.textContent;
+            downloadBtn.textContent = '✅';
+            downloadBtn.style.background = 'linear-gradient(135deg, #4aff4a, #357abd)';
+            
+            setTimeout(() => {
+                downloadBtn.textContent = originalText;
+                downloadBtn.style.background = '';
+            }, 2000);
+            
+            this.showMessage(`Downloaded ${filename} successfully!`, 'success');
+            
+        } catch (error) {
+            console.error('Error downloading script:', error);
+            this.showMessage('Failed to download script', 'error');
+        }
+    },
+
+    async downloadScript(scriptId) {
+        try {
+            // Use the existing API infrastructure
+            const apiResponse = await this.apiCall('getScript', {
+                id: scriptId
+            });
+            
+            // Extract script data
+            let scriptData;
+            if (apiResponse && apiResponse.data) {
+                if (Array.isArray(apiResponse.data) && apiResponse.data.length > 0) {
+                    scriptData = apiResponse.data[0];
+                } else if (typeof apiResponse.data === 'object' && apiResponse.data.id) {
+                    scriptData = apiResponse.data;
+                } else {
+                    throw new Error('Invalid API response structure');
+                }
+            } else if (typeof apiResponse === 'object' && apiResponse.id) {
+                scriptData = apiResponse;
+            } else {
+                throw new Error('Invalid API response structure for script data');
+            }
+
+            // Get the script name and content
+            let filename = 'script.lua';
+            if (scriptData.name) {
+                // Sanitize filename by removing invalid characters
+                filename = scriptData.name.replace(/[^a-zA-Z0-9-_\.]/g, '_');
+                // Add .lua extension if not already present
+                if (!filename.endsWith('.lua')) {
+                    filename += '.lua';
+                }
+            }
+
+            const sourceCode = scriptData.script || scriptData.code || scriptData.source || '';
+            
+            if (!sourceCode || sourceCode.trim() === '') {
+                this.showMessage('No source code to download', 'error');
+                return;
+            }
+
+            // Create a blob with the script content
+            const blob = new Blob([sourceCode], { type: 'text/plain' });
+            
+            // Create a temporary download link
+            const downloadLink = document.createElement('a');
+            downloadLink.href = URL.createObjectURL(blob);
+            downloadLink.download = filename;
+            
+            // Trigger the download
+            document.body.appendChild(downloadLink);
+            downloadLink.click();
+            document.body.removeChild(downloadLink);
+            
+            // Clean up the object URL
+            URL.revokeObjectURL(downloadLink.href);
+            
+            this.showMessage(`Downloaded ${filename} successfully!`, 'success');
+            
+        } catch (error) {
+            console.error('Error downloading script:', error);
+            this.showMessage('Failed to download script', 'error');
+        }
+    },
+
+    // Script Preview Functions
+    showPreviewUploadModal() {
+        document.getElementById('previewUploadModal').classList.add('active');
+        this.setupModalPreviewUpload();
+    },
+
+    closePreviewUploadModal() {
+        document.getElementById('previewUploadModal').classList.remove('active');
+        document.getElementById('modalPreviewFileInput').value = '';
+    },
+
+    setupModalPreviewUpload() {
+        const uploadArea = document.getElementById('modalPreviewUploadArea');
+        const fileInput = document.getElementById('modalPreviewFileInput');
+        
+        // Remove existing listeners to prevent duplicates
+        uploadArea.onclick = () => fileInput.click();
+        
+        uploadArea.ondragover = (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = '#4a9eff';
+            uploadArea.style.background = 'rgba(74, 158, 255, 0.1)';
+        };
+        
+        uploadArea.ondragleave = (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'rgba(74, 158, 255, 0.3)';
+            uploadArea.style.background = 'rgba(74, 158, 255, 0.05)';
+        };
+        
+        uploadArea.ondrop = (e) => {
+            e.preventDefault();
+            uploadArea.style.borderColor = 'rgba(74, 158, 255, 0.3)';
+            uploadArea.style.background = 'rgba(74, 158, 255, 0.05)';
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                this.handlePreviewFile(files[0]);
+            }
+        };
+    },
+
+    handleModalPreviewFileUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            this.handlePreviewFile(file);
+        }
+    },
+
+    handlePreviewFileUpload(event) {
+        const file = event.target.files[0];
+        if (file) {
+            this.handlePreviewFile(file);
+        }
+    },
+
+    handlePreviewFile(file) {
+        if (!file.name.endsWith('.lua')) {
+            this.showMessage('Please upload a .lua file', 'error');
+            return;
+        }
+
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const scriptContent = e.target.result;
+            this.parsePreviewScript(scriptContent, file.name);
+        };
+        reader.readAsText(file);
+    },
+
+    parsePreviewScript(scriptContent, fileName) {
+        try {
+            // Use the existing configuration parsing system
+            const existingCategories = this.extractConfigCategories(scriptContent);
+            
+            if (!existingCategories || Object.keys(existingCategories.categories || {}).length === 0) {
+                this.showMessage('No configuration found in script', 'warning');
+                return;
+            }
+
+            // Store script content temporarily for default value extraction
+            localStorage.setItem('preview_script_content', scriptContent);
+
+            // Store preview data using existing format
+            this.previewScriptData = {
+                name: fileName.replace('.lua', ''),
+                categories: existingCategories.categories,
+                dropdowns: { ...existingCategories.dropdowns },
+                ranges: existingCategories.ranges || {},
+                multiselects: existingCategories.multiselects || {},
+                descriptions: existingCategories.descriptions || {},
+                requires: existingCategories.requires || {},
+                fileName: fileName
+            };
+
+            // Add to script dropdown
+            this.addPreviewToDropdown();
+            
+            // Show clear button
+            document.getElementById('clearPreviewBtn').style.display = 'inline-block';
+            
+            // Close modal and switch to config tab
+            this.closePreviewUploadModal();
+            
+            // Switch to config tab by simulating click
+            const configTab = document.querySelector('.nav-tab[onclick*="config"]');
+            if (configTab) {
+                configTab.click();
+            }
+            
+            this.showMessage(`Preview loaded: ${fileName}`, 'success');
+
+        } catch (error) {
+            console.error('Error parsing preview script:', error);
+            this.showMessage('Failed to parse script configuration', 'error');
+        }
+    },
+
+    addPreviewToDropdown() {
+        const dropdown = document.getElementById('scriptConfigSelect');
+        
+        // Remove any existing preview option
+        const existingPreview = dropdown.querySelector('option[value="__preview__"]');
+        if (existingPreview) {
+            existingPreview.remove();
+        }
+        
+        // Add new preview option at the top
+        const option = document.createElement('option');
+        option.value = '__preview__';
+        option.textContent = `🧪 ${this.previewScriptData.name} (Preview)`;
+        
+        // Insert after the first option (which is usually "Select a software first...")
+        if (dropdown.children.length > 1) {
+            dropdown.insertBefore(option, dropdown.children[1]);
+        } else {
+            dropdown.appendChild(option);
+        }
+        
+        // Auto-select the preview
+        dropdown.value = '__preview__';
+        
+        // Trigger config load
+        this.loadScriptConfig();
+    },
+
+
+    extractEnhancedMetadata(scriptContent) {
+        const metadata = {};
+        const lines = scriptContent.split('\n');
+        
+        let currentCategory = null;
+        let currentGroup = null;
+        let pendingMetadata = {};
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i].trim();
+            
+            // Check if this line has a configuration variable
+            const configMatch = line.match(/(\w+)\s*=\s*(.+?)(?:,\s*(?:--.*)?)?$/);
+            if (configMatch) {
+                const varName = configMatch[1];
+                
+                // Apply any pending metadata to this variable
+                if (Object.keys(pendingMetadata).length > 0 || currentCategory || currentGroup) {
+                    metadata[varName] = { ...pendingMetadata };
+                    
+                    if (currentCategory && !metadata[varName].category) {
+                        metadata[varName].category = currentCategory;
+                    }
+                    if (currentGroup && !metadata[varName].group) {
+                        metadata[varName].group = currentGroup;
+                    }
+                    
+                    // Clear pending metadata after applying it
+                    pendingMetadata = {};
+                }
+                continue;
+            }
+            
+            // Parse metadata from comment lines
+            if (line.startsWith('--')) {
+                if (line.includes('@category:')) {
+                    const match = line.match(/--\s*@category:\s*(.+)/i);
+                    if (match) {
+                        currentCategory = match[1].trim();
+                        currentGroup = null; // Reset group when category changes
+                    }
+                }
+                
+                if (line.includes('@group:')) {
+                    const match = line.match(/--\s*@group:\s*(.+)/i);
+                    if (match) currentGroup = match[1].trim();
+                }
+                
+                if (line.includes('@multiselect:')) {
+                    const match = line.match(/--\s*@multiselect:\s*(.+)/i);
+                    if (match) {
+                        pendingMetadata.multiselect = match[1].split(',').map(s => s.trim());
+                    }
+                }
+                
+                if (line.includes('@range:')) {
+                    const match = line.match(/--\s*@range:\s*(.+)/i);
+                    if (match) {
+                        const parts = match[1].split(',').map(s => s.trim());
+                        pendingMetadata.range = {
+                            min: parseFloat(parts[0]),
+                            max: parseFloat(parts[1]),
+                            step: parseFloat(parts[2] || 1)
+                        };
+                    }
+                }
+                
+                if (line.includes('@requires:')) {
+                    const match = line.match(/--\s*@requires:\s*(.+)/i);
+                    if (match) {
+                        pendingMetadata.requires = match[1].split(',').map(s => s.trim());
+                    }
+                }
+                
+                if (line.includes('@description:')) {
+                    const match = line.match(/--\s*@description:\s*(.+)/i);
+                    if (match) pendingMetadata.description = match[1].trim();
+                }
+                
+                if (line.includes('@dropdown:')) {
+                    const match = line.match(/--\s*@dropdown:\s*(.+)/i);
+                    if (match) {
+                        pendingMetadata.dropdown = match[1].split(',').map(s => s.trim());
+                    }
+                }
+            }
+        }
+        
+        return metadata;
+    },
+
+
+
+    clearPreview() {
+        // Clear preview data
+        this.previewScriptData = null;
+        this.previewConfigMetadata = null;
+        
+        // Clear stored script content
+        localStorage.removeItem('preview_script_content');
+        
+        // Remove preview option from dropdown
+        const dropdown = document.getElementById('scriptConfigSelect');
+        const previewOption = dropdown.querySelector('option[value="__preview__"]');
+        if (previewOption) {
+            previewOption.remove();
+        }
+        
+        // Reset dropdown selection
+        dropdown.value = '';
+        
+        // Hide clear button
+        document.getElementById('clearPreviewBtn').style.display = 'none';
+        
+        // Remove preview indicator from the DOM
+        const previewIndicator = document.querySelector('.preview-indicator');
+        if (previewIndicator) {
+            previewIndicator.remove();
+        }
+        
+        // Clear file inputs
+        const modalInput = document.getElementById('modalPreviewFileInput');
+        if (modalInput) modalInput.value = '';
+        
+        // Reload config to clear preview
+        this.loadScriptConfig();
+        
+        this.showMessage('Preview cleared', 'info');
     },
 
     closeScriptSource() {
