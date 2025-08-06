@@ -1103,127 +1103,17 @@ Object.assign(app, {
             }
         });
         
-        // Calculate and display streak if user has Lunar Rhythm perk
-        this.calculateAndDisplayStreak();
+        // Display mathematician bonus if available
+        this.displayMathematicianBonus();
     },
     
-    calculateAndDisplayStreak() {
-        const hasLunarRhythm = this.memberData?.perks?.some(perk => perk.id === 26);
-        if (!hasLunarRhythm) {
-            return;
-        }
+    displayMathematicianBonus() {
+        const mathematicianBonus = this.memberData?.mathematician;
+        const bonusElement = document.getElementById('mathematicianBonus');
         
-        // Calculate streak based on Constelia session history
-        const sessionHistory = this.memberData?.session_history;
-        if (!sessionHistory?.success || sessionHistory.success.length === 0) {
-            const streakInfo = document.getElementById('xpStreakInfo');
-            if (streakInfo) {
-                streakInfo.style.display = 'block';
-                document.getElementById('currentStreak').textContent = '0';
-                document.getElementById('streakBonus').textContent = '0%';
-            }
-            return;
-        }
-        
-        // Get successful Constelia connections sorted by time descending
-        const successfulSessions = [...sessionHistory.success]
-            .filter(session => session.software === 'Omega' || session.solution === 'Omega')
-            .sort((a, b) => b.time - a.time);
-        
-        if (successfulSessions.length === 0) {
-            const streakInfo = document.getElementById('xpStreakInfo');
-            if (streakInfo) {
-                streakInfo.style.display = 'block';
-                document.getElementById('currentStreak').textContent = '0';
-                document.getElementById('streakBonus').textContent = '0%';
-            }
-            return;
-        }
-        
-        let currentStreak = 0;
-        let lastDate = null;
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        
-        // Group sessions by day
-        const sessionsByDay = new Map();
-        for (const session of successfulSessions) {
-            const sessionDate = new Date(session.time * 1000);
-            sessionDate.setHours(0, 0, 0, 0);
-            const dateKey = sessionDate.toISOString().split('T')[0];
-            
-            if (!sessionsByDay.has(dateKey)) {
-                sessionsByDay.set(dateKey, sessionDate);
-            }
-        }
-        
-        // Convert to sorted array of unique days
-        const uniqueDays = Array.from(sessionsByDay.values()).sort((a, b) => b - a);
-        
-        // Debug logging
-        console.log('Lunar Rhythm Streak Debug (Overview):');
-        console.log('Today:', today.toISOString().split('T')[0]);
-        console.log('Most recent session:', uniqueDays[0]?.toISOString().split('T')[0]);
-        console.log('Days since last session:', Math.floor((today - uniqueDays[0]) / (24 * 60 * 60 * 1000)));
-        
-        for (const sessionDate of uniqueDays) {
-            if (!lastDate) {
-                // First entry - check if it's today or yesterday
-                const daysDiff = Math.floor((today - sessionDate) / (24 * 60 * 60 * 1000));
-                if (daysDiff === 0 || daysDiff === 1) {
-                    currentStreak = 1;
-                    lastDate = sessionDate;
-                } else {
-                    // Streak broken - no session today or yesterday
-                    console.log('Streak broken: Last session was', daysDiff, 'days ago');
-                    break;
-                }
-            } else {
-                // Check if consecutive day
-                const dayDiff = Math.floor((lastDate - sessionDate) / (24 * 60 * 60 * 1000));
-                if (dayDiff === 1) {
-                    currentStreak++;
-                    lastDate = sessionDate;
-                } else {
-                    // Gap in days - streak broken
-                    console.log('Streak broken: Gap of', dayDiff, 'days between sessions');
-                    break;
-                }
-            }
-        }
-        
-        console.log('Final streak:', currentStreak)
-        
-        // Display streak info
-        const streakInfo = document.getElementById('xpStreakInfo');
-        if (streakInfo) {
-            streakInfo.style.display = 'block';
-            document.getElementById('currentStreak').textContent = currentStreak;
-            const bonus = Math.min(currentStreak * 2, 100); // 2% per day, max 100%
-            document.getElementById('streakBonus').textContent = `${bonus}%`;
-            
-            // Calculate time until next reward (0:00 UTC)
-            const now = new Date();
-            const tomorrow = new Date(now);
-            tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
-            tomorrow.setUTCHours(0, 0, 0, 0);
-            
-            const updateCountdown = () => {
-                const now = new Date();
-                const diff = tomorrow - now;
-                if (diff > 0) {
-                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                    const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                    const seconds = Math.floor((diff % (1000 * 60)) / 1000);
-                    document.getElementById('nextRewardTime').textContent = 
-                        `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-                } else {
-                    document.getElementById('nextRewardTime').textContent = '00:00:00';
-                }
-            };
-            
-            updateCountdown();
-            setInterval(updateCountdown, 1000);
+        if (mathematicianBonus && bonusElement) {
+            bonusElement.textContent = `(+${mathematicianBonus}% XP Bonus)`;
+            bonusElement.style.display = 'inline';
         }
     },
 

@@ -800,6 +800,9 @@ body {
 
 .config-field {
 	margin-bottom: 15px;
+}
+
+.config-field.horizontal-layout {
 	display: flex;
 	align-items: center;
 	gap: 15px;
@@ -815,10 +818,10 @@ body {
 }
 
 .config-control {
-	flex: 1;
 	display: flex;
 	justify-content: flex-end;
 	align-items: center;
+	flex-shrink: 0;
 }
 
 .config-control .color-picker-wrapper {
@@ -826,7 +829,37 @@ body {
 }
 
 .config-control .color-picker-trigger {
-	min-width: 140px;
+	min-width: 60px;
+	padding: 4px 8px;
+	gap: 6px;
+}
+
+.config-control .color-preview {
+	width: 24px;
+	height: 24px;
+}
+
+.config-control .color-value {
+	font-size: 12px;
+}
+
+/* Make color picker more compact in config fields */
+.config-field .color-picker-wrapper {
+	display: inline-flex;
+	align-items: center;
+	width: 100%;
+}
+
+.config-field .color-picker-trigger {
+	height: 32px;
+	min-height: unset;
+	width: 100%;
+	justify-content: space-between;
+}
+
+/* Ensure consistent sizing for all config controls */
+.config-control-inner {
+	min-height: 32px;
 }
 
 /* ========================
@@ -3730,6 +3763,15 @@ body {
 	            inset 0 0 0 1px rgba(255, 255, 255, 0.1);
 }
 
+/* Preview upload modal styling */
+#previewUploadModal .modal-content {
+	background: linear-gradient(135deg, rgba(26, 26, 46, 0.98) 0%, rgba(22, 33, 62, 0.98) 100%);
+	border: 2px solid rgba(255, 193, 7, 0.3);
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8), 
+	            0 0 40px rgba(255, 193, 7, 0.2),
+	            inset 0 0 0 1px rgba(255, 255, 255, 0.1);
+}
+
 /* ========================
    TUTORIAL SYSTEM
    ======================== */
@@ -3947,4 +3989,95 @@ body {
 		transform: scale(1);
 		opacity: 1;
 	}
+}
+
+/* Script Preview Styles */
+.multiselect-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.multiselect-option {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+}
+
+.multiselect-option input[type="checkbox"] {
+    margin: 0;
+}
+
+.range-container {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.range-container input[type="range"] {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    outline: none;
+}
+
+.range-value {
+    font-weight: 600;
+    color: #4a9eff;
+    min-width: 40px;
+    text-align: center;
+}
+
+.range-bounds {
+    color: #888;
+    font-size: 12px;
+}
+
+.config-subgroup {
+    margin: 15px 0;
+    padding-left: 15px;
+    border-left: 2px solid rgba(74, 158, 255, 0.3);
+}
+
+.config-subgroup-title {
+    font-weight: 600;
+    color: #4a9eff;
+    margin-bottom: 10px;
+    font-size: 14px;
+}
+
+.config-description {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 4px;
+    font-style: italic;
+}
+
+.color-field {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.color-field input[type="color"] {
+    width: 40px;
+    height: 30px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.color-value {
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 12px;
+    color: #ccc;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
 }
