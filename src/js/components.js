@@ -570,12 +570,12 @@ Object.assign(app, {
                         <div class="script-info">
                             <div class="script-name" style="display: flex; align-items: center; gap: 10px;">
                                 ${script.name}
-                                <span onclick="app.downloadScript(${script.id})" style="cursor: pointer; font-size: 18px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'" title="Download script">📥</span>
                                 ${isOwned ? `<button class="btn btn-small" onclick="app.editScript(${script.id})" style="font-size: 12px; padding: 4px 8px;">✏️ Edit</button>` : ''}
                             </div>
                             <div class="script-meta">
                                 <span class="script-author">by ${script.author}</span>
                                 <span>ID: ${script.id}</span>
+                                ${script.users !== undefined ? `<span title="All-Seeing Eye: Active users">👁️ ${script.users} users</span>` : ''}
                             </div>
                             <div class="script-meta">
                                 <span>Software: ${softwareName}</span>
@@ -598,9 +598,6 @@ Object.assign(app, {
                             </div>
                         </div>
                     </div>
-                    <p style="margin-top: 8px; color: #4aff4a; font-size: 12px; font-weight: 500;">
-                        ✅ Active${script.users ? ` • ${script.users} users` : ''}
-                    </p>
                 </div>
             `;
         }).join('');
@@ -639,12 +636,12 @@ Object.assign(app, {
                         <div class="script-info">
                             <div class="script-name" style="display: flex; align-items: center; gap: 10px;">
                                 ${script.name}
-                                <span onclick="app.downloadScript(${script.id})" style="cursor: pointer; font-size: 18px; opacity: 0.7; transition: opacity 0.2s;" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.7'" title="Download script">📥</span>
                                 ${isOwned ? `<button class="btn btn-small" onclick="app.editScript(${script.id})" style="font-size: 12px; padding: 4px 8px;">✏️ Edit</button>` : ''}
                             </div>
                             <div class="script-meta">
                                 <span class="script-author">by ${script.author}</span>
                                 <span>ID: ${script.id}</span>
+                                ${script.users !== undefined ? `<span title="All-Seeing Eye: Active users">👁️ ${script.users} users</span>` : ''}
                             </div>
                             ${script.category_names ? `
                                 <div class="script-categories">
@@ -670,7 +667,6 @@ Object.assign(app, {
                     </div>
                     <p style="margin-top: 10px; color: #aaa; font-size: 14px;">
                         <strong>Last Updated:</strong> ${script.elapsed || 'Never'}
-                        <br><strong>Status:</strong> ${isActive ? '✅ Active' : '❌ Inactive'}
                     </p>
                 </div>
             `;
@@ -723,9 +719,6 @@ Object.assign(app, {
                             </div>
                         </div>
                     </div>
-                    <p style="margin-top: 8px; color: #4aff4a; font-size: 12px; font-weight: 500;">
-                        ✅ Active
-                    </p>
                 </div>
             `;
         }).join('');
@@ -777,7 +770,6 @@ Object.assign(app, {
                     </div>
                     <p style="margin-top: 10px; color: #aaa; font-size: 14px;">
                         <strong>Last Updated:</strong> ${this.getElapsedTime(project.last_update) || 'Never'}
-                        <br><strong>Status:</strong> ${isActive ? '✅ Active' : '❌ Inactive'}
                     </p>
                 </div>
             `;
@@ -1322,6 +1314,80 @@ Object.assign(app, {
         } catch (error) {
             console.error('Error respeccing perks:', error);
             this.showMessage(`Failed to respec perks: ${error.message}`, 'error');
+        }
+    },
+
+    async setForumBackground() {
+        const urlInput = document.getElementById('forumBackgroundUrl');
+        const statusDiv = document.getElementById('forumBackgroundStatus');
+        
+        if (!urlInput || !urlInput.value.trim()) {
+            this.showMessage('Please enter a valid image URL', 'error');
+            return;
+        }
+        
+        const url = urlInput.value.trim();
+        if (url.length > 256) {
+            this.showMessage('URL must be 256 characters or less', 'error');
+            return;
+        }
+        
+        try {
+            statusDiv.innerHTML = '<div class="spinner"></div>';
+            
+            const result = await this.apiPost('setForumBackground', {}, { url: url });
+            
+            // The API returns "updated to '[url]'" on success
+            if (result.success || (result.message && result.message.includes('updated to'))) {
+                this.showMessage('Forum background updated successfully!', 'success');
+                statusDiv.innerHTML = '<span style="color: #4CAF50;">✅ Background set successfully!</span>';
+                
+                // Update member data
+                if (this.memberData) {
+                    this.memberData.forum_background = url;
+                }
+                
+                // Update the display
+                this.updateMemberInfoDisplay();
+            } else {
+                throw new Error(result.message || 'Failed to set forum background');
+            }
+        } catch (error) {
+            console.error('Error setting forum background:', error);
+            this.showMessage(`Failed to set background: ${error.message}`, 'error');
+            statusDiv.innerHTML = `<span style="color: #f44336;">❌ ${error.message}</span>`;
+        }
+    },
+    
+    async clearForumBackground() {
+        const statusDiv = document.getElementById('forumBackgroundStatus');
+        const urlInput = document.getElementById('forumBackgroundUrl');
+        
+        try {
+            statusDiv.innerHTML = '<div class="spinner"></div>';
+            
+            const result = await this.apiPost('setForumBackground', {}, { url: '' });
+            
+            // The API returns "updated to ''" or similar on success
+            if (result.success || (result.message && (result.message.includes('updated to') || result.message.includes('cleared')))) {
+                this.showMessage('Forum background cleared!', 'success');
+                statusDiv.innerHTML = '<span style="color: #4CAF50;">✅ Background cleared!</span>';
+                if (urlInput) urlInput.value = '';
+                
+                // Update member data
+                if (this.memberData) {
+                    this.memberData.forum_background = null;
+                }
+                
+                // Update the display
+                this.updateMemberInfoDisplay();
+            } else {
+                throw new Error(result.message || 'Failed to clear forum background');
+            }
+        } catch (error) {
+            console.error('Error clearing forum background:', error);
+            this.showMessage(`Failed to clear background: ${error.message}`, 'error');
+            statusDiv.innerHTML = `<span style="color: #f44336;">❌ ${error.message}</span>`;
         }
     },
 
