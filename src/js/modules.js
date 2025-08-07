@@ -1145,10 +1145,37 @@ Object.assign(app, {
                         this.allPerks.find(p => p.id === perk.id && p.name.toLowerCase().includes('venus'))
                     );
                     
+                    const hasArtist = this.ownedPerks.some(perk => perk.id === 1);
+                    
                     if (hasVenus) {
-                        console.log('Checking Venus status on tab switch...');
-                        // Always try to load Venus status when switching to perks tab
-                        this.loadVenusStatus();
+                        // Show Venus card immediately
+                        const venusCard = document.getElementById('venusCard');
+                        if (venusCard) {
+                            venusCard.style.display = 'block';
+                        }
+                        
+                        // Only load Venus status if not already loaded
+                        if (!this.venusStatus) {
+                            console.log('Loading Venus status on tab switch...');
+                            this.loadVenusStatus();
+                        } else {
+                            // Status already loaded, just display it
+                            this.displayVenusStatus();
+                        }
+                    }
+                    
+                    // Show/hide Artist card based on perk ownership
+                    const artistCard = document.getElementById('artistCard');
+                    if (artistCard) {
+                        artistCard.style.display = hasArtist ? 'block' : 'none';
+                        
+                        // If user has existing forum background, show it
+                        if (hasArtist && this.memberData?.forum_background) {
+                            const urlInput = document.getElementById('forumBackgroundUrl');
+                            if (urlInput) {
+                                urlInput.value = this.memberData.forum_background;
+                            }
+                        }
                     }
                 }, 100); // Small delay to ensure DOM is ready
             }
@@ -1703,11 +1730,11 @@ Object.assign(app, {
             this.displayCurrentSessionInfo();
             
             if (detailed) {
-                this.displayDetailedSecurityInfo();
+                // Security info removed per user request
                 this.displayAccountActivity();
             }
             
-            this.showMessage(detailed ? 'Detailed security & activity data loaded!' : 'Session history loaded!', 'success');
+            this.showMessage(detailed ? 'Activity data loaded!' : 'Session history loaded!', 'success');
         } catch (error) {
             console.error('Error loading session history:', error);
             this.showMessage('Failed to load session history', 'error');

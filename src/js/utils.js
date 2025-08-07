@@ -1215,11 +1215,12 @@ Object.assign(app, {
 
         } catch (error) {
             console.error('Error loading Venus status:', error);
-            // Don't show error for Venus - user might not have the perk
-            const venusCard = document.getElementById('venusCard');
-            if (venusCard) {
-                venusCard.style.display = 'none';
-            }
+            // Set a default status if the API call fails
+            this.venusStatus = {
+                message: 'Unable to load Venus status',
+                error: true
+            };
+            this.displayVenusStatus();
         }
     },
 

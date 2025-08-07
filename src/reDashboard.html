@@ -43,7 +43,7 @@
           <button class="roll-button" id="rollButton" onclick="app.rollLoot()"> 🎲 Roll Loot </button>
           <button class="settings-button" id="settingsButton" onclick="app.showSettingsModal()"> ⚙️ Settings </button>
         </div>
-        <h1> fantasy.dashboard <span class="version-badge">v1.6.4</span>
+        <h1> fantasy.dashboard <span class="version-badge">v1.6.7</span>
         </h1>
         <div class="login-section" id="loginSection">
           <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your Constelia API key...">
@@ -257,7 +257,6 @@
             <h2>📈 Session History</h2>
             <div style="display: flex; gap: 15px; margin-bottom: 20px; flex-wrap: wrap;">
               <button class="btn" onclick="app.refreshSessionHistory()">🔄 Refresh History</button>
-              <button class="btn btn-small" onclick="app.loadSessionHistory(true)" style="background: linear-gradient(135deg, #4aff4a, #357abd);">📊 Load Detailed History</button>
               <button class="btn" id="freezeSessionButton" onclick="app.freezeSession()" style="display: none; background: linear-gradient(135deg, #00bfff, #0080ff);">❄️ Freeze Session</button>
             </div>
             <div id="sessionHistoryContainer">
@@ -292,6 +291,18 @@
             <h2>💕 Venus Perk - Partnership System</h2>
             <div id="venusStatus" style="margin-bottom: 20px;">
               <div class="spinner"></div>
+            </div>
+          </div>
+          <div class="card" id="artistCard" style="display: none;">
+            <h2>🎨 Artist Perk - Forum Background</h2>
+            <div style="margin-bottom: 20px;">
+              <p style="color: #aaa; margin-bottom: 15px;">Set a custom background image for your forum profile</p>
+              <input type="text" id="forumBackgroundUrl" placeholder="Enter image URL (max 256 characters)" class="input-field" style="width: 100%; margin-bottom: 15px;">
+              <div style="display: flex; gap: 10px;">
+                <button class="btn" onclick="app.setForumBackground()">🎨 Set Background</button>
+                <button class="btn btn-secondary" onclick="app.clearForumBackground()">🗑️ Clear Background</button>
+              </div>
+              <div id="forumBackgroundStatus" style="margin-top: 15px;"></div>
             </div>
           </div>
           <div class="card">
@@ -470,7 +481,7 @@
       <span style="color: #ff6b6b; font-size: 14px; margin: 0 3px;">♡</span>
       <span style="opacity: 0.7;">by</span>
       <a href="https://constelia.ai/forums/index.php?members/rucka.17146/" target="_blank" style="color: #4a9eff; font-weight: 600; margin-left: 4px; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.color='#6bb6ff'; this.style.textDecoration='underline';" onmouseout="this.style.color='#4a9eff'; this.style.textDecoration='none';">Rucka</a>
-      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.6.4</span>
+      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.6.7</span>
     </div>
     <!-- Bottom-Right Notification Container -->
     <div class="notification-container" id="notificationContainer">

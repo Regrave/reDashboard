@@ -319,11 +319,22 @@ const app = {
     },
 
     async verifySessionBeforeUI() {
-        // Make a quick API call to check if session is valid
+        // Load full member data to verify session and avoid duplicate calls
         try {
-            const response = await this.apiCall('getMember', { beautify: '' });
-            // If we get here, the session is valid
-            return { valid: true };
+            const response = await this.apiCall('getMember', {
+                scripts: '',
+                bans: '',
+                history: '',
+                fc2t: '',
+                xp: '',
+                rolls: '',
+                hashes: '',
+                achievements: '',
+                beautify: '',
+                steam: ''
+            });
+            // If we get here, the session is valid and we have the member data
+            return { valid: true, memberData: response };
         } catch (error) {
             if (error.message === 'HASH_MISMATCH') {
                 // Session has hash mismatch
@@ -374,10 +385,10 @@ const app = {
                     return false;
                 }
 
-                // Skip the getMember call here - we'll do it in loadInitialData
+                // Use the member data from session check
                 this.showMessage('Session restored, loading data...', 'success');
                 this.updateUIAfterLogin();
-                await this.loadInitialData();
+                await this.loadInitialData(sessionCheck.memberData);
                 return true;
             }
         } catch (error) {
@@ -442,11 +453,11 @@ const app = {
                         return;
                     }
                     
-                    // If we got a key, assume it works and let loadInitialData verify
+                    // Use the member data from session check
                     this.showMessage('Connected successfully, loading data...', 'success');
                     this.updateUIAfterLogin();
                     apiKeyInput.value = '';
-                    await this.loadInitialData();
+                    await this.loadInitialData(sessionCheck.memberData);
                     return;
                 } catch (existingError) {
                     console.log('❌ Existing handshake failed, will create new one:', existingError.message);
@@ -540,9 +551,14 @@ const app = {
                 }
 
                 this.showMessage('Connected successfully, loading data...', 'success');
+                // Pass member data to loadInitialData
+                this.updateUIAfterLogin();
+                apiKeyInput.value = '';
+                await this.loadInitialData(sessionCheck.memberData);
+                return;
             }
 
-            // Only update UI and load data if connection was successful
+            // Only update UI and load data if connection was successful (no session check path)
             this.updateUIAfterLogin();
             apiKeyInput.value = '';
             await this.loadInitialData();
@@ -605,7 +621,7 @@ const app = {
             // Only update UI and load data if connection was successful
             this.updateUIAfterLogin();
             handshakeInput.value = '';
-            await this.loadInitialData();
+            await this.loadInitialData(sessionCheck.memberData);
 
         } catch (error) {
             console.error('Handshake connection error:', error);
@@ -1179,14 +1195,14 @@ const app = {
     },
 
     // Load initial data after successful login
-    async loadInitialData() {
+    async loadInitialData(preLoadedMemberData = null) {
         this.sessionInitialized = false;
         
         try {
             // Execute ALL API calls in parallel for maximum speed
             const allDataPromises = [
-                // Member data - comprehensive call (critical)
-                this.apiCall('getMember', {
+                // Member data - use pre-loaded data if available, otherwise fetch it
+                preLoadedMemberData ? Promise.resolve(preLoadedMemberData) : this.apiCall('getMember', {
                     scripts: '',
                     bans: '',
                     history: '',
@@ -1195,7 +1211,8 @@ const app = {
                     rolls: '',
                     hashes: '',
                     achievements: '',
-                    beautify: ''
+                    beautify: '',
+                    steam: ''
                 }),
                 // All other data calls
                 this.apiCall('getAllScripts').catch(e => { console.warn('getAllScripts failed:', e); return []; }),
@@ -1227,6 +1244,15 @@ const app = {
                 if (hasAbundanceOfJupiter) {
                     rollButton.classList.add('active');
                     rollButton.style.display = ''; // Override CSS display: none
+                }
+                
+                // Load Venus status immediately if user has Venus perk (ID 4)
+                const hasVenus = this.ownedPerks.some(perk => perk.id === 4);
+                if (hasVenus) {
+                    console.log('User has Venus perk, loading status...');
+                    this.loadVenusStatus().catch(error => {
+                        console.warn('Failed to load Venus status:', error);
+                    });
                 }
                 
                 // Show the dashboard now that we have member data
@@ -1697,10 +1723,6 @@ const app = {
                 <div class="stat-value">${this.memberData.username}</div>
             </div>
             <div class="stat-box">
-                <div class="stat-label">Level</div>
-                <div class="stat-value">${this.memberData.level}</div>
-            </div>
-            <div class="stat-box">
                 <div class="stat-label">XP</div>
                 <div class="stat-value">${this.memberData.xp.toLocaleString()}</div>
             </div>
@@ -1717,13 +1739,19 @@ const app = {
                 <div class="stat-value">${this.memberScripts.length}</div>
             </div>
             <div class="stat-box">
-                <div class="stat-label">Active Projects</div>
-                <div class="stat-value">${this.memberProjects.length}</div>
-            </div>
-            <div class="stat-box">
                 <div class="stat-label">Protection Mode</div>
-                <div class="stat-value">${this.protectionModes[this.memberData.protection] || 'Unknown'}</div>
+                <div class="stat-value">${this.memberData.protection_name || this.protectionModes[this.memberData.protection] || 'Unknown'}</div>
             </div>
+            ${this.memberData.last_blood_of_mars ? `
+            <div class="stat-box">
+                <div class="stat-label">🩸 Last Blood of Mars</div>
+                <div class="stat-value">${new Date(this.memberData.last_blood_of_mars * 1000).toLocaleDateString()}</div>
+            </div>` : ''}
+            ${this.memberData.venus ? `
+            <div class="stat-box">
+                <div class="stat-label">💕 Venus Status</div>
+                <div class="stat-value">${Array.isArray(this.memberData.venus) ? this.memberData.venus.join(', ') : 'Active'}</div>
+            </div>` : ''}
         `;
 
         // Populate protection mode dropdown
@@ -2066,7 +2094,7 @@ const app = {
             }
             
             this.updateUIAfterLogin();
-            await this.loadInitialData();
+            await this.loadInitialData(sessionCheck.memberData);
             
             return true;
             
