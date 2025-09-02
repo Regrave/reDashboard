@@ -2919,9 +2919,10 @@ Object.assign(app, {
             "Wheel of Fortune", "Justice", "The Hanged Man", "Death", "Temperance",
             "The Devil", "The Tower", "The Star", "The Moon", "The Sun",
             "Judgement", "The World",
-            // Wands cards (22-31)
+            // Wands cards (22-34)
             "Ace of Wands", "Two of Wands", "Three of Wands", "Four of Wands", "Five of Wands",
-            "Six of Wands", "Seven of Wands", "Eight of Wands", "Nine of Wands", "Ten of Wands"
+            "Six of Wands", "Seven of Wands", "Eight of Wands", "Nine of Wands", "Ten of Wands",
+            "Page of Wands", "Knight of Wands", "Queen of Wands"
         ];
         
         // Generate tarot names for all achievements
