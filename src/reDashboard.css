@@ -1785,6 +1785,30 @@ body {
 	overflow: hidden;
 }
 
+/* Build Details Modal - Smaller size */
+#buildDetailsModal.active {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
+}
+
+#buildDetailsModal .script-editor-content {
+	width: auto;
+	height: auto;
+	max-width: 900px;
+	max-height: 80vh;
+	border-radius: 16px;
+	overflow: hidden;
+	box-shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+	border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+#buildDetailsModal .script-editor-body {
+	max-height: 70vh;
+	overflow-y: auto;
+}
+
 .script-editor-modal.active {
 	display: block;
 }
@@ -1827,6 +1851,7 @@ body {
 	display: flex;
 	align-items: center;
 	gap: 15px;
+	padding-right: 20px;
 }
 
 .script-editor-actions {

@@ -1546,9 +1546,14 @@ Object.assign(app, {
                                 <span>${projectIds.length} project${projectIds.length !== 1 ? 's' : ''}</span>
                                 ${build.configuration ? '<span style="color: #4aff4a;">✅ Config</span>' : '<span style="color: #888;">❌ No Config</span>'}
                             </div>
-                            <button class="btn btn-small" onclick="app.showBuildDetails('${build.tag}')" style="margin-top: 8px; font-size: 12px; padding: 4px 8px;">
-                                🔍 Inspect Build
-                            </button>
+                            <div style="display: flex; gap: 6px; margin-top: 8px;">
+                                <button class="btn btn-small" onclick="app.showBuildDetails('${build.tag}')" style="font-size: 12px; padding: 4px 8px;">
+                                    🔍 Inspect Build
+                                </button>
+                                ${build.configuration ? `<button class="btn btn-small" onclick="app.showRawBuildConfig('${build.tag}')" style="font-size: 12px; padding: 4px 8px; background: rgba(255, 140, 0, 0.2); border-color: rgba(255, 140, 0, 0.3);" title="View raw JSON configuration">
+                                    📄 Raw JSON
+                                </button>` : ''}
+                            </div>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <button class="btn btn-small" onclick="app.previewBuild('${build.tag}')" title="Apply this build">

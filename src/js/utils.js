@@ -1596,250 +1596,73 @@ Object.assign(app, {
         const title = document.getElementById('buildDetailsTitle');
         const content = document.getElementById('buildDetailsContent');
 
-        title.textContent = `"${build.tag}" by ${build.author}`;
+        title.textContent = `"${build.tag}"`;
 
         // Get build data
         const buildScripts = JSON.parse(build.scripts || '[]').map(id => String(id));
-        const buildProjects = JSON.parse(build.projects || '[]').map(id => String(id));
         const currentScripts = this.memberScripts.map(s => String(s.id));
-        const currentProjects = this.memberProjects.map(p => String(p.id));
 
-        // Calculate differences (ensure no duplicates by converting to Sets)
+        // Calculate script differences
         const buildScriptsSet = new Set(buildScripts);
         const currentScriptsSet = new Set(currentScripts);
-        const buildProjectsSet = new Set(buildProjects);
-        const currentProjectsSet = new Set(currentProjects);
-
         const scriptsToAdd = buildScripts.filter(id => !currentScriptsSet.has(id));
         const scriptsToRemove = currentScripts.filter(id => !buildScriptsSet.has(id));
-        const projectsToAdd = buildProjects.filter(id => !currentProjectsSet.has(id));
-        const projectsToRemove = currentProjects.filter(id => !buildProjectsSet.has(id));
 
-        let detailsHTML = `
-            <div style="margin-bottom: 30px;">
-                <h3 style="color: #4a9eff; margin-bottom: 15px;">📋 Build Overview</h3>
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; margin-bottom: 20px;">
-                    <div style="background: rgba(74, 158, 255, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #4a9eff;">${buildScripts.length}</div>
-                        <div style="color: #aaa; font-size: 14px;">Scripts</div>
-                    </div>
-                    <div style="background: rgba(74, 158, 255, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: #4a9eff;">${buildProjects.length}</div>
-                        <div style="color: #aaa; font-size: 14px;">Projects</div>
-                    </div>
-                    <div style="background: rgba(74, 158, 255, 0.1); padding: 15px; border-radius: 8px; text-align: center;">
-                        <div style="font-size: 24px; font-weight: bold; color: ${build.configuration ? '#4aff4a' : '#ff6666'};">${build.configuration ? 'YES' : 'NO'}</div>
-                        <div style="color: #aaa; font-size: 14px;">Configuration</div>
-                    </div>
-                </div>
-            </div>
-        `;
-
-        // Configuration Preview Section  
+        // Parse build configuration for individual script configs
+        let buildConfig = null;
         if (build.configuration) {
             try {
-                const buildConfig = typeof build.configuration === 'string' 
+                buildConfig = typeof build.configuration === 'string' 
                     ? JSON.parse(build.configuration) 
                     : build.configuration;
-                
-                const configSummary = this.getConfigurationSummary(buildConfig);
-                
-                detailsHTML += `
-                    <div style="margin-bottom: 30px;">
-                        <h3 style="color: #ff8c00; margin-bottom: 15px;">⚙️ Configuration Override</h3>
-                        <div style="background: rgba(255, 140, 0, 0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 140, 0, 0.3);">
-                            <p style="color: #ffcc00; margin-bottom: 10px;"><strong>⚠️ Warning:</strong> This build includes a configuration file.</p>
-                            <p style="color: #aaa; font-size: 14px; margin-bottom: 15px;">Your entire current configuration will be replaced with the build's configuration. Make sure to backup your current settings if needed.</p>
-                            
-                            ${configSummary.hasCustomSettings ? `
-                                <div style="background: rgba(255, 255, 255, 0.05); padding: 12px; border-radius: 6px; margin-bottom: 15px;">
-                                    <h4 style="color: #4a9eff; margin-bottom: 10px; font-size: 14px;">📋 Key Configuration Highlights:</h4>
-                                    ${this.renderConfigHighlights(configSummary.highlights)}
-                                </div>
-                            ` : ''}
-                            
-                            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; margin-bottom: 15px;">
-                                <div style="text-align: center; background: rgba(255, 255, 255, 0.03); padding: 10px; border-radius: 6px;">
-                                    <div style="font-size: 18px; font-weight: bold; color: #4a9eff;">${configSummary.softwareCount}</div>
-                                    <div style="color: #aaa; font-size: 12px;">Software</div>
-                                </div>
-                                <div style="text-align: center; background: rgba(255, 255, 255, 0.03); padding: 10px; border-radius: 6px;">
-                                    <div style="font-size: 18px; font-weight: bold; color: #4a9eff;">${configSummary.scriptCount}</div>
-                                    <div style="color: #aaa; font-size: 12px;">Scripts</div>
-                                </div>
-                                <div style="text-align: center; background: rgba(255, 255, 255, 0.03); padding: 10px; border-radius: 6px;">
-                                    <div style="font-size: 18px; font-weight: bold; color: #4a9eff;">${configSummary.customSettingsCount}</div>
-                                    <div style="color: #aaa; font-size: 12px;">Custom Settings</div>
-                                </div>
-                            </div>
-                            
-                            <!-- Collapsible detailed view -->
-                            <div style="text-align: center;">
-                                <button style="background: none; border: 1px solid rgba(255, 140, 0, 0.5); color: #ff8c00; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 12px; transition: all 0.2s;" onclick="app.toggleBuildConfigPreview('${build.tag}')">
-                                    <span id="config-preview-icon-${build.tag}">📁</span> View Detailed Configuration
-                                </button>
-                            </div>
-                            
-                            <div id="config-preview-content-${build.tag}" style="display: none; margin-top: 15px;">
-                                <pre style="background: #0a0a0a; border: 1px solid #444; border-radius: 6px; padding: 15px; color: #0f0; font-family: 'Consolas', 'Monaco', monospace; font-size: 11px; max-height: 250px; overflow: auto; white-space: pre-wrap; word-wrap: break-word;">${JSON.stringify(buildConfig, null, 2)}</pre>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                
             } catch (error) {
                 console.error('Error parsing build configuration:', error);
-                detailsHTML += `
-                    <div style="margin-bottom: 30px;">
-                        <h3 style="color: #ff6666; margin-bottom: 15px;">⚠️ Configuration Error</h3>
-                        <div style="background: rgba(255, 102, 102, 0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 102, 102, 0.3);">
-                            <p style="color: #ff6666;">Could not parse configuration data for this build.</p>
-                        </div>
-                    </div>
-                `;
             }
         }
 
-        // Show changes that would be made
-        if (scriptsToAdd.length > 0 || scriptsToRemove.length > 0 || projectsToAdd.length > 0 || projectsToRemove.length > 0) {
-            detailsHTML += `
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #ff8c00; margin-bottom: 15px;">⚠️ Changes Required</h3>
-                    <p style="color: #aaa; margin-bottom: 20px;">Applying this build will make the following changes to your current setup:</p>
-            `;
-
-            // Script changes
-            if (scriptsToAdd.length > 0 || scriptsToRemove.length > 0) {
-                detailsHTML += `
-                    <div style="margin-bottom: 20px;">
-                        <h4 style="color: #4a9eff; margin-bottom: 10px;">📜 Script Changes</h4>
-                `;
-
-                if (scriptsToAdd.length > 0) {
-                    detailsHTML += `
-                        <div style="margin-bottom: 15px;">
-                            <h5 style="color: #4aff4a; margin-bottom: 8px;">✅ Scripts to Enable (${scriptsToAdd.length}):</h5>
-                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                ${scriptsToAdd.map(id => {
-                                    const script = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
-                                    const scriptName = script ? script.name : `Unknown Script (ID: ${id})`;
-                                    return `<span style="background: rgba(74, 255, 74, 0.2); color: #4aff4a; padding: 4px 8px; border-radius: 6px; font-size: 12px; border: 1px solid rgba(74, 255, 74, 0.4);">${scriptName}</span>`;
-                                }).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-
-                if (scriptsToRemove.length > 0) {
-                    detailsHTML += `
-                        <div style="margin-bottom: 15px;">
-                            <h5 style="color: #ff6666; margin-bottom: 8px;">❌ Scripts to Disable (${scriptsToRemove.length}):</h5>
-                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                ${scriptsToRemove.map(id => {
-                                    const script = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
-                                    const scriptName = script ? script.name : `Unknown Script (ID: ${id})`;
-                                    return `<span style="background: rgba(255, 102, 102, 0.2); color: #ff6666; padding: 4px 8px; border-radius: 6px; font-size: 12px; border: 1px solid rgba(255, 102, 102, 0.4);">${scriptName}</span>`;
-                                }).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-
-                detailsHTML += '</div>';
+        // Get all script names from the configuration to show both known and unknown scripts
+        const allScriptNames = new Set();
+        
+        // Add scripts from the build's script IDs
+        buildScripts.forEach(id => {
+            const script = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
+            if (script) {
+                allScriptNames.add(script.name);
             }
-
-            // Project changes
-            if (projectsToAdd.length > 0 || projectsToRemove.length > 0) {
-                detailsHTML += `
-                    <div style="margin-bottom: 20px;">
-                        <h4 style="color: #4a9eff; margin-bottom: 10px;">👥 Project Changes</h4>
-                `;
-
-                if (projectsToAdd.length > 0) {
-                    detailsHTML += `
-                        <div style="margin-bottom: 15px;">
-                            <h5 style="color: #4aff4a; margin-bottom: 8px;">✅ Projects to Enable (${projectsToAdd.length}):</h5>
-                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                ${scriptsToAdd.map(id => {
-                                    const script = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
-                                    const scriptName = script ? script.name : `Unknown Script (ID: ${id})`;
-                                    return `<span style="background: rgba(74, 255, 74, 0.2); color: #4aff4a; padding: 4px 8px; border-radius: 6px; font-size: 12px; border: 1px solid rgba(74, 255, 74, 0.4);">${scriptName}</span>`;
-                                }).join('')}
-                            </div>
-                        </div>
-                    `;
+        });
+        
+        // Add scripts from the configuration JSON (these might be default scripts not in allScripts)
+        if (buildConfig?.omega) {
+            Object.keys(buildConfig.omega).forEach(scriptName => {
+                if (scriptName !== 'bones') { // Skip the bones array
+                    allScriptNames.add(scriptName);
                 }
-
-                if (projectsToRemove.length > 0) {
-                    detailsHTML += `
-                        <div style="margin-bottom: 15px;">
-                            <h5 style="color: #ff6666; margin-bottom: 8px;">❌ Projects to Disable (${projectsToRemove.length}):</h5>
-                            <div style="display: flex; flex-wrap: wrap; gap: 8px;">
-                                ${projectsToRemove.map(id => {
-                                    const project = this.allProjects.find(p => p.id == id || p.id === String(id) || p.id === Number(id));
-                                    const projectName = project ? project.name : `Unknown Project (ID: ${id})`;
-                                    return `<span style="background: rgba(255, 102, 102, 0.2); color: #ff6666; padding: 4px 8px; border-radius: 6px; font-size: 12px; border: 1px solid rgba(255, 102, 102, 0.4);">${projectName}</span>`;
-                                }).join('')}
-                            </div>
-                        </div>
-                    `;
-                }
-
-                detailsHTML += '</div>';
-            }
-
-            detailsHTML += '</div>';
-
-        } else {
-            detailsHTML += `
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #4aff4a; margin-bottom: 15px;">✅ Perfect Match</h3>
-                    <p style="color: #4aff4a; text-align: center; padding: 20px; background: rgba(74, 255, 74, 0.1); border-radius: 8px; border: 1px solid rgba(74, 255, 74, 0.3);">
-                        🎉 This build matches your current setup perfectly! No changes are needed.
-                    </p>
-                </div>
-            `;
+            });
         }
+        
+        // Build the script cards HTML
+        const scriptCards = Array.from(allScriptNames).map(scriptName => {
+            const script = this.allScripts.find(s => s.name === scriptName);
+            const scriptId = script ? script.id : null;
+            const isNewScript = scriptId ? !currentScripts.includes(String(scriptId)) : false;
+            
+            // Get script config from build if available
+            const scriptConfig = buildConfig?.omega?.[scriptName] || null;
+            const hasConfig = scriptConfig && Object.keys(scriptConfig).length > 0;
+            
+            const newBadge = isNewScript ? '<div style="position: absolute; top: -8px; right: -8px; background: #4aff4a; color: #000; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: bold; box-shadow: 0 2px 8px rgba(74, 255, 74, 0.3);">NEW</div>' : '';
+            
+            const isDefaultScript = !script; // No script found means it's a default script
+            const configInfo = hasConfig ? 
+                '<div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1);"><span style="color: #4a9eff; font-size: 12px;">⚙️ ' + (isDefaultScript ? 'Configured' : 'Has custom config') + '</span><span style="color: #666; font-size: 11px;">Click to view</span></div>' :
+                '<div style="color: #666; font-size: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1);">✨ Default settings</div>';
+            
+            const clickHandler = hasConfig ? ' onclick="app.showScriptConfig(\'' + scriptName.replace(/'/g, "\\'") + '\', \'' + build.tag.replace(/'/g, "\\'") + '\')" onmouseover="this.style.background=\'rgba(74, 158, 255, 0.08)\'; this.style.borderColor=\'rgba(74, 158, 255, 0.3)\'" onmouseout="this.style.background=\'rgba(255, 255, 255, 0.03)\'; this.style.borderColor=\'rgba(255, 255, 255, 0.1)\'"' : '';
+            
+            return '<div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 16px; position: relative; transition: all 0.2s; cursor: ' + (hasConfig ? 'pointer' : 'default') + ';"' + clickHandler + '>' + newBadge + '<div style="color: #fff; font-weight: 600; font-size: 16px; margin-bottom: 8px;">' + scriptName + '</div>' + configInfo + '</div>';
+        }).join('');
 
-        // Configuration section
-        if (build.configuration) {
-            detailsHTML += `
-                <div style="margin-bottom: 30px;">
-                    <h3 style="color: #ff8c00; margin-bottom: 15px;">⚙️ Configuration Override</h3>
-                    <div style="background: rgba(255, 140, 0, 0.1); padding: 15px; border-radius: 8px; border: 1px solid rgba(255, 140, 0, 0.3);">
-                        <p style="color: #ffcc00; margin-bottom: 10px;"><strong>⚠️ Warning:</strong> This build includes a configuration file.</p>
-                        <p style="color: #aaa; font-size: 14px;">Your entire current configuration will be replaced with the build's configuration. Make sure to backup your current settings if needed.</p>
-                    </div>
-                </div>
-            `;
-        }
-
-        // Build metadata
-        detailsHTML += `
-            <div style="margin-bottom: 20px;">
-                <h3 style="color: #4a9eff; margin-bottom: 15px;">📊 Build Information</h3>
-                <div style="background: rgba(255, 255, 255, 0.05); padding: 15px; border-radius: 8px;">
-                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                        <div>
-                            <strong style="color: #aaa;">Author:</strong><br>
-                            <span style="color: #fff;">${build.author}</span>
-                        </div>
-                        <div>
-                            <strong style="color: #aaa;">Popularity:</strong><br>
-                            <span style="color: #fff;">${build.popularity || 0} users</span>
-                        </div>
-                        <div>
-                            <strong style="color: #aaa;">Privacy:</strong><br>
-                            <span style="color: #fff;">${build.private === 1 ? '🔒 Private' : '🌐 Public'}</span>
-                        </div>
-                        <div>
-                            <strong style="color: #aaa;">Type:</strong><br>
-                            <span style="color: #fff;">${build.configuration ? '📦 Full Build' : '📜 Scripts Only'}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+        let detailsHTML = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; padding: 20px 0;">' + scriptCards + '</div>';
 
         content.innerHTML = detailsHTML;
         modal.classList.add('active');
@@ -1848,6 +1671,131 @@ Object.assign(app, {
     closeBuildDetails() {
         document.getElementById('buildDetailsModal').classList.remove('active');
         this.currentBuildToApply = null;
+    },
+
+    showScriptConfig(scriptName, buildTag) {
+        try {
+            // Use the current build that's already loaded
+            const build = this.currentBuildToApply;
+            
+            if (!build || !build.configuration) {
+                console.log('No build or configuration found:', { buildTag, build: !!build, hasConfig: !!build?.configuration });
+                return;
+            }
+
+        let buildConfig;
+        try {
+            buildConfig = typeof build.configuration === 'string' 
+                ? JSON.parse(build.configuration) 
+                : build.configuration;
+        } catch (error) {
+            this.showNotification('Error parsing build configuration', 'error');
+            return;
+        }
+
+        const scriptConfig = buildConfig?.omega?.[scriptName];
+        if (!scriptConfig) {
+            this.showNotification('No configuration found for this script', 'warning');
+            return;
+        }
+
+        // Create a mini modal to show script config
+        const modalHTML = `
+            <div class="script-config-overlay" id="scriptConfigOverlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.8); z-index: 1060; display: flex; align-items: center; justify-content: center; padding: 20px;" onclick="this.remove()">
+                <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 25px; max-width: 600px; width: 100%; max-height: 80vh; overflow-y: auto; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);" onclick="event.stopPropagation()">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                        <h3 style="color: #4a9eff; margin: 0; font-size: 18px;">⚙️ ${scriptName} Configuration</h3>
+                        <button style="background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; padding: 5px;" onclick="this.closest('.script-config-overlay').remove()">✕</button>
+                    </div>
+                    <div style="background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); padding: 20px;">
+                        ${this.renderScriptConfigSettings(scriptConfig, scriptName)}
+                    </div>
+                </div>
+            </div>
+        `;
+
+        // Remove any existing script config overlay
+        const existingOverlay = document.getElementById('scriptConfigOverlay');
+        if (existingOverlay) {
+            existingOverlay.remove();
+        }
+
+        // Add the new overlay to the body
+        document.body.insertAdjacentHTML('beforeend', modalHTML);
+        
+        } catch (error) {
+            console.error('Error showing script config:', error);
+        }
+    },
+
+    showRawBuildConfig(buildTag) {
+        try {
+            // Use the current build that's already loaded
+            const build = this.currentBuildToApply || this.allBuilds?.find(b => b && b.tag === buildTag);
+            
+            if (!build || !build.configuration) {
+                console.log('No build or configuration found for raw view');
+                return;
+            }
+
+            let buildConfig;
+            try {
+                buildConfig = typeof build.configuration === 'string' 
+                    ? JSON.parse(build.configuration) 
+                    : build.configuration;
+            } catch (error) {
+                console.error('Error parsing build configuration:', error);
+                return;
+            }
+
+            // Create a modal to show raw JSON
+            const modalHTML = `
+                <div class="raw-config-overlay" id="rawConfigOverlay" style="position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); z-index: 1060; display: flex; align-items: center; justify-content: center; padding: 20px;" onclick="this.remove()">
+                    <div style="background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 16px; padding: 25px; max-width: 800px; width: 100%; max-height: 85vh; overflow: hidden; box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);" onclick="event.stopPropagation()">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                            <h3 style="color: #ff8c00; margin: 0; font-size: 18px;">📄 Raw Configuration - "${build.tag}"</h3>
+                            <button style="background: none; border: none; color: #aaa; font-size: 20px; cursor: pointer; padding: 5px;" onclick="this.closest('.raw-config-overlay').remove()">✕</button>
+                        </div>
+                        <div style="height: 70vh; overflow: hidden; display: flex; flex-direction: column;">
+                            <pre style="background: #0f0f0f; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 20px; color: #4a9eff; font-family: 'Consolas', 'Monaco', monospace; font-size: 12px; overflow: auto; white-space: pre-wrap; word-wrap: break-word; line-height: 1.4; flex: 1; margin: 0;">${JSON.stringify(buildConfig, null, 2)}</pre>
+                        </div>
+                    </div>
+                </div>
+            `;
+
+            // Remove any existing overlay
+            const existingOverlay = document.getElementById('rawConfigOverlay');
+            if (existingOverlay) {
+                existingOverlay.remove();
+            }
+
+            // Add the new overlay to the body
+            document.body.insertAdjacentHTML('beforeend', modalHTML);
+            
+        } catch (error) {
+            console.error('Error showing raw config:', error);
+        }
+    },
+
+    renderScriptConfigSettings(config, scriptName) {
+        if (!config || typeof config !== 'object') {
+            return '<div style="color: #888; text-align: center; font-style: italic;">No configuration settings found</div>';
+        }
+
+        const settings = Object.entries(config).map(([key, value]) => {
+            const formattedName = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const valueDisplay = this.formatSettingValue(value);
+            const typeColor = this.getTypeColor(this.getSettingType(value));
+            
+            return `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                    <span style="color: #fff; font-weight: 500; font-size: 14px;">${formattedName}</span>
+                    <span style="color: ${typeColor}; font-size: 13px; background: rgba(255, 255, 255, 0.05); padding: 6px 10px; border-radius: 6px; font-family: 'Consolas', monospace;">${valueDisplay}</span>
+                </div>
+            `;
+        });
+
+        return settings.join('');
     },
 
     // ========================
@@ -3159,16 +3107,37 @@ Object.assign(app, {
             return '<p style="color: #888; font-style: italic; text-align: center;">No significant custom settings detected.</p>';
         }
         
-        return highlights.map(highlight => {
-            const formattedName = highlight.setting.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-            const valueDisplay = this.formatSettingValue(highlight.value);
-            const typeColor = this.getTypeColor(highlight.type);
+        // Group highlights by script for cleaner organization
+        const groupedHighlights = {};
+        highlights.forEach(highlight => {
+            if (!groupedHighlights[highlight.script]) {
+                groupedHighlights[highlight.script] = [];
+            }
+            groupedHighlights[highlight.script].push(highlight);
+        });
+        
+        return Object.entries(groupedHighlights).map(([scriptName, scriptHighlights]) => {
+            const settingsList = scriptHighlights.map(highlight => {
+                const formattedName = highlight.setting.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+                const valueDisplay = this.formatSettingValue(highlight.value);
+                const typeColor = this.getTypeColor(highlight.type);
+                
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(255, 255, 255, 0.05);">
+                        <span style="color: #fff; font-weight: 500; font-size: 14px;">${formattedName}</span>
+                        <span style="color: ${typeColor}; font-size: 13px; background: rgba(255, 255, 255, 0.05); padding: 4px 8px; border-radius: 6px;">${valueDisplay}</span>
+                    </div>
+                `;
+            }).join('');
             
             return `
-                <div style="display: inline-block; background: rgba(255, 255, 255, 0.03); padding: 6px 10px; border-radius: 4px; margin: 2px 4px; border-left: 3px solid ${typeColor};">
-                    <span style="color: #ccc; font-size: 11px;">${highlight.script}:</span>
-                    <span style="color: #fff; font-size: 12px; font-weight: 500;"> ${formattedName}</span>
-                    <span style="color: #aaa;">:</span> ${valueDisplay}
+                <div style="margin-bottom: 20px; background: rgba(255, 255, 255, 0.02); border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.1); overflow: hidden;">
+                    <div style="background: rgba(74, 158, 255, 0.1); padding: 12px 16px; border-bottom: 1px solid rgba(255, 255, 255, 0.1);">
+                        <span style="color: #4a9eff; font-weight: 600; font-size: 15px;">${scriptName}</span>
+                    </div>
+                    <div style="padding: 12px 16px;">
+                        ${settingsList}
+                    </div>
                 </div>
             `;
         }).join('');
@@ -3227,10 +3196,10 @@ Object.assign(app, {
         if (content && icon) {
             if (content.style.display === 'none') {
                 content.style.display = 'block';
-                icon.textContent = '📂';
+                icon.textContent = '📋';
             } else {
                 content.style.display = 'none';
-                icon.textContent = '📁';
+                icon.textContent = '📄';
             }
         }
     },
