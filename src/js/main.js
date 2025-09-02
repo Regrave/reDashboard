@@ -123,9 +123,21 @@ function setupKeyboardListeners() {
 function setupWindowListeners() {
     // Handle page unload for cleanup
     window.addEventListener('beforeunload', (e) => {
-        // Save any pending drafts
+        // Check if there are unsaved changes in the script editor
         if (window.app.currentEditingScript && document.getElementById('scriptEditorModal').classList.contains('active')) {
-            window.app.saveDraft();
+            const currentCode = window.app.getCodeEditorContent();
+            const currentNotes = document.getElementById('updateNotes').value;
+            
+            // Compare with original content
+            const codeChanged = currentCode !== window.app.originalScriptContent;
+            const notesChanged = currentNotes !== (window.app.originalNotesContent || '');
+            
+            if (codeChanged || notesChanged) {
+                // Browser will show its own dialog, we just need to return a value
+                e.preventDefault();
+                e.returnValue = 'You have unsaved changes in the script editor.';
+                return e.returnValue;
+            }
         }
         
         // Note: We don't terminate handshake on unload as user might just be refreshing

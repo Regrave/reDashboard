@@ -735,6 +735,10 @@ Object.assign(app, {
                 .replace(/\\"/g, '"')
                 .replace(/\\'/g, "'");
         }
+        
+        // Store the original content for change detection
+        this.originalScriptContent = sourceCode;
+        this.originalNotesContent = draft ? draft.notes : '';
 
         // Set content and apply syntax highlighting
         const codeEditor = document.getElementById('scriptCodeEditor');
@@ -916,24 +920,12 @@ Object.assign(app, {
             return; // Already attached
         }
 
-        // Auto-save draft as user types
-        const draftSave = () => {
-            this.saveDraft();
-        };
-
-        // Debounced draft saving  
-        const debouncedDraftSave = () => {
-            clearTimeout(this.scriptEditorDraftTimeout);
-            this.scriptEditorDraftTimeout = setTimeout(draftSave, 1000);
-        };
-
-        // Use 'input' event for contenteditable
-        codeEditor.addEventListener('input', debouncedDraftSave);
+        // Remove auto-save draft functionality - we'll ask the user instead
+        // Just track changes for the character counter
         updateNotes.addEventListener('input', (e) => {
             // Ensure the event isn't being prevented
             e.stopPropagation();
             this.updateNotesCharCounter();
-            debouncedDraftSave();
         });
 
         // Enhanced code editor features
@@ -944,6 +936,15 @@ Object.assign(app, {
     },
 
     setupCodeEditorFeatures(editor) {
+        // Check if features are already set up to prevent duplicate listeners
+        if (editor.dataset.featuresSetup === 'true') {
+            console.log('Code editor features already set up, skipping');
+            return;
+        }
+        
+        // Mark that features have been set up
+        editor.dataset.featuresSetup = 'true';
+        
         // Simple input handler - highlight after typing stops
         let typingTimer;
         let isHighlighting = false;
@@ -1150,6 +1151,15 @@ Object.assign(app, {
             this.updateSaveIndicator('saved');
             this.showMessage(`Script "${this.currentEditingScript.name}" updated successfully!`, 'success');
 
+            // Update the current editing script with the saved content
+            this.currentEditingScript.script = code;
+            this.currentEditingScript.source = code;
+            this.currentEditingScript.content = code;
+            
+            // Update the original content to reflect what was just saved
+            this.originalScriptContent = code;
+            this.originalNotesContent = '';
+
             // Clear draft after successful save
             this.clearDraft(this.currentEditingScript.id);
 
@@ -1167,12 +1177,30 @@ Object.assign(app, {
     },
 
     closeScriptEditor() {
-        // Ask about unsaved changes if there's content
-        const code = this.getCodeEditorContent();
-        const notes = document.getElementById('updateNotes').value;
-
-        if ((code.trim() || notes.trim()) && !confirm('You have unsaved changes. Are you sure you want to close the editor?')) {
-            return;
+        // Check for unsaved changes using the stored original content
+        const currentCode = this.getCodeEditorContent();
+        const currentNotes = document.getElementById('updateNotes').value;
+        
+        // Normalize content for comparison (trim whitespace and normalize line endings)
+        const normalizeContent = (content) => {
+            if (!content) return '';
+            return content.replace(/\r\n/g, '\n').replace(/\r/g, '\n').trim();
+        };
+        
+        // Compare normalized content
+        const codeChanged = normalizeContent(currentCode) !== normalizeContent(this.originalScriptContent);
+        const notesChanged = currentNotes.trim() !== (this.originalNotesContent || '').trim();
+        const hasChanges = codeChanged || notesChanged;
+        
+        if (hasChanges) {
+            // Ask user what to do with changes
+            const result = confirm('You have unsaved changes.\n\nClick OK to save as draft, or Cancel to discard changes.');
+            
+            if (result) {
+                // User wants to save draft
+                this.saveDraft();
+                this.showMessage('Draft saved successfully', 'success');
+            }
         }
 
         // Clear state
@@ -1183,12 +1211,13 @@ Object.assign(app, {
         // Hide modal
         document.getElementById('scriptEditorModal').classList.remove('active');
 
-        // Clear editor content
+        // Clear editor content and reset features flag
         const codeEditor = document.getElementById('scriptCodeEditor');
         if (codeEditor) {
             codeEditor.className = 'code-editor';
             codeEditor.innerHTML = '';
             codeEditor.removeAttribute('data-highlighted');
+            codeEditor.dataset.featuresSetup = 'false'; // Reset the features setup flag
         }
         document.getElementById('updateNotes').value = '';
         this.hideDraftIndicator();
@@ -2080,6 +2109,9 @@ Object.assign(app, {
         const hasRange = metadata && metadata.range;
         const hasMultiselect = metadata && metadata.multiselect;
         const hasDescription = metadata && metadata.description;
+        
+        // Check if this is an array-like string
+        const isArrayString = this.isArrayString(value);
 
         let fieldHTML = `<div class="config-field horizontal-layout" ${requiresAttribute} style="border: 1px solid #333; border-radius: 6px; padding: 12px; margin-bottom: 12px; background: rgba(255, 255, 255, 0.02); ${isVisible ? '' : 'display: none;'}">`;
 
@@ -2219,6 +2251,46 @@ Object.assign(app, {
             });
             
             fieldHTML += `</select>`;
+        } else if (isArrayString) {
+            // Handle array-like strings with a custom editor
+            const arrayItems = this.parseArrayString(value);
+            fieldHTML += `
+                <div class="array-editor">
+                    <div class="array-items" id="${fieldId}_items" style="display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px;">
+            `;
+            
+            if (arrayItems.length > 0) {
+                arrayItems.forEach((item, index) => {
+                    fieldHTML += `
+                        <div class="array-item" style="display: flex; gap: 4px; align-items: center;">
+                            <input type="text" 
+                                value="${item.replace(/"/g, '&quot;')}" 
+                                style="flex: 1; padding: 4px 8px; background: #2a2a2a; border: 1px solid #555; border-radius: 4px; color: #fff;"
+                                onchange="app.updateArrayItem('${key}', ${index}, this.value)">
+                            <button onclick="app.removeArrayItem('${key}', ${index})" 
+                                style="padding: 4px 8px; background: #ff4444; border: none; border-radius: 4px; color: white; cursor: pointer;"
+                                title="Remove item">×</button>
+                        </div>
+                    `;
+                });
+            } else {
+                fieldHTML += `<div style="color: #888; font-style: italic; padding: 4px;">Empty array</div>`;
+            }
+            
+            fieldHTML += `
+                    </div>
+                    <div class="array-add" style="display: flex; gap: 4px;">
+                        <input type="text" 
+                            id="${fieldId}_new" 
+                            placeholder="Add new item..."
+                            style="flex: 1; padding: 4px 8px; background: #2a2a2a; border: 1px solid #555; border-radius: 4px; color: #fff;"
+                            onkeypress="if(event.key==='Enter') app.addArrayItem('${key}')">
+                        <button onclick="app.addArrayItem('${key}')" 
+                            style="padding: 4px 12px; background: linear-gradient(135deg, #4aff4a, #357abd); border: none; border-radius: 4px; color: white; cursor: pointer;"
+                            title="Add item">+</button>
+                    </div>
+                </div>
+            `;
         } else {
             // Regular text input - display the actual value without quotes
             const displayValue = value;
@@ -2245,6 +2317,127 @@ Object.assign(app, {
         
         // Everything else is treated as text input to allow any value
         return 'text';
+    },
+    
+    isArrayString(value) {
+        // Check if a value looks like a JSON array string
+        if (typeof value !== 'string') return false;
+        const trimmed = value.trim();
+        return trimmed.startsWith('[') && trimmed.endsWith(']');
+    },
+    
+    parseArrayString(value) {
+        // Parse a JSON array string into an array of items
+        if (!this.isArrayString(value)) return [];
+        
+        try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+                return parsed.map(item => String(item));
+            }
+        } catch (e) {
+            // If JSON parse fails, try to extract items manually
+            const trimmed = value.trim();
+            const inner = trimmed.slice(1, -1).trim();
+            if (!inner) return [];
+            
+            // Handle quoted strings with commas
+            const items = [];
+            let current = '';
+            let inQuotes = false;
+            let quoteChar = null;
+            
+            for (let i = 0; i < inner.length; i++) {
+                const char = inner[i];
+                const nextChar = inner[i + 1];
+                
+                if (!inQuotes && (char === '"' || char === "'")) {
+                    inQuotes = true;
+                    quoteChar = char;
+                } else if (inQuotes && char === quoteChar && inner[i - 1] !== '\\') {
+                    inQuotes = false;
+                    quoteChar = null;
+                } else if (!inQuotes && char === ',') {
+                    const item = current.trim();
+                    if (item) {
+                        // Remove surrounding quotes if present
+                        if ((item.startsWith('"') && item.endsWith('"')) || 
+                            (item.startsWith("'") && item.endsWith("'"))) {
+                            items.push(item.slice(1, -1));
+                        } else {
+                            items.push(item);
+                        }
+                    }
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            // Add the last item
+            const item = current.trim();
+            if (item) {
+                if ((item.startsWith('"') && item.endsWith('"')) || 
+                    (item.startsWith("'") && item.endsWith("'"))) {
+                    items.push(item.slice(1, -1));
+                } else {
+                    items.push(item);
+                }
+            }
+            
+            return items;
+        }
+        
+        return [];
+    },
+    
+    updateArrayItem(key, index, newValue) {
+        const fieldId = `config_${key}`.replace(/\./g, '_');
+        const currentValue = this.currentScriptConfig[key];
+        const items = this.parseArrayString(currentValue);
+        
+        if (index >= 0 && index < items.length) {
+            items[index] = newValue;
+            const newArrayString = JSON.stringify(items);
+            this.updateConfigValue(key, newArrayString);
+            
+            // Refresh the display
+            this.renderConfigForm();
+        }
+    },
+    
+    removeArrayItem(key, index) {
+        const currentValue = this.currentScriptConfig[key];
+        const items = this.parseArrayString(currentValue);
+        
+        if (index >= 0 && index < items.length) {
+            items.splice(index, 1);
+            const newArrayString = JSON.stringify(items);
+            this.updateConfigValue(key, newArrayString);
+            
+            // Refresh the display
+            this.renderConfigForm();
+        }
+    },
+    
+    addArrayItem(key) {
+        const fieldId = `config_${key}`.replace(/\./g, '_');
+        const newItemInput = document.getElementById(`${fieldId}_new`);
+        
+        if (newItemInput && newItemInput.value.trim()) {
+            const currentValue = this.currentScriptConfig[key];
+            const items = this.parseArrayString(currentValue);
+            items.push(newItemInput.value.trim());
+            
+            const newArrayString = JSON.stringify(items);
+            this.updateConfigValue(key, newArrayString);
+            
+            // Clear the input
+            newItemInput.value = '';
+            
+            // Refresh the display
+            this.renderConfigForm();
+        }
     },
 
     toggleMultiselectDropdown(fieldId) {

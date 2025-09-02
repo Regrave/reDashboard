@@ -2968,7 +2968,10 @@ Object.assign(app, {
             28: "Seven of Wands represents perseverance and defense. Unlocked for being a member for at least 7 years (FC2.5/Omega only).",
             29: "Eight of Wands represents momentum and progress. Unlocked for being a member for at least 8 years (FC2.5/Omega only).",
             30: "Nine of Wands represents resilience and inner strength. Unlocked for being a member for at least 9 years (FC2.5/Omega only).",
-            31: "Ten of Wands represents burdens and responsibility. Unlocked for being a member for at least 10 years (FC2.5/Omega only)."
+            31: "Ten of Wands represents burdens and responsibility. Unlocked for being a member for at least 10 years (FC2.5/Omega only).",
+            32: "The Page of Wands represents pursuit and adventure. Unlocked for having a Session older than 30 days.",
+            33: "The Knight of Wands generally signifies action and go-getter energy. Unlocked for having over 100 successful Humanizer4 operations in a single Omega launch.",
+            34: "The Queen of Wands is said by some to represent one's basic instinct. Her strength and task are providing initial inputs. Unlocked for being a Translator."
         };
         
         // Generate descriptions for additional achievements
