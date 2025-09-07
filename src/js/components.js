@@ -1184,11 +1184,7 @@ Object.assign(app, {
 
             let buttonHTML = '';
             if (isOwned) {
-                buttonHTML = `
-                    <div style="color: #4aff4a; font-size: 12px; text-align: center; font-weight: 600;">
-                        ✅ ACTIVE
-                    </div>
-                `;
+                buttonHTML = '';
             } else if (!isPurchasable) {
                 buttonHTML = `
                     <div style="color: #888; font-size: 12px; text-align: center; font-weight: 600;">
@@ -1276,7 +1272,7 @@ Object.assign(app, {
         const perk = this.allPerks.find(p => p.id === perkId);
         if (!perk) return;
 
-        if (!confirm(`Are you sure you want to buy "${perk.name}" for ${perk.cost} perk point${perk.cost !== 1 ? 's' : ''}?`)) {
+        if (!confirm(`Are you sure you want to buy "${perk.name}" for 1 perk point?`)) {
             return;
         }
 
@@ -1285,6 +1281,8 @@ Object.assign(app, {
                 id: perkId
             });
             this.showMessage(`Successfully purchased "${perk.name}"!`, 'success');
+            // Reload member data to get updated perks list
+            await this.loadMemberInfo();
             await this.loadPerks();
         } catch (error) {
             console.error('Error buying perk:', error);
@@ -1460,6 +1458,47 @@ Object.assign(app, {
         }
     },
 
+    getBuildCategories(build) {
+        const scriptIds = JSON.parse(build.scripts || '[]');
+        const categories = new Set();
+        
+        // Filter out library and system scripts like we do in build details
+        const systemScripts = new Set([
+            'achievements.lua', 'anticheat.lua', 'constelia.lua', 'io.lua', 
+            'net.lua', 'os.lua', 'parallax.lua', 'sync.lua', 'system.lua', 
+            'truobleshooter.lua', 'whitelist.lua', 'who.lua', 'workspace.lua'
+        ]);
+        
+        // Filter out unimportant categories (including Uncategorized)
+        const unimportantCategories = new Set([
+            'Aurora2 Supported', 'CLI', 'CS2', 'CSS', 'Configuration Management',
+            'Constelia', 'Dependency / Library', 'FC2T', 'GUI', 'Source Engine Exclusive', 
+            'TF2', 'Uncategorized'
+        ]);
+        
+        scriptIds.forEach(id => {
+            const script = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
+            if (script) {
+                // Skip library scripts and system scripts
+                if (script.name.toLowerCase().startsWith('lib_') || 
+                    systemScripts.has(script.name.toLowerCase())) {
+                    return;
+                }
+                
+                // Add categories from this script, filtering out unimportant ones
+                if (script.category_names && script.category_names.length > 0) {
+                    script.category_names.forEach(cat => {
+                        if (!unimportantCategories.has(cat)) {
+                            categories.add(cat);
+                        }
+                    });
+                }
+            }
+        });
+        
+        return Array.from(categories).sort();
+    },
+
     displayMyBuilds() {
         const container = document.getElementById('myBuildsGrid');
 
@@ -1470,8 +1509,10 @@ Object.assign(app, {
 
         container.innerHTML = this.myBuilds.map(build => {
             const scriptIds = JSON.parse(build.scripts || '[]');
-            const projectIds = JSON.parse(build.projects || '[]');
             const isPrivate = build.private === 1;
+            const categories = this.getBuildCategories(build);
+            const categoryTags = categories.length > 0 ? 
+                categories.map(cat => `<span class="category-badge">${cat}</span>`).join('') : '';
 
             return `
                 <div class="script-card compact owned" 
@@ -1491,9 +1532,9 @@ Object.assign(app, {
                             </div>
                             <div class="script-meta">
                                 <span>${scriptIds.length} script${scriptIds.length !== 1 ? 's' : ''}</span>
-                                <span>${projectIds.length} project${projectIds.length !== 1 ? 's' : ''}</span>
                                 ${build.configuration ? '<span>✅ Config</span>' : '<span>❌ No Config</span>'}
                             </div>
+                            ${categoryTags ? `<div class="script-meta" style="flex-wrap: wrap; gap: 4px;">${categoryTags}</div>` : ''}
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 8px; align-items: center;">
                             <button class="btn btn-small" onclick="app.previewBuild('${build.tag}')" title="Apply this build">
@@ -1520,9 +1561,11 @@ Object.assign(app, {
 
         container.innerHTML = availableBuilds.map(build => {
             const scriptIds = JSON.parse(build.scripts || '[]');
-            const projectIds = JSON.parse(build.projects || '[]');
             const isOwned = build.author === this.memberData.username;
             const isPrivate = build.private === 1;
+            const categories = this.getBuildCategories(build);
+            const categoryTags = categories.length > 0 ? 
+                categories.map(cat => `<span class="category-badge">${cat}</span>`).join('') : '';
 
             return `
                 <div class="script-card ${isOwned ? 'owned' : ''}" 
@@ -1543,12 +1586,17 @@ Object.assign(app, {
                             </div>
                             <div class="script-meta">
                                 <span>${scriptIds.length} script${scriptIds.length !== 1 ? 's' : ''}</span>
-                                <span>${projectIds.length} project${projectIds.length !== 1 ? 's' : ''}</span>
                                 ${build.configuration ? '<span style="color: #4aff4a;">✅ Config</span>' : '<span style="color: #888;">❌ No Config</span>'}
                             </div>
-                            <button class="btn btn-small" onclick="app.showBuildDetails('${build.tag}')" style="margin-top: 8px; font-size: 12px; padding: 4px 8px;">
-                                🔍 Inspect Build
-                            </button>
+                            ${categoryTags ? `<div class="script-meta" style="flex-wrap: wrap; gap: 4px;">${categoryTags}</div>` : ''}
+                            <div style="display: flex; gap: 6px; margin-top: 8px;">
+                                <button class="btn btn-small" onclick="app.showBuildDetails('${build.tag}')" style="font-size: 12px; padding: 4px 8px;">
+                                    🔍 Inspect Build
+                                </button>
+                                ${build.configuration ? `<button class="btn btn-small" onclick="app.showRawBuildConfig('${build.tag}')" style="font-size: 12px; padding: 4px 8px; background: rgba(255, 140, 0, 0.2); border-color: rgba(255, 140, 0, 0.3);" title="View raw JSON configuration">
+                                    📄 Raw JSON
+                                </button>` : ''}
+                            </div>
                         </div>
                         <div style="display: flex; gap: 8px; align-items: center;">
                             <button class="btn btn-small" onclick="app.previewBuild('${build.tag}')" title="Apply this build">
