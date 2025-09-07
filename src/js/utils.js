@@ -1411,15 +1411,11 @@ Object.assign(app, {
 
         // Get build data
         const buildScripts = JSON.parse(build.scripts || '[]');
-        const buildProjects = JSON.parse(build.projects || '[]');
         const currentScripts = this.memberScripts.map(s => s.id);
-        const currentProjects = this.memberProjects.map(p => p.id);
 
         // Calculate differences
         const scriptsToAdd = buildScripts.filter(id => !currentScripts.includes(id));
         const scriptsToRemove = currentScripts.filter(id => !buildScripts.includes(id));
-        const projectsToAdd = buildProjects.filter(id => !currentProjects.includes(id));
-        const projectsToRemove = currentProjects.filter(id => !buildProjects.includes(id));
 
         let changesHTML = '';
 
@@ -1463,45 +1459,6 @@ Object.assign(app, {
             changesHTML += '</div>';
         }
 
-        // Project changes
-        if (projectsToAdd.length > 0 || projectsToRemove.length > 0) {
-            changesHTML += `
-                <div style="margin-bottom: 20px;">
-                    <h4 style="color: #4a9eff; margin-bottom: 10px;">👥 Project Changes</h4>
-            `;
-
-            if (projectsToAdd.length > 0) {
-                changesHTML += `
-                    <div style="margin-bottom: 10px;">
-                        <strong style="color: #4aff4a;">Projects to Enable (${projectsToAdd.length}):</strong>
-                        <div style="margin-top: 5px;">
-                            ${projectsToAdd.map(id => {
-                                const project = this.allProjects.find(p => p.id == id || p.id === String(id) || p.id === Number(id));
-                                const projectName = project ? project.name : `Unknown Project (ID: ${id})`;
-                                return `<span style="background: rgba(74, 255, 74, 0.2); color: #4aff4a; padding: 4px 8px; border-radius: 6px; font-size: 12px; border: 1px solid rgba(74, 255, 74, 0.4);">${projectName}</span>`;
-                            }).join('')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            if (projectsToRemove.length > 0) {
-                changesHTML += `
-                    <div style="margin-bottom: 10px;">
-                        <strong style="color: #ff6666;">Projects to Disable (${projectsToRemove.length}):</strong>
-                        <div style="margin-top: 5px;">
-                            ${projectsToRemove.map(id => {
-                                const project = this.allProjects.find(p => p.id === id);
-                                const projectName = project ? project.name : `Unknown Project (ID: ${id})`;
-                                return `<span style="color: #ff6666; font-size: 12px; background: rgba(255, 102, 102, 0.2); padding: 2px 6px; border-radius: 8px; margin: 2px;">${projectName}</span>`;
-                            }).join(' ')}
-                        </div>
-                    </div>
-                `;
-            }
-
-            changesHTML += '</div>';
-        }
 
         // Configuration changes
         if (build.configuration) {
@@ -1542,13 +1499,6 @@ Object.assign(app, {
                 });
             }
 
-            // Apply projects
-            const buildProjects = JSON.parse(build.projects || '[]');
-            if (buildProjects.length > 0) {
-                await this.apiCall('setMemberProjects', {
-                    projects: JSON.stringify(buildProjects)
-                });
-            }
 
             // Apply configuration
             if (build.configuration) {
@@ -1563,7 +1513,6 @@ Object.assign(app, {
             // Refresh data
             await this.loadMemberInfo();
             await this.loadAllScripts();
-            await this.loadAllProjects();
             await this.loadConfiguration();
 
         } catch (error) {
@@ -1640,29 +1589,143 @@ Object.assign(app, {
             });
         }
         
-        // Build the script cards HTML
-        const scriptCards = Array.from(allScriptNames).map(scriptName => {
+        // Filter out library scripts and default system scripts
+        const systemScripts = new Set([
+            'achievements.lua', 'anticheat.lua', 'constelia.lua', 'io.lua', 
+            'net.lua', 'os.lua', 'parallax.lua', 'sync.lua', 'system.lua', 
+            'truobleshooter.lua', 'whitelist.lua', 'who.lua', 'workspace.lua'
+        ]);
+        
+        // Categories that should not appear in build tags but can be used as fallback sections
+        const hiddenCategories = new Set([
+            'Aurora2 Supported', 'CLI', 'CS2', 'CSS', 'Configuration Management',
+            'Constelia', 'Dependency / Library', 'FC2T', 'GUI', 'Source Engine Exclusive', 'TF2'
+        ]);
+        
+        const filteredScriptNames = Array.from(allScriptNames).filter(scriptName => {
+            // Filter out library scripts (start with "lib_")
+            if (scriptName.toLowerCase().startsWith('lib_')) {
+                return false;
+            }
+            // Filter out system scripts
+            if (systemScripts.has(scriptName.toLowerCase())) {
+                return false;
+            }
+            return true;
+        });
+        
+        // Group scripts by category
+        const scriptsByCategory = new Map();
+        const buildCategories = new Set(); // Collect all categories for build tagging
+        
+        filteredScriptNames.forEach(scriptName => {
             const script = this.allScripts.find(s => s.name === scriptName);
-            const scriptId = script ? script.id : null;
-            const isNewScript = scriptId ? !currentScripts.includes(String(scriptId)) : false;
+            const allCategories = script?.category_names || [];
             
-            // Get script config from build if available
-            const scriptConfig = buildConfig?.omega?.[scriptName] || null;
-            const hasConfig = scriptConfig && Object.keys(scriptConfig).length > 0;
+            // Separate meaningful categories from hidden ones
+            const meaningfulCategories = allCategories.filter(cat => !hiddenCategories.has(cat));
+            const hiddenCategoriesFound = allCategories.filter(cat => hiddenCategories.has(cat));
             
-            const newBadge = isNewScript ? '<div style="position: absolute; top: -8px; right: -8px; background: #4aff4a; color: #000; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: bold; box-shadow: 0 2px 8px rgba(74, 255, 74, 0.3);">NEW</div>' : '';
+            let finalCategories;
+            let primaryCategory;
             
-            const isDefaultScript = !script; // No script found means it's a default script
-            const configInfo = hasConfig ? 
-                '<div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1);"><span style="color: #4a9eff; font-size: 12px;">⚙️ ' + (isDefaultScript ? 'Configured' : 'Has custom config') + '</span><span style="color: #666; font-size: 11px;">Click to view</span></div>' :
-                '<div style="color: #666; font-size: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1);">✨ Default settings</div>';
+            if (meaningfulCategories.length > 0) {
+                // Has meaningful categories - use them and add to build tags
+                finalCategories = meaningfulCategories;
+                primaryCategory = meaningfulCategories[0];
+                
+                // Add meaningful categories to build categories set
+                meaningfulCategories.forEach(cat => buildCategories.add(cat));
+                
+            } else if (hiddenCategoriesFound.length > 0) {
+                // Only has hidden categories - use them as fallback but don't add to build tags
+                finalCategories = hiddenCategoriesFound;
+                primaryCategory = hiddenCategoriesFound[0];
+                
+            } else {
+                // Truly has no categories
+                finalCategories = ['Uncategorized'];
+                primaryCategory = 'Uncategorized';
+            }
             
-            const clickHandler = hasConfig ? ' onclick="app.showScriptConfig(\'' + scriptName.replace(/'/g, "\\'") + '\', \'' + build.tag.replace(/'/g, "\\'") + '\')" onmouseover="this.style.background=\'rgba(74, 158, 255, 0.08)\'; this.style.borderColor=\'rgba(74, 158, 255, 0.3)\'" onmouseout="this.style.background=\'rgba(255, 255, 255, 0.03)\'; this.style.borderColor=\'rgba(255, 255, 255, 0.1)\'"' : '';
-            
-            return '<div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 16px; position: relative; transition: all 0.2s; cursor: ' + (hasConfig ? 'pointer' : 'default') + ';"' + clickHandler + '>' + newBadge + '<div style="color: #fff; font-weight: 600; font-size: 16px; margin-bottom: 8px;">' + scriptName + '</div>' + configInfo + '</div>';
-        }).join('');
+            // Group script by its primary category
+            if (!scriptsByCategory.has(primaryCategory)) {
+                scriptsByCategory.set(primaryCategory, []);
+            }
+            scriptsByCategory.get(primaryCategory).push({
+                name: scriptName,
+                script: script,
+                categories: finalCategories
+            });
+        });
 
-        let detailsHTML = '<div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; padding: 20px 0;">' + scriptCards + '</div>';
+        // Build HTML with categorized sections
+        let detailsHTML = '';
+        
+        // Add build category tags at the top
+        if (buildCategories.size > 0) {
+            const categoryTags = Array.from(buildCategories).map(category => 
+                `<span class="category-badge">${category}</span>`
+            ).join('');
+            detailsHTML += `
+                <div style="margin-bottom: 20px; padding: 16px; background: rgba(255, 255, 255, 0.02); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.05);">
+                    <h4 style="color: #4a9eff; margin: 0 0 12px 0; font-size: 14px;">📦 Build Categories</h4>
+                    <div style="display: flex; flex-wrap: wrap; gap: 8px;">${categoryTags}</div>
+                </div>
+            `;
+        }
+
+        // Sort categories with priority: meaningful first, then hidden, then uncategorized
+        const allCategories = Array.from(scriptsByCategory.keys());
+        const meaningfulCats = allCategories.filter(cat => !hiddenCategories.has(cat) && cat !== 'Uncategorized').sort();
+        const hiddenCats = allCategories.filter(cat => hiddenCategories.has(cat)).sort();
+        const uncategorized = allCategories.filter(cat => cat === 'Uncategorized');
+        
+        const sortedCategories = [...meaningfulCats, ...hiddenCats, ...uncategorized];
+        
+        sortedCategories.forEach(category => {
+            const scripts = scriptsByCategory.get(category);
+            
+            detailsHTML += `
+                <div style="margin-bottom: 24px;">
+                    <h4 style="color: #4a9eff; margin: 0 0 16px 0; display: flex; align-items: center; gap: 8px; font-size: 16px; border-bottom: 1px solid rgba(74, 158, 255, 0.2); padding-bottom: 8px;">
+                        📁 ${category} <span style="color: #666; font-size: 12px; font-weight: normal;">(${scripts.length})</span>
+                    </h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 16px;">
+            `;
+            
+            scripts.forEach(({ name: scriptName, script, categories }) => {
+                const scriptId = script ? script.id : null;
+                const isNewScript = scriptId ? !currentScripts.includes(String(scriptId)) : false;
+                
+                // Get script config from build if available
+                const scriptConfig = buildConfig?.omega?.[scriptName] || null;
+                const hasConfig = scriptConfig && Object.keys(scriptConfig).length > 0;
+                
+                const newBadge = isNewScript ? '<div style="position: absolute; top: -8px; right: -8px; background: #4aff4a; color: #000; font-size: 11px; padding: 3px 8px; border-radius: 12px; font-weight: bold; box-shadow: 0 2px 8px rgba(74, 255, 74, 0.3);">NEW</div>' : '';
+                
+                const isDefaultScript = !script; // No script found means it's a default script
+                
+                // Show all categories below the script name
+                const allCategoryBadges = categories.length > 0 ? 
+                    '<div style="display: flex; flex-wrap: wrap; gap: 4px; margin-top: 8px;">' + 
+                    categories.map(cat => `<span class="category-badge" style="font-size: 10px;">${cat}</span>`).join('') + 
+                    '</div>' : '';
+                
+                const configInfo = hasConfig ? 
+                    '<div style="display: flex; align-items: center; gap: 8px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1);"><span style="color: #4a9eff; font-size: 12px;">⚙️ ' + (isDefaultScript ? 'Configured' : 'Has custom config') + '</span><span style="color: #666; font-size: 11px;">Click to view</span></div>' :
+                    '<div style="color: #666; font-size: 12px; margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.1);">✨ Default settings</div>';
+                
+                const clickHandler = hasConfig ? ' onclick="app.showScriptConfig(\'' + scriptName.replace(/'/g, "\\'") + '\', \'' + build.tag.replace(/'/g, "\\'") + '\')" onmouseover="this.style.background=\'rgba(74, 158, 255, 0.08)\'; this.style.borderColor=\'rgba(74, 158, 255, 0.3)\'" onmouseout="this.style.background=\'rgba(255, 255, 255, 0.03)\'; this.style.borderColor=\'rgba(255, 255, 255, 0.1)\'"' : '';
+                
+                detailsHTML += '<div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 16px; position: relative; transition: all 0.2s; cursor: ' + (hasConfig ? 'pointer' : 'default') + ';"' + clickHandler + '>' + newBadge + '<div style="color: #fff; font-weight: 600; font-size: 16px; margin-bottom: 8px;">' + scriptName + '</div>' + allCategoryBadges + configInfo + '</div>';
+            });
+            
+            detailsHTML += `
+                    </div>
+                </div>
+            `;
+        });
 
         content.innerHTML = detailsHTML;
         modal.classList.add('active');
