@@ -43,7 +43,7 @@
           <button class="roll-button" id="rollButton" onclick="app.rollLoot()"> 🎲 Roll Loot </button>
           <button class="settings-button" id="settingsButton" onclick="app.showSettingsModal()"> ⚙️ Settings </button>
         </div>
-        <h1> fantasy.dashboard <span class="version-badge">v1.7.0</span>
+        <h1> fantasy.dashboard <span class="version-badge">v1.7.2</span>
         </h1>
         <div class="login-section" id="loginSection">
           <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your Constelia API key...">
@@ -297,7 +297,9 @@
             <h2>🎨 Artist Perk - Forum Background</h2>
             <div style="margin-bottom: 20px;">
               <p style="color: #aaa; margin-bottom: 15px;">Set a custom background image for your forum profile</p>
-              <input type="text" id="forumBackgroundUrl" placeholder="Enter image URL (max 256 characters)" class="input-field" style="width: 100%; margin-bottom: 15px;">
+              <input type="text" id="forumBackgroundUrl" placeholder="Enter image URL (max 256 characters)" class="input-field" style="width: 100%; margin-bottom: 15px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; padding: 12px 16px; font-size: 14px; transition: all 0.3s ease; outline: none;" 
+                     onfocus="this.style.borderColor='#4CAF50'; this.style.background='rgba(0, 0, 0, 0.5)'" 
+                     onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.background='rgba(0, 0, 0, 0.3)'">
               <div style="display: flex; gap: 10px;">
                 <button class="btn" onclick="app.setForumBackground()">🎨 Set Background</button>
                 <button class="btn btn-secondary" onclick="app.clearForumBackground()">🗑️ Clear Background</button>
@@ -481,7 +483,7 @@
       <span style="color: #ff6b6b; font-size: 14px; margin: 0 3px;">♡</span>
       <span style="opacity: 0.7;">by</span>
       <a href="https://constelia.ai/forums/index.php?members/rucka.17146/" target="_blank" style="color: #4a9eff; font-weight: 600; margin-left: 4px; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.color='#6bb6ff'; this.style.textDecoration='underline';" onmouseout="this.style.color='#4a9eff'; this.style.textDecoration='none';">Rucka</a>
-      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.7.0</span>
+      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.7.2</span>
     </div>
     <!-- Bottom-Right Notification Container -->
     <div class="notification-container" id="notificationContainer">
@@ -639,14 +641,14 @@
       </div>
     </div>
     <!-- Build Details Modal -->
-    <div class="script-editor-modal" id="buildDetailsModal">
-      <div class="script-editor-content">
+    <div class="script-editor-modal" id="buildDetailsModal" onclick="app.closeBuildDetails()">
+      <div class="script-editor-content" onclick="event.stopPropagation()">
         <div class="script-editor-header">
           <div class="script-editor-title"> 🔍 Build Details <span id="buildDetailsTitle">Loading...</span>
           </div>
           <div class="script-editor-actions">
             <button class="btn" onclick="app.applyBuildFromDetails()" id="applyFromDetailsBtn"> 🚀 Apply Build </button>
-            <button class="script-editor-close" onclick="app.closeBuildDetails()"> ✕ Close </button>
+            <button class="script-editor-close" onclick="app.closeBuildDetails()"> ✕ </button>
           </div>
         </div>
         <div class="script-editor-body">

@@ -431,12 +431,25 @@ Object.assign(app, {
         }
 
         try {
+            // Reset configuration on server
             await this.apiCall('resetConfiguration');
-            this.showMessage('Configuration reset successfully!', 'success');
+            
+            // Reload the configuration to get the reset values
             await this.loadConfiguration();
+            
+            // Now save the reset configuration with push to omega
+            const configText = document.getElementById('configDisplay').textContent;
+            await this.apiPost('setConfiguration', {
+                needs_update: ''  // This flag pushes to omega
+            }, {
+                value: configText
+            });
+            
+            this.showMessage('Configuration reset successfully! 🚀 Pushed to Omega!', 'success');
 
         } catch (error) {
             console.error('Error resetting configuration:', error);
+            this.showMessage('Failed to reset configuration', 'error');
         }
     },
 
