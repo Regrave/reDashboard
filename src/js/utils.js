@@ -1268,8 +1268,31 @@ Object.assign(app, {
 
         // Extract the message from the API response
         let statusMessage = 'Unknown status';
-        if (typeof this.venusStatus === 'object' && this.venusStatus.message) {
-            statusMessage = this.venusStatus.message;
+        if (typeof this.venusStatus === 'object') {
+            // Handle the specific Venus API response format
+            if (this.venusStatus.partner !== undefined) {
+                const partner = this.venusStatus.partner;
+                const timeYouBonded = this.venusStatus.time_you_bonded;
+                const timeTheyBonded = this.venusStatus.time_they_bonded;
+                const hasRing = this.venusStatus.special_ring_of_venus_perk;
+                
+                if (!partner || partner === '') {
+                    statusMessage = "You're currently not partnered with anyone. Use the Request Partnership button to send a partnership request!";
+                } else if (timeYouBonded > 0 || timeTheyBonded > 0) {
+                    // If either timestamp is set, they are bonded
+                    const bondTimestamp = timeYouBonded > 0 ? timeYouBonded : timeTheyBonded;
+                    const bondedDate = new Date(bondTimestamp * 1000);
+                    statusMessage = `💕 You're partnered with ${partner}! Bonded since ${bondedDate.toLocaleDateString()}`;
+                    if (hasRing) {
+                        statusMessage += ' 💍';
+                    }
+                } else {
+                    // Both timestamps are 0 - this might be a pending request
+                    statusMessage = `Partnership status with ${partner} is pending...`;
+                }
+            } else if (this.venusStatus.message) {
+                statusMessage = this.venusStatus.message;
+            }
         } else if (typeof this.venusStatus === 'string') {
             statusMessage = this.venusStatus;
         }

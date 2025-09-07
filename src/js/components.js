@@ -1184,11 +1184,7 @@ Object.assign(app, {
 
             let buttonHTML = '';
             if (isOwned) {
-                buttonHTML = `
-                    <div style="color: #4aff4a; font-size: 12px; text-align: center; font-weight: 600;">
-                        ✅ ACTIVE
-                    </div>
-                `;
+                buttonHTML = '';
             } else if (!isPurchasable) {
                 buttonHTML = `
                     <div style="color: #888; font-size: 12px; text-align: center; font-weight: 600;">
@@ -1276,7 +1272,7 @@ Object.assign(app, {
         const perk = this.allPerks.find(p => p.id === perkId);
         if (!perk) return;
 
-        if (!confirm(`Are you sure you want to buy "${perk.name}" for ${perk.cost} perk point${perk.cost !== 1 ? 's' : ''}?`)) {
+        if (!confirm(`Are you sure you want to buy "${perk.name}" for 1 perk point?`)) {
             return;
         }
 
@@ -1285,6 +1281,8 @@ Object.assign(app, {
                 id: perkId
             });
             this.showMessage(`Successfully purchased "${perk.name}"!`, 'success');
+            // Reload member data to get updated perks list
+            await this.loadMemberInfo();
             await this.loadPerks();
         } catch (error) {
             console.error('Error buying perk:', error);
