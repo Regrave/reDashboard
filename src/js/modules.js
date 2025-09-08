@@ -369,6 +369,9 @@ Object.assign(app, {
             // Update software dropdown after loading configuration
             this.populateSoftwareDropdown();
             this.loadAutoSavePreference();
+            
+            // Check for missing config options
+            this.checkAndShowConfigSyncButton();
 
 
         } catch (error) {
@@ -385,6 +388,9 @@ Object.assign(app, {
             
             this.populateSoftwareDropdown();
             this.loadAutoSavePreference();
+            
+            // Check for missing config options even with empty config
+            this.checkAndShowConfigSyncButton();
             
             this.showMessage('Failed to load configuration. Using empty configuration.', 'error');
         }
@@ -1148,7 +1154,10 @@ Object.assign(app, {
         document.getElementById(`${tabName}-section`).classList.add('active');
 
         // Load data for specific tabs if needed
-        if (tabName === 'perks') {
+        if (tabName === 'config') {
+            // Check for missing configuration options when switching to config tab
+            this.checkAndShowConfigSyncButton();
+        } else if (tabName === 'perks') {
             if (this.allPerks.length === 0) {
                 this.loadPerks();
             } else {

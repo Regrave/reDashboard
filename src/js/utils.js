@@ -1326,9 +1326,14 @@ Object.assign(app, {
         this.showMessage('Venus status refreshed', 'success');
     },
 
-    async requestVenusPartnership() {
-        const partnerName = prompt('Enter the username of the person you want to partner with:');
-        if (!partnerName || !partnerName.trim()) {
+    async requestVenusPartnership(partnerName) {
+        // If called without parameter, show modal
+        if (!partnerName) {
+            this.showVenusPartnershipModal();
+            return;
+        }
+
+        if (!partnerName.trim()) {
             return;
         }
 
@@ -2768,7 +2773,7 @@ Object.assign(app, {
         }
     },
 
-    resetScriptConfig() {
+    async resetScriptConfig() {
         const software = document.getElementById('softwareSelect').value;
 
         if (software === 'bones') {
@@ -2793,9 +2798,28 @@ Object.assign(app, {
             return;
         }
 
+        // Remove the script completely from the main config structure
+        if (this.currentConfig[software] && this.currentConfig[software][scriptKey]) {
+            delete this.currentConfig[software][scriptKey];
+        }
+        
+        // Clear the current script config
         this.currentScriptConfig = {};
-        this.loadScriptConfig();
-        this.showMessage(`Configuration reset for ${scriptKey}!`, 'success');
+        
+        // Update the raw JSON display immediately
+        document.getElementById('configDisplay').textContent = JSON.stringify(this.currentConfig, null, 2);
+        
+        // Save to cloud
+        await this.saveConfiguration();
+        
+        // Reload the script config UI after a short delay, then check for missing options
+        setTimeout(() => {
+            this.loadScriptConfig();
+            // Check for missing options after reset - there probably will be some!
+            this.checkAndShowConfigSyncButton();
+        }, 1000);
+        
+        this.showMessage(`Configuration reset for ${scriptKey}! Check for "Merge Missing Options" button to restore defaults.`, 'success');
     },
 
     // ========================
@@ -4414,5 +4438,510 @@ Object.assign(app, {
         if (badge) {
             badge.classList.remove('active');
         }
+    },
+
+    // ========================
+    // CONFIG SYNC FUNCTIONS
+    // ========================
+
+    getScriptDefaultConfig(scriptSource) {
+        const config = {};
+        const lines = scriptSource.split('\n');
+        
+        let inConfigTable = false;
+        let inFunction = false;
+        let inNestedTable = false;
+        let braceCount = 0;
+        let nestedBraces = 0;
+        let functionDepth = 0;
+        let scriptTableName = '';
+        let foundMainTable = false;
+        
+        // First pass: find the main script table name
+        for (let i = 0; i < lines.length; i++) {
+            const trimmed = lines[i].trim();
+            if (trimmed.startsWith('--')) continue;
+            
+            // Check for single-line table declaration: local name = {
+            const singleLineMatch = trimmed.match(/^(?:local\s+)?(\w+)\s*=\s*{/);
+            if (singleLineMatch) {
+                scriptTableName = singleLineMatch[1];
+                break;
+            }
+            
+            // Check for multi-line table declaration: local name = (followed by { on next line)
+            const multiLineMatch = trimmed.match(/^(?:local\s+)?(\w+)\s*=\s*$/);
+            if (multiLineMatch && i + 1 < lines.length) {
+                const nextLine = lines[i + 1].trim();
+                if (nextLine === '{') {
+                    scriptTableName = multiLineMatch[1];
+                    break;
+                }
+            }
+        }
+        
+        // If no main script table found, this is likely a library script - return empty config
+        if (!scriptTableName) {
+            return config;
+        }
+        
+        // Skip library scripts (lib_*) - they typically don't have user config
+        if (scriptTableName.startsWith('lib_')) {
+            return config;
+        }
+        
+        for (let i = 0; i < lines.length; i++) {
+            const line = lines[i];
+            const trimmed = line.trim();
+            
+            // Skip comments and empty lines
+            if (trimmed.startsWith('--') || trimmed === '') continue;
+            
+            // Track if we're inside a function
+            if (trimmed.includes('function ') && trimmed.includes('(')) {
+                inFunction = true;
+                functionDepth = 0;
+            }
+            
+            if (inFunction) {
+                // Count braces/ends to track function scope
+                if (trimmed.includes('function') || trimmed.includes('if ') || 
+                    trimmed.includes('for ') || trimmed.includes('while ')) {
+                    functionDepth++;
+                }
+                if (trimmed === 'end' || trimmed.startsWith('end ')) {
+                    functionDepth--;
+                    if (functionDepth <= 0) {
+                        inFunction = false;
+                    }
+                }
+                continue; // Skip everything inside functions
+            }
+            
+            // Method 1: Direct assignments like "scriptName.enabled = true" (only outside functions)
+            if (scriptTableName && !inFunction) {
+                const directMatch = trimmed.match(new RegExp(`^${scriptTableName}\\.(\\w+)\\s*=\\s*(.+?)(?:,\\s*(?:--.*)?)?$`));
+                if (directMatch) {
+                    const key = directMatch[1];
+                    let value = directMatch[2].trim();
+                    
+                    // Skip if value is complex
+                    if (value.startsWith('{') || value.includes('function')) {
+                        continue;
+                    }
+                    
+                    const parsedValue = this.parseConfigValue(value);
+                    if (parsedValue !== null) {
+                        config[key] = parsedValue;
+                    }
+                    continue;
+                }
+            }
+            
+            // Method 2: Table definitions (only the main script table)
+            // Single-line: local name = {
+            const singleLineTableMatch = trimmed.match(/^(?:local\s+)?(\w+)\s*=\s*{/);
+            if (singleLineTableMatch && singleLineTableMatch[1] === scriptTableName && !foundMainTable) {
+                inConfigTable = true;
+                foundMainTable = true;
+                braceCount = 1;
+                continue;
+            }
+            
+            // Multi-line: local name = (then { on current line)
+            if (trimmed === '{' && !foundMainTable && i > 0) {
+                const prevLine = lines[i - 1].trim();
+                const multiLineTableMatch = prevLine.match(/^(?:local\s+)?(\w+)\s*=\s*$/);
+                if (multiLineTableMatch && multiLineTableMatch[1] === scriptTableName) {
+                    inConfigTable = true;
+                    foundMainTable = true;
+                    braceCount = 1;
+                    continue;
+                }
+            }
+            
+            if (inConfigTable && foundMainTable) {
+                // Count braces to know when main table ends
+                braceCount += (line.match(/{/g) || []).length;
+                braceCount -= (line.match(/}/g) || []).length;
+                
+                // If we've closed all braces, we're done with the main table
+                if (braceCount <= 0) {
+                    inConfigTable = false;
+                    break; // Stop parsing after main table
+                }
+                
+                // Handle nested tables - skip over them but continue parsing after
+                if (!inNestedTable) {
+                    // Check if this line starts a nested table
+                    if (trimmed.match(/^(\w+)\s*=\s*{/)) {
+                        inNestedTable = true;
+                        nestedBraces = 1; // We just opened one brace for the nested table
+                        continue; // Skip the opening line of the nested table
+                    }
+                } else {
+                    // We're inside a nested table, count braces to know when it ends
+                    nestedBraces += (line.match(/{/g) || []).length;
+                    nestedBraces -= (line.match(/}/g) || []).length;
+                    
+                    // If nested table is closed, exit nested mode and continue parsing
+                    if (nestedBraces <= 0) {
+                        inNestedTable = false;
+                    }
+                    continue; // Skip all lines while in nested table
+                }
+                
+                // Parse simple variable assignments (only when not in nested table)
+                if (!inNestedTable) {
+                    const assignmentMatch = trimmed.match(/^(\w+)\s*=\s*(.+?)(?:,\s*(?:--.*)?)?$/);
+                    if (assignmentMatch) {
+                        const key = assignmentMatch[1];
+                        let value = assignmentMatch[2].trim();
+                        
+                        // Skip if value is complex (table, function, etc.)
+                        if (value.startsWith('{') || 
+                            value.startsWith('[') ||
+                            value.includes('function') ||
+                            value.includes('require(') ||
+                            value.includes('setmetatable') ||
+                            trimmed.includes('= {}')) {
+                            continue;
+                        }
+                        
+                        const parsedValue = this.parseConfigValue(value);
+                        if (parsedValue !== null) {
+                            config[key] = parsedValue;
+                        }
+                    }
+                }
+            }
+        }
+        
+        return config;
+    },
+
+    parseConfigValue(value) {
+        // Remove trailing comma and comments
+        value = value.replace(/,?\s*--.*$/, '').replace(/,$/, '').trim();
+        
+        // Skip if value contains complex expressions or is empty
+        if (!value || 
+            value.includes('function') || 
+            value.includes('setmetatable') || 
+            value.includes('entity:') || 
+            value.includes('valve_source') ||
+            value.includes('fantasy.') ||
+            value.includes('require(') ||
+            value.includes('{}') ||
+            value.length > 100) { // Skip very long values (likely not config)
+            return null;
+        }
+        
+        // Parse the value
+        try {
+            if (value === 'true' || value === 'false') {
+                return value === 'true';
+            } else if (value.match(/^-?\d+$/) && Math.abs(parseInt(value)) < 1000000) {
+                return parseInt(value);
+            } else if (value.match(/^-?\d+\.\d+$/) && Math.abs(parseFloat(value)) < 1000000) {
+                return parseFloat(value);
+            } else if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+                return value.slice(1, -1);
+            } else {
+                // For other values, store as string without quotes
+                return value.replace(/^["']|["']$/g, '');
+            }
+        } catch (e) {
+            return null;
+        }
+    },
+
+    findScriptsWithMissingOptions() {
+        const scriptsWithMissing = [];
+        
+        if (!this.memberScripts || !Array.isArray(this.memberScripts) || this.memberScripts.length === 0) {
+            return scriptsWithMissing;
+        }
+        
+        // Get the script IDs that are active/enabled
+        const activeScriptIds = this.memberScripts.map(s => s.id);
+        
+        if (!this.allScripts || !Array.isArray(this.allScripts)) {
+            return scriptsWithMissing;
+        }
+        
+        for (const script of this.allScripts) {
+            // Only process scripts that are active/enabled
+            if (!activeScriptIds.includes(script.id)) continue;
+            
+            // Skip if script has no source code
+            if (!script.script) continue;
+            
+            // Get script name and software
+            const scriptName = script.name;
+            const softwareId = script.software;
+            const softwareName = this.getSoftwareNameById(softwareId);
+            
+            if (!softwareName) continue;
+            
+            // Skip library scripts - they typically don't have user configuration
+            if (scriptName.startsWith('lib_')) continue;
+            
+            // Get default config from script source
+            const defaultConfig = this.getScriptDefaultConfig(script.script);
+            const defaultKeys = Object.keys(defaultConfig);
+            
+            if (defaultKeys.length === 0) continue;
+            
+            // Check current config
+            const currentScriptConfig = this.currentConfig[softwareName] && this.currentConfig[softwareName][scriptName];
+            const currentKeys = currentScriptConfig ? Object.keys(currentScriptConfig) : [];
+            
+            // Find missing keys
+            const missingKeys = defaultKeys.filter(key => !currentKeys.includes(key));
+            
+            if (missingKeys.length > 0) {
+                const missingOptions = {};
+                for (const key of missingKeys) {
+                    missingOptions[key] = defaultConfig[key];
+                }
+                
+                scriptsWithMissing.push({
+                    name: scriptName,
+                    software: softwareName,
+                    softwareId: softwareId,
+                    missingKeys: missingKeys,
+                    missingOptions: missingOptions,
+                    defaultConfig: defaultConfig
+                });
+            }
+        }
+        
+        return scriptsWithMissing;
+    },
+
+    getSoftwareNameById(softwareId) {
+        const softwareMap = {
+            '4': 'omega',
+            '5': 'universe4', 
+            '6': 'omega',
+            '7': 'parallax2'
+        };
+        return softwareMap[softwareId.toString()];
+    },
+
+    checkAndShowConfigSyncButton() {
+        const scriptsWithMissing = this.findScriptsWithMissingOptions();
+        const syncBtn = document.getElementById('syncConfigOptionsBtn');
+        
+        if (syncBtn) {
+            if (scriptsWithMissing.length > 0) {
+                syncBtn.style.display = 'block';
+                syncBtn.textContent = `🔄 Sync Config Options (${scriptsWithMissing.length})`;
+            } else {
+                syncBtn.style.display = 'none';
+            }
+        }
+    },
+
+    showConfigSyncModal() {
+        const scriptsWithMissing = this.findScriptsWithMissingOptions();
+        const modal = document.getElementById('configSyncModal');
+        const listContainer = document.getElementById('configSyncList');
+        
+        if (scriptsWithMissing.length === 0) {
+            this.showMessage('All configuration options are up to date!', 'success');
+            return;
+        }
+        
+        // Build the checklist
+        let listHTML = '';
+        for (const script of scriptsWithMissing) {
+            listHTML += `
+                <div class="config-sync-item" style="display: flex; align-items: flex-start; gap: 12px; padding: 15px; border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; margin-bottom: 10px; background: rgba(0, 0, 0, 0.2);">
+                    <div class="filter-checkbox" data-script="${script.name}" data-software="${script.software}" onclick="app.toggleConfigSyncItem(this)" style="margin-top: 2px; cursor: pointer;"></div>
+                    <div style="flex: 1;">
+                        <div style="font-weight: 600; color: #4a9eff; margin-bottom: 5px;">
+                            ${script.name} <span style="color: #888; font-weight: normal; font-size: 12px;">(${script.software})</span>
+                        </div>
+                        <div style="color: #ccc; font-size: 14px; margin-bottom: 8px;">
+                            Missing ${script.missingKeys.length} option${script.missingKeys.length > 1 ? 's' : ''}:
+                        </div>
+                        <div style="color: #aaa; font-size: 12px; font-family: monospace;">
+                            ${script.missingKeys.map(key => `${key}: ${JSON.stringify(script.missingOptions[key])}`).join(', ')}
+                        </div>
+                    </div>
+                    <div class="sync-action-dropdown" style="position: relative;">
+                        <select class="form-select" style="font-size: 12px; padding: 4px 8px; min-width: 120px;" data-script="${script.name}" data-software="${script.software}">
+                            <option value="merge">Add missing options</option>
+                            <option value="reset">Reset to defaults</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+        }
+        
+        listContainer.innerHTML = listHTML;
+        modal.classList.add('active');
+    },
+
+    closeConfigSyncModal() {
+        const modal = document.getElementById('configSyncModal');
+        modal.classList.remove('active');
+    },
+
+    toggleConfigSyncItem(checkbox) {
+        checkbox.classList.toggle('checked');
+        this.updateConfigSyncButtonState();
+    },
+
+    selectAllConfigSync(selectAll) {
+        const checkboxes = document.querySelectorAll('#configSyncList .filter-checkbox');
+        for (const checkbox of checkboxes) {
+            if (selectAll) {
+                checkbox.classList.add('checked');
+            } else {
+                checkbox.classList.remove('checked');
+            }
+        }
+        this.updateConfigSyncButtonState();
+    },
+
+    updateConfigSyncButtonState() {
+        const selectedItems = document.querySelectorAll('#configSyncList .filter-checkbox.checked');
+        const syncBtn = document.getElementById('performSyncBtn');
+        
+        if (syncBtn) {
+            if (selectedItems.length > 0) {
+                syncBtn.disabled = false;
+                syncBtn.textContent = `🔄 Sync Selected (${selectedItems.length})`;
+            } else {
+                syncBtn.disabled = false;
+                syncBtn.textContent = '🔄 Sync Selected';
+            }
+        }
+    },
+
+    async performConfigSync() {
+        const selectedItems = document.querySelectorAll('#configSyncList .filter-checkbox.checked');
+        
+        if (selectedItems.length === 0) {
+            this.showMessage('Please select at least one script to sync.', 'warning');
+            return;
+        }
+        
+        const results = {
+            synced: [],
+            failed: [],
+            newOptions: 0,
+            removedScripts: []
+        };
+        
+        for (const checkbox of selectedItems) {
+            const scriptName = checkbox.dataset.script;
+            const software = checkbox.dataset.software;
+            const actionSelect = document.querySelector(`select[data-script="${scriptName}"][data-software="${software}"]`);
+            const action = actionSelect ? actionSelect.value : 'merge';
+            
+            try {
+                const script = this.allScripts.find(s => s.name === scriptName);
+                if (!script) {
+                    results.failed.push(`${scriptName}: Script not found`);
+                    continue;
+                }
+                
+                const defaultConfig = this.getScriptDefaultConfig(script.script);
+                
+                // Ensure software config exists
+                if (!this.currentConfig[software]) {
+                    this.currentConfig[software] = {};
+                }
+                
+                if (action === 'reset') {
+                    // Reset entire script config to defaults
+                    this.currentConfig[software][scriptName] = { ...defaultConfig };
+                    results.synced.push(`${scriptName}: Reset to defaults`);
+                    results.newOptions += Object.keys(defaultConfig).length;
+                } else {
+                    // Merge missing options
+                    const currentConfig = this.currentConfig[software][scriptName] || {};
+                    const missingKeys = Object.keys(defaultConfig).filter(key => !(key in currentConfig));
+                    
+                    for (const key of missingKeys) {
+                        currentConfig[key] = defaultConfig[key];
+                    }
+                    
+                    this.currentConfig[software][scriptName] = currentConfig;
+                    results.synced.push(`${scriptName}: Added ${missingKeys.length} options`);
+                    results.newOptions += missingKeys.length;
+                }
+                
+            } catch (error) {
+                console.error(`Error syncing ${scriptName}:`, error);
+                results.failed.push(`${scriptName}: ${error.message}`);
+            }
+        }
+        
+        // Save the updated configuration
+        try {
+            await this.apiPost('setConfiguration', {}, {
+                value: JSON.stringify(this.currentConfig)
+            });
+            
+            // Update displays
+            const configDisplay = document.getElementById('configDisplay');
+            if (configDisplay) {
+                configDisplay.textContent = JSON.stringify(this.currentConfig, null, 2);
+                this.highlightJSONEditor();
+            }
+            
+            // Close modal and refresh UI
+            this.closeConfigSyncModal();
+            this.checkAndShowConfigSyncButton();
+            this.populateSoftwareDropdown();
+            
+            // Show summary
+            let message = `✅ Sync completed! Added ${results.newOptions} new configuration options.`;
+            if (results.failed.length > 0) {
+                message += `\n❌ ${results.failed.length} scripts failed to sync.`;
+            }
+            this.showMessage(message, results.failed.length > 0 ? 'warning' : 'success');
+            
+        } catch (error) {
+            console.error('Error saving configuration:', error);
+            this.showMessage('Failed to save synchronized configuration.', 'error');
+        }
+    },
+
+    // Venus Partnership Modal Functions
+    showVenusPartnershipModal() {
+        const modal = document.getElementById('venusPartnershipModal');
+        const input = document.getElementById('venusPartnerInput');
+        
+        input.value = '';
+        modal.classList.add('active');
+        
+        // Focus the input after animation
+        setTimeout(() => {
+            input.focus();
+        }, 100);
+    },
+
+    closeVenusPartnershipModal() {
+        const modal = document.getElementById('venusPartnershipModal');
+        modal.classList.remove('active');
+    },
+
+    async submitVenusPartnership() {
+        const input = document.getElementById('venusPartnerInput');
+        const username = input.value.trim();
+        
+        if (!username) {
+            this.showMessage('Please enter a username.', 'warning');
+            return;
+        }
+        
+        this.closeVenusPartnershipModal();
+        await this.requestVenusPartnership(username);
     },
 });
