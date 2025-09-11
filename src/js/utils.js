@@ -1519,23 +1519,50 @@ Object.assign(app, {
             confirmBtn.disabled = true;
             confirmBtn.textContent = '🔄 Applying...';
 
-            // Apply scripts
+            let scriptsApplied = false;
+            let configApplied = false;
+            let scriptError = null;
+
+            // Apply scripts (with error handling to continue even if scripts fail)
             const buildScripts = JSON.parse(build.scripts || '[]');
             if (buildScripts.length > 0) {
-                await this.apiCall('setMemberScripts', {
-                    scripts: JSON.stringify(buildScripts)
-                });
+                try {
+                    await this.apiCall('setMemberScripts', {
+                        scripts: JSON.stringify(buildScripts)
+                    });
+                    scriptsApplied = true;
+                } catch (scriptErr) {
+                    scriptError = scriptErr.message || 'Failed to apply scripts';
+                    console.warn('Failed to apply build scripts:', scriptErr);
+                    // Continue to apply configuration even if scripts fail
+                }
             }
 
 
             // Apply configuration
             if (build.configuration) {
+                // Check if configuration is already a string (from API) or an object
+                const configValue = typeof build.configuration === 'string' 
+                    ? build.configuration 
+                    : JSON.stringify(build.configuration);
+                    
                 await this.apiPost('setConfiguration', {}, {
-                    value: JSON.stringify(build.configuration)
+                    value: configValue
                 });
+                configApplied = true;
             }
 
-            this.showMessage(`Build "${build.tag}" applied successfully!`, 'success');
+            // Show appropriate success/warning message
+            if (scriptError) {
+                if (configApplied) {
+                    this.showMessage(`Build "${build.tag}" partially applied. Configuration applied successfully, but some scripts may be unavailable: ${scriptError}`, 'warning');
+                } else {
+                    this.showMessage(`Build "${build.tag}" partially applied: ${scriptError}`, 'warning');
+                }
+            } else {
+                this.showMessage(`Build "${build.tag}" applied successfully!`, 'success');
+            }
+            
             this.closeBuildPreview();
 
             // Refresh data
