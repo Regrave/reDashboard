@@ -1439,47 +1439,69 @@ Object.assign(app, {
 
         // Get build data
         const buildScripts = JSON.parse(build.scripts || '[]');
-        const currentScripts = this.memberScripts.map(s => s.id);
-
-        // Calculate differences
-        const scriptsToAdd = buildScripts.filter(id => !currentScripts.includes(id));
-        const scriptsToRemove = currentScripts.filter(id => !buildScripts.includes(id));
+        
+        // Check for invalid scripts
+        const validScripts = [];
+        const invalidScripts = [];
+        
+        buildScripts.forEach(id => {
+            const script = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
+            if (script) {
+                validScripts.push({ id, name: script.name });
+            } else {
+                invalidScripts.push(id);
+            }
+        });
 
         let changesHTML = '';
 
-        // Script changes
-        if (scriptsToAdd.length > 0 || scriptsToRemove.length > 0) {
+        // Script changes - only show what will be enabled
+        if (buildScripts.length > 0) {
             changesHTML += `
                 <div style="margin-bottom: 20px;">
-                    <h4 style="color: #4a9eff; margin-bottom: 10px;">📜 Script Changes</h4>
+                    <h4 style="color: #4a9eff; margin-bottom: 10px;">📜 Scripts to Enable</h4>
             `;
 
-            if (scriptsToAdd.length > 0) {
+            // Show warning if there are invalid scripts
+            if (invalidScripts.length > 0) {
                 changesHTML += `
-                    <div style="margin-bottom: 10px;">
-                        <strong style="color: #4aff4a;">Scripts to Enable (${scriptsToAdd.length}):</strong>
+                    <div style="margin-bottom: 15px; padding: 10px; background: rgba(255, 102, 102, 0.1); border: 1px solid rgba(255, 102, 102, 0.3); border-radius: 5px;">
+                        <strong style="color: #ff6666;">⚠️ Warning: Invalid Scripts Detected</strong>
+                        <p style="color: #ffaa66; margin: 5px 0; font-size: 13px;">
+                            This build contains ${invalidScripts.length} script(s) that are no longer available or have been removed.
+                            These will be skipped during application.
+                        </p>
                         <div style="margin-top: 5px;">
-                            ${scriptsToAdd.map(id => {
-                                const script = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
-                                const scriptName = script ? script.name : `Unknown Script (ID: ${id})`;
-                                return `<span style="color: #4aff4a; font-size: 12px; background: rgba(74, 255, 74, 0.2); padding: 2px 6px; border-radius: 8px; margin: 2px;">${scriptName}</span>`;
-                            }).join(' ')}
+                            ${invalidScripts.map(id => 
+                                `<span style="color: #ff6666; font-size: 11px; background: rgba(255, 102, 102, 0.2); padding: 2px 6px; border-radius: 8px; margin: 2px; display: inline-block;">
+                                    ❌ Unknown Script ID: ${id}
+                                </span>`
+                            ).join(' ')}
                         </div>
                     </div>
                 `;
             }
 
-            if (scriptsToRemove.length > 0) {
+            // Show valid scripts that will be enabled
+            if (validScripts.length > 0) {
                 changesHTML += `
                     <div style="margin-bottom: 10px;">
-                        <strong style="color: #ff6666;">Scripts to Disable (${scriptsToRemove.length}):</strong>
+                        <strong style="color: #4aff4a;">Valid Scripts (${validScripts.length}):</strong>
                         <div style="margin-top: 5px;">
-                            ${scriptsToRemove.map(id => {
-                                const script = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
-                                const scriptName = script ? script.name : `Unknown Script (ID: ${id})`;
-                                return `<span style="color: #ff6666; font-size: 12px; background: rgba(255, 102, 102, 0.2); padding: 2px 6px; border-radius: 8px; margin: 2px;">${script ? script.name : `ID: ${id}`}</span>`;
-                            }).join(' ')}
+                            ${validScripts.map(script => 
+                                `<span style="color: #4aff4a; font-size: 12px; background: rgba(74, 255, 74, 0.2); padding: 2px 6px; border-radius: 8px; margin: 2px; display: inline-block;">
+                                    ✓ ${script.name}
+                                </span>`
+                            ).join(' ')}
                         </div>
+                    </div>
+                `;
+            } else if (invalidScripts.length > 0) {
+                changesHTML += `
+                    <div style="margin-bottom: 10px;">
+                        <p style="color: #ff9999; font-style: italic;">
+                            ⚠️ No valid scripts found in this build. Only the configuration will be applied.
+                        </p>
                     </div>
                 `;
             }
@@ -1523,18 +1545,37 @@ Object.assign(app, {
             let configApplied = false;
             let scriptError = null;
 
-            // Apply scripts (with error handling to continue even if scripts fail)
+            // Apply scripts (filter out invalid ones first)
             const buildScripts = JSON.parse(build.scripts || '[]');
             if (buildScripts.length > 0) {
-                try {
-                    await this.apiCall('setMemberScripts', {
-                        scripts: JSON.stringify(buildScripts)
-                    });
-                    scriptsApplied = true;
-                } catch (scriptErr) {
-                    scriptError = scriptErr.message || 'Failed to apply scripts';
-                    console.warn('Failed to apply build scripts:', scriptErr);
-                    // Continue to apply configuration even if scripts fail
+                // Filter to only valid scripts that exist
+                const validScriptIds = buildScripts.filter(id => {
+                    const scriptExists = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
+                    if (!scriptExists) {
+                        console.warn(`Skipping invalid script ID: ${id}`);
+                    }
+                    return scriptExists;
+                });
+                
+                const invalidCount = buildScripts.length - validScriptIds.length;
+                
+                if (validScriptIds.length > 0) {
+                    try {
+                        await this.apiCall('setMemberScripts', {
+                            scripts: JSON.stringify(validScriptIds)
+                        });
+                        scriptsApplied = true;
+                        
+                        if (invalidCount > 0) {
+                            scriptError = `${invalidCount} invalid script(s) were skipped`;
+                        }
+                    } catch (scriptErr) {
+                        scriptError = scriptErr.message || 'Failed to apply scripts';
+                        console.warn('Failed to apply build scripts:', scriptErr);
+                        // Continue to apply configuration even if scripts fail
+                    }
+                } else {
+                    scriptError = 'All scripts in this build are invalid or unavailable';
                 }
             }
 
