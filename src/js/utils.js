@@ -726,16 +726,10 @@ Object.assign(app, {
             console.warn('No source code found in script data. Available properties:', Object.keys(scriptData));
         }
 
-        // Decode any escaped characters
-        if (sourceCode && typeof sourceCode === 'string') {
-            sourceCode = sourceCode
-                .replace(/\\\\/g, '\\')  // Process double backslashes first
-                .replace(/\\n/g, '\n')
-                .replace(/\\t/g, '\t')
-                .replace(/\\"/g, '"')
-                .replace(/\\'/g, "'");
-        }
-        
+        // Note: JSON.parse already handles escape sequences, so we don't need manual replacements
+        // Removing manual escape replacements to preserve literal backslash patterns in scripts
+        // like [\\/] regex patterns that should remain as-is
+
         // Store the original content for change detection
         this.originalScriptContent = sourceCode;
         this.originalNotesContent = draft ? draft.notes : '';
@@ -991,25 +985,15 @@ Object.assign(app, {
         // Handle paste event to convert to plain text
         editor.addEventListener('paste', (e) => {
             e.preventDefault();
-            
+            e.stopPropagation(); // Prevent event bubbling
+
             // Get the plain text from clipboard
             const text = (e.clipboardData || window.clipboardData).getData('text/plain');
-            
-            // Insert the plain text at the current cursor position
-            const selection = window.getSelection();
-            if (!selection.rangeCount) return;
-            
-            selection.deleteFromDocument();
-            const range = selection.getRangeAt(0);
-            const textNode = document.createTextNode(text);
-            range.insertNode(textNode);
-            
-            // Move cursor to end of inserted text
-            range.setStartAfter(textNode);
-            range.setEndAfter(textNode);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            
+
+            // Use execCommand for contenteditable - more reliable than range manipulation
+            // This properly handles cursor position and undo/redo
+            document.execCommand('insertText', false, text);
+
             // Trigger input event for draft saving
             editor.dispatchEvent(new Event('input', { bubbles: true }));
         });
@@ -1541,69 +1525,12 @@ Object.assign(app, {
             confirmBtn.disabled = true;
             confirmBtn.textContent = '🔄 Applying...';
 
-            let scriptsApplied = false;
-            let configApplied = false;
-            let scriptError = null;
+            // Use the applyBuild API - this gives the build owner XP and increments popularity
+            await this.apiCall('applyBuild', {
+                tag: build.tag
+            });
 
-            // Apply scripts (filter out invalid ones first)
-            const buildScripts = JSON.parse(build.scripts || '[]');
-            if (buildScripts.length > 0) {
-                // Filter to only valid scripts that exist
-                const validScriptIds = buildScripts.filter(id => {
-                    const scriptExists = this.allScripts.find(s => s.id == id || s.id === String(id) || s.id === Number(id));
-                    if (!scriptExists) {
-                        console.warn(`Skipping invalid script ID: ${id}`);
-                    }
-                    return scriptExists;
-                });
-                
-                const invalidCount = buildScripts.length - validScriptIds.length;
-                
-                if (validScriptIds.length > 0) {
-                    try {
-                        await this.apiCall('setMemberScripts', {
-                            scripts: JSON.stringify(validScriptIds)
-                        });
-                        scriptsApplied = true;
-                        
-                        if (invalidCount > 0) {
-                            scriptError = `${invalidCount} invalid script(s) were skipped`;
-                        }
-                    } catch (scriptErr) {
-                        scriptError = scriptErr.message || 'Failed to apply scripts';
-                        console.warn('Failed to apply build scripts:', scriptErr);
-                        // Continue to apply configuration even if scripts fail
-                    }
-                } else {
-                    scriptError = 'All scripts in this build are invalid or unavailable';
-                }
-            }
-
-
-            // Apply configuration
-            if (build.configuration) {
-                // Check if configuration is already a string (from API) or an object
-                const configValue = typeof build.configuration === 'string' 
-                    ? build.configuration 
-                    : JSON.stringify(build.configuration);
-                    
-                await this.apiPost('setConfiguration', {}, {
-                    value: configValue
-                });
-                configApplied = true;
-            }
-
-            // Show appropriate success/warning message
-            if (scriptError) {
-                if (configApplied) {
-                    this.showMessage(`Build "${build.tag}" partially applied. Configuration applied successfully, but some scripts may be unavailable: ${scriptError}`, 'warning');
-                } else {
-                    this.showMessage(`Build "${build.tag}" partially applied: ${scriptError}`, 'warning');
-                }
-            } else {
-                this.showMessage(`Build "${build.tag}" applied successfully!`, 'success');
-            }
-            
+            this.showMessage(`Build "${build.tag}" applied successfully!`, 'success');
             this.closeBuildPreview();
 
             // Refresh data
@@ -1832,6 +1759,45 @@ Object.assign(app, {
         this.currentBuildToApply = null;
     },
 
+    async applyBuildFromDetails() {
+        if (!this.currentBuildToApply) {
+            this.showMessage('No build selected', 'error');
+            return;
+        }
+
+        const build = this.currentBuildToApply;
+        const applyBtn = document.getElementById('applyFromDetailsBtn');
+
+        if (!confirm(`Are you sure you want to apply the build "${build.tag}"? This will replace your current scripts and configuration.`)) {
+            return;
+        }
+
+        try {
+            applyBtn.disabled = true;
+            applyBtn.textContent = '🔄 Applying...';
+
+            // Use the applyBuild API - this gives the build owner XP and increments popularity
+            await this.apiCall('applyBuild', {
+                tag: build.tag
+            });
+
+            this.showMessage(`Build "${build.tag}" applied successfully!`, 'success');
+            this.closeBuildDetails();
+
+            // Refresh data
+            await this.loadMemberInfo();
+            await this.loadAllScripts();
+            await this.loadConfiguration();
+
+        } catch (error) {
+            console.error('Error applying build:', error);
+            this.showMessage(`Failed to apply build: ${error.message}`, 'error');
+        } finally {
+            applyBtn.disabled = false;
+            applyBtn.textContent = '🚀 Apply Build';
+        }
+    },
+
     showScriptConfig(scriptName, buildTag) {
         try {
             // Use the current build that's already loaded
@@ -1971,8 +1937,8 @@ Object.assign(app, {
         if (this.currentScriptKey === '__preview__' && this.previewConfigMetadata) {
             configMetadata = this.previewConfigMetadata;
         } else {
-            // Get the current script being edited
-            const currentScript = this.memberScripts.find(script => {
+            // Get the current script being edited - search both active scripts and all available scripts
+            const findScript = (scripts) => scripts.find(script => {
                 const scriptName = script.name.endsWith('.lua') ? script.name : script.name + '.lua';
                 const scriptBaseName = script.name.replace('.lua', '');
                 return this.currentScriptKey === scriptName ||
@@ -1980,6 +1946,9 @@ Object.assign(app, {
                     this.currentScriptKey.toLowerCase().includes(script.name.toLowerCase()) ||
                     script.name.toLowerCase().includes(this.currentScriptKey.toLowerCase().replace('.lua', ''));
             });
+
+            // First try member scripts, then fall back to all scripts
+            const currentScript = findScript(this.memberScripts) || findScript(this.allScripts || []);
 
             if (currentScript) {
                 try {
@@ -2937,15 +2906,7 @@ Object.assign(app, {
                 return { categories: {}, dropdowns: {} };
             }
 
-            // Decode any escaped characters
-            if (scriptSource && typeof scriptSource === 'string') {
-                scriptSource = scriptSource
-                    .replace(/\\n/g, '\n')
-                    .replace(/\\t/g, '\t')
-                    .replace(/\\"/g, '"')
-                    .replace(/\\'/g, "'")
-                    .replace(/\\\\/g, '\\');
-            }
+            // Note: JSON.parse already handles escape sequences, no manual replacements needed
 
             // Parse configuration metadata from source
             const metadata = this.extractConfigCategories(scriptSource);
@@ -2973,7 +2934,9 @@ Object.assign(app, {
         const multiselects = {};
         const descriptions = {};
         const requires = {};
-        const lines = scriptSource.split('\n');
+        // Normalize line endings (handle Windows \r\n and old Mac \r)
+        const normalizedSource = scriptSource.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
+        const lines = normalizedSource.split('\n');
         let currentCategory = null;
 
         for (let i = 0; i < lines.length; i++) {
@@ -2987,7 +2950,8 @@ Object.assign(app, {
             }
 
             // Look for setting assignments inside configuration tables
-            const settingMatch = line.match(/^\s*(\w+)\s*=\s*.+[,]?\s*$/);
+            // Match: settingName = value (with optional comma and/or trailing comment)
+            const settingMatch = line.match(/^\s*(\w+)\s*=\s*.+/);
             if (settingMatch && currentCategory) {
                 const settingName = settingMatch[1];
 
@@ -3004,16 +2968,51 @@ Object.assign(app, {
                     categories[currentCategory].push(settingName);
                 }
 
-                // Look backwards from current line to collect all metadata for this setting
+                // First, check for inline comments on the current line (e.g., value = 70, -- @dropdown: ...)
+                const inlineCommentMatch = line.match(/--\s*@(\w+):\s*(.+)/i);
+                if (inlineCommentMatch) {
+                    const metaType = inlineCommentMatch[1].toLowerCase();
+                    const metaValue = inlineCommentMatch[2].trim();
+
+                    if (metaType === 'dropdown') {
+                        const dropdownOptions = metaValue
+                            .split(',')
+                            .map(option => option.trim())
+                            .filter(option => option.length > 0);
+                        if (dropdownOptions.length > 0) {
+                            dropdowns[settingName] = dropdownOptions;
+                        }
+                    } else if (metaType === 'range') {
+                        const parts = metaValue.split(',').map(p => p.trim());
+                        if (parts.length >= 3) {
+                            ranges[settingName] = {
+                                min: parseFloat(parts[0]),
+                                max: parseFloat(parts[1]),
+                                step: parseFloat(parts[2])
+                            };
+                        }
+                    } else if (metaType === 'multiselect') {
+                        multiselects[settingName] = metaValue
+                            .split(',')
+                            .map(option => option.trim())
+                            .filter(option => option.length > 0);
+                    } else if (metaType === 'description') {
+                        descriptions[settingName] = metaValue;
+                    } else if (metaType === 'requires') {
+                        requires[settingName] = metaValue;
+                    }
+                }
+
+                // Also look backwards from current line to collect metadata on previous lines
                 for (let j = i - 1; j >= 0; j--) {
                     const metaLine = lines[j].trim();
-                    
+
                     // Stop if we hit another setting or non-comment line
                     if (!metaLine.startsWith('--') || metaLine.match(/^\s*\w+\s*=/)) {
                         break;
                     }
-                    
-                    // Parse different metadata types
+
+                    // Parse different metadata types (only if not already set by inline comment)
                     const dropdownMatch = metaLine.match(/--\s*@dropdown:\s*(.+)/i);
                     if (dropdownMatch) {
                         const dropdownOptions = dropdownMatch[1]

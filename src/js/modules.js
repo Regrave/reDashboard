@@ -1214,12 +1214,6 @@ Object.assign(app, {
         if (tabName === 'sessions') {
             this.loadSessionInfo();
             
-            // Show freeze button if user has Arctic of Uranus perk (ID 15)
-            const hasArcticOfUranus = this.memberData?.perks?.some(perk => perk.id === 15);
-            const freezeButton = document.getElementById('freezeSessionButton');
-            if (freezeButton) {
-                freezeButton.style.display = hasArcticOfUranus ? 'inline-block' : 'none';
-            }
         }
 
         if (tabName === 'divinity') {
@@ -1439,14 +1433,8 @@ Object.assign(app, {
                         <span class="session-label">Status:</span>
                         <span class="session-value" style="color: #4aff4a;">🟢 Active</span>
                     </div>
-                    <div class="session-info-item">
-                        <span class="session-label">Frozen:</span>
-                        <span class="session-value" style="color: ${recentSession?.frozen === '1' ? '#ff6666' : '#4aff4a'};">
-                            ${recentSession?.frozen === '1' ? '❄️ Yes' : '✅ No'}
-                        </span>
-                    </div>
                 </div>
-                
+
                 <div class="session-info-card">
                     <h4 style="color: #4a9eff; margin-bottom: 15px;">🛡️ Security Info</h4>
                     <div class="session-info-item">
@@ -1712,21 +1700,6 @@ Object.assign(app, {
         }
     },
     
-    async freezeSession() {
-        if (!confirm('Are you sure you want to freeze your session? While frozen, you cannot launch FC2 solutions and your hashes will be locked.')) {
-            return;
-        }
-        
-        try {
-            const result = await this.apiCall('freeze');
-            this.showMessage('❄️ Session frozen successfully!', 'success');
-            await this.loadSessionInfo(); // Refresh session info
-        } catch (error) {
-            console.error('Error freezing session:', error);
-            this.showMessage(`Failed to freeze session: ${error.message}`, 'error');
-        }
-    },
-
     async loadSessionHistory(detailed = false) {
         try {
             const flags = {
@@ -2129,7 +2102,22 @@ Object.assign(app, {
                 document.execCommand('insertText', false, '  '); // 2 spaces for JSON
             }
         });
-        
+
+        // Handle paste event to convert to plain text (prevents HTML formatting issues)
+        jsonEditor.addEventListener('paste', (e) => {
+            e.preventDefault();
+            e.stopPropagation(); // Prevent event bubbling
+
+            // Get the plain text from clipboard
+            const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+
+            // Use execCommand for contenteditable - more reliable than range manipulation
+            document.execCommand('insertText', false, text);
+
+            // Trigger input event for highlighting
+            jsonEditor.dispatchEvent(new Event('input', { bubbles: true }));
+        });
+
         // Mark listeners as attached
         this.jsonEditorListenersAttached = true;
         

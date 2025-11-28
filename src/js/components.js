@@ -1174,11 +1174,11 @@ Object.assign(app, {
 
         const ownedPerkIds = this.ownedPerks.map(perk => perk.id);
         const perkPoints = this.memberData?.perk_points || 0;
-        const nonPurchasablePerks = [10, 13, 23, 24];
 
         container.innerHTML = this.allPerks.map(perk => {
             const isOwned = ownedPerkIds.includes(perk.id);
-            const isPurchasable = !nonPurchasablePerks.includes(perk.id);
+            // Use the purchasable field from API (listPerks now includes this)
+            const isPurchasable = perk.purchasable !== false;
             const canAfford = isPurchasable && perkPoints >= 1;
             const isVenus = perk.name.toLowerCase().includes('venus');
 
