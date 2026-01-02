@@ -1141,6 +1141,12 @@ Object.assign(app, {
     // ========================
 
     switchTab(tabName) {
+        // Save current tab to localStorage for persistence
+        const validTabs = ['overview', 'scripts', 'builds', 'sessions', 'perks', 'achievements', 'quests', 'divinity', 'config'];
+        if (validTabs.includes(tabName)) {
+            localStorage.setItem('reDashboard_lastTab', tabName);
+        }
+
         // Update nav tabs
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.classList.remove('active');

@@ -961,9 +961,66 @@ const app = {
             
             this.setUserAvatar(this.memberData);
         }
-        
+
+        // Restore last visited tab if saved
+        const savedTab = localStorage.getItem('reDashboard_lastTab');
+        if (savedTab && savedTab !== 'overview') {
+            const validTabs = ['overview', 'scripts', 'builds', 'sessions', 'perks', 'achievements', 'quests', 'divinity', 'config'];
+            if (validTabs.includes(savedTab)) {
+                // Find and click the correct nav tab to switch
+                const navTab = document.querySelector(`.nav-tab[onclick*="${savedTab}"]`);
+                if (navTab) {
+                    // Update nav tabs
+                    document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+                    navTab.classList.add('active');
+
+                    // Update content sections
+                    document.querySelectorAll('.content-section').forEach(section => section.classList.remove('active'));
+                    const section = document.getElementById(`${savedTab}-section`);
+                    if (section) section.classList.add('active');
+
+                    // Trigger tab-specific data loading
+                    this.triggerTabDataLoad(savedTab);
+                }
+            }
+        }
+
         // Resume tutorial if it was paused for login
         this.resumeTutorial();
+    },
+
+    // Trigger data loading for a specific tab (used when restoring saved tab)
+    triggerTabDataLoad(tabName) {
+        switch (tabName) {
+            case 'quests':
+                this.loadQuests();
+                break;
+            case 'divinity':
+                this.loadDivinityChart();
+                break;
+            case 'builds':
+                if (this.allBuilds.length === 0) {
+                    this.loadBuilds();
+                }
+                break;
+            case 'config':
+                this.checkAndShowConfigSyncButton();
+                if (Object.keys(this.availableLanguages).length === 0) {
+                    this.loadLanguages();
+                }
+                break;
+            case 'perks':
+                if (this.allPerks.length === 0) {
+                    this.loadPerks();
+                }
+                break;
+            case 'sessions':
+                this.loadSessionInfo();
+                break;
+            case 'achievements':
+                this.loadAchievements();
+                break;
+        }
     },
 
     resetUIAfterLogout() {
@@ -1006,6 +1063,8 @@ const app = {
         if (this.modules) {
             this.modules.omegaVerified = false;
         }
+        // Clear saved tab preference on logout
+        localStorage.removeItem('reDashboard_lastTab');
     },
 
     setUserAvatar(memberData) {

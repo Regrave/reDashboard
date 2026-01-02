@@ -2846,8 +2846,10 @@ Object.assign(app, {
 
         // Sort by rank tier (descending), then by XP (descending)
         const sortedMembers = [...members].sort((a, b) => {
-            const rankTierA = this.getRankTier(a.rank_name) || 0;
-            const rankTierB = this.getRankTier(b.rank_name) || 0;
+            const rankNameA = a.rank_information?.rank_name;
+            const rankNameB = b.rank_information?.rank_name;
+            const rankTierA = this.getRankTier(rankNameA) || 0;
+            const rankTierB = this.getRankTier(rankNameB) || 0;
 
             // First sort by rank tier (higher tier = higher rank)
             if (rankTierB !== rankTierA) {
@@ -2864,7 +2866,7 @@ Object.assign(app, {
         });
 
         // Use rank-aware card if any member has rank data, otherwise fall back to original
-        const hasRankData = members.some(m => m.rank_name);
+        const hasRankData = members.some(m => m.rank_information?.rank_name);
 
         if (hasRankData) {
             container.innerHTML = sortedMembers.map(member => this.createDivinityMemberCardWithRank(member, zodiacSymbols)).join('');
@@ -2949,7 +2951,8 @@ Object.assign(app, {
         let filteredMembers = this.divinityData.members.filter(member => {
             const matchesSearch = member.forum_username.toLowerCase().includes(searchTerm);
             const matchesSign = !selectedSign || member.sign === selectedSign;
-            const matchesRank = !selectedRank || member.rank_name === selectedRank;
+            const memberRankName = member.rank_information?.rank_name;
+            const matchesRank = !selectedRank || memberRankName === selectedRank;
             return matchesSearch && matchesSign && matchesRank;
         });
 
@@ -3623,13 +3626,13 @@ Object.assign(app, {
     createLeaderboardRankBadge(rankName) {
         if (!rankName) return '';
 
-        const icon = this.getRankIcon(rankName);
-        const rankClass = this.getRankClass(rankName);
+        const rankGifUrl = `https://constelia.ai/ranks/cache/${rankName}.gif`;
 
         return `
-            <span class="leaderboard-rank-badge rank-badge ${rankClass}" style="padding: 4px 10px; min-width: auto;">
-                <span style="font-size: 14px;">${icon}</span>
-                <span style="font-size: 11px;">${rankName}</span>
+            <span class="leaderboard-rank-badge" style="display: inline-flex; align-items: center; gap: 6px;">
+                <img src="${rankGifUrl}" alt="${rankName}"
+                     style="height: 20px; width: auto;"
+                     onerror="this.style.display='none'">
             </span>
         `;
     },
@@ -3641,8 +3644,9 @@ Object.assign(app, {
         const profileUrl = `https://constelia.ai/forums/index.php?members/${member.forum_username}.${member.forum_uid}/`;
         const firstLetter = member.forum_username.charAt(0).toUpperCase();
 
-        // Get rank info if available
-        const rankName = member.rank_name || member.rank?.rank_name;
+        // Get rank info from rank_information object
+        const rankInfo = member.rank_information;
+        const rankName = rankInfo?.rank_name;
         const rankBadge = rankName ? this.createLeaderboardRankBadge(rankName) : '';
 
         // Avatar URL construction
