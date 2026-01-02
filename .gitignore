@@ -164,6 +164,7 @@ Thumbs.db
 # Documentation files
 *.md
 !README.md
+!SCRIPT_CONFIG_METADATA.md
 
 # Text files
 *.txt
