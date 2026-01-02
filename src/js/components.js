@@ -2803,15 +2803,21 @@ Object.assign(app, {
             // Set up filters only once
             const searchInput = document.getElementById('divinitySearchInput');
             const signFilter = document.getElementById('divinitySignFilter');
-            
+            const rankFilter = document.getElementById('divinityRankFilter');
+
             if (!searchInput.hasAttribute('data-listener-attached')) {
                 searchInput.addEventListener('input', () => this.filterDivinityMembers());
                 searchInput.setAttribute('data-listener-attached', 'true');
             }
-            
+
             if (!signFilter.hasAttribute('data-listener-attached')) {
                 signFilter.addEventListener('change', () => this.filterDivinityMembers());
                 signFilter.setAttribute('data-listener-attached', 'true');
+            }
+
+            if (rankFilter && !rankFilter.hasAttribute('data-listener-attached')) {
+                rankFilter.addEventListener('change', () => this.filterDivinityMembers());
+                rankFilter.setAttribute('data-listener-attached', 'true');
             }
             
         } catch (error) {
@@ -2822,7 +2828,7 @@ Object.assign(app, {
 
     displayDivinityMembers(members) {
         const container = document.getElementById('divinityGrid');
-        
+
         const zodiacSymbols = {
             'Aries': '♈',
             'Taurus': '♉',
@@ -2837,8 +2843,34 @@ Object.assign(app, {
             'Aquarius': '♒',
             'Pisces': '♓'
         };
-        
-        container.innerHTML = members.map(member => this.createDivinityMemberCard(member, zodiacSymbols)).join('');
+
+        // Sort by rank tier (descending), then by XP (descending)
+        const sortedMembers = [...members].sort((a, b) => {
+            const rankTierA = this.getRankTier(a.rank_name) || 0;
+            const rankTierB = this.getRankTier(b.rank_name) || 0;
+
+            // First sort by rank tier (higher tier = higher rank)
+            if (rankTierB !== rankTierA) {
+                return rankTierB - rankTierA;
+            }
+
+            // Then by XP within the same rank
+            return (b.xp || 0) - (a.xp || 0);
+        });
+
+        // Re-assign display ranks after sorting
+        sortedMembers.forEach((member, index) => {
+            member.rank = index + 1;
+        });
+
+        // Use rank-aware card if any member has rank data, otherwise fall back to original
+        const hasRankData = members.some(m => m.rank_name);
+
+        if (hasRankData) {
+            container.innerHTML = sortedMembers.map(member => this.createDivinityMemberCardWithRank(member, zodiacSymbols)).join('');
+        } else {
+            container.innerHTML = sortedMembers.map(member => this.createDivinityMemberCard(member, zodiacSymbols)).join('');
+        }
     },
 
 
@@ -2912,13 +2944,15 @@ Object.assign(app, {
     filterDivinityMembers() {
         const searchTerm = document.getElementById('divinitySearchInput').value.toLowerCase();
         const selectedSign = document.getElementById('divinitySignFilter').value;
-        
+        const selectedRank = document.getElementById('divinityRankFilter')?.value || '';
+
         let filteredMembers = this.divinityData.members.filter(member => {
             const matchesSearch = member.forum_username.toLowerCase().includes(searchTerm);
             const matchesSign = !selectedSign || member.sign === selectedSign;
-            return matchesSearch && matchesSign;
+            const matchesRank = !selectedRank || member.rank_name === selectedRank;
+            return matchesSearch && matchesSign && matchesRank;
         });
-        
+
         this.displayDivinityMembers(filteredMembers);
     },
 
@@ -3106,5 +3140,546 @@ Object.assign(app, {
             console.error('Error redeeming achievements:', error);
             this.showMessage(`Failed to redeem achievements: ${error.message}`, 'error');
         }
+    },
+
+    // ========================
+    // SEASON 6 RANK SYSTEM
+    // ========================
+
+    // Rank definitions with icons and colors
+    RANK_DATA: {
+        'Dust': { icon: '🌫️', tier: 1 },
+        'Meteor': { icon: '☄️', tier: 2 },
+        'Asteroid': { icon: '🪨', tier: 3 },
+        'Comet': { icon: '💫', tier: 4 },
+        'Moon': { icon: '🌙', tier: 5 },
+        'Planet': { icon: '🪐', tier: 6 },
+        'Star': { icon: '⭐', tier: 7 },
+        'Nebula': { icon: '🌌', tier: 8 },
+        'Cluster': { icon: '✨', tier: 9 },
+        'Galaxy': { icon: '🌀', tier: 10 },
+        'Pulsar': { icon: '💠', tier: 11 },
+        'Quasar': { icon: '🔮', tier: 12 },
+        'Supernova': { icon: '💥', tier: 13 },
+        'Blackhole': { icon: '🕳️', tier: 14 },
+        'Wormhole': { icon: '🌀', tier: 15 },
+        'Universe': { icon: '🌐', tier: 16 },
+        'Multiverse': { icon: '🎆', tier: 17 },
+        'Cosmos': { icon: '🌟', tier: 18 },
+        'Void': { icon: '⬛', tier: 19 },
+        'Zenith': { icon: '👑', tier: 20 }
+    },
+
+    getRankIcon(rankName) {
+        return this.RANK_DATA[rankName]?.icon || '🌟';
+    },
+
+    getRankTier(rankName) {
+        return this.RANK_DATA[rankName]?.tier || 0;
+    },
+
+    getRankClass(rankName) {
+        return `rank-${rankName.toLowerCase()}`;
+    },
+
+    updateRankDisplay() {
+        if (!this.memberData || !this.memberData.rank) {
+            // Hide rank card if no rank data
+            const rankCard = document.getElementById('rankProgressCard');
+            if (rankCard) rankCard.style.display = 'none';
+            return;
+        }
+
+        const rank = this.memberData.rank;
+        const rankCard = document.getElementById('rankProgressCard');
+
+        // Show rank card
+        if (rankCard) rankCard.style.display = 'block';
+
+        // Update rank badge
+        const rankBadge = document.getElementById('currentRankBadge');
+        const rankIcon = document.getElementById('rankIcon');
+        const rankName = document.getElementById('rankName');
+
+        if (rankBadge) {
+            // Remove old rank classes
+            rankBadge.className = 'rank-badge';
+            rankBadge.classList.add(this.getRankClass(rank.rank_name));
+        }
+
+        if (rankIcon) rankIcon.textContent = this.getRankIcon(rank.rank_name);
+        if (rankName) rankName.textContent = rank.rank_name;
+
+        // Update progress info
+        const nextRankName = document.getElementById('nextRankName');
+        const rankProgressPercent = document.getElementById('rankProgressPercent');
+        const rankProgressFill = document.getElementById('rankProgressFill');
+        const currentRankXP = document.getElementById('currentRankXP');
+        const xpNeeded = document.getElementById('xpNeeded');
+
+        if (nextRankName) nextRankName.textContent = rank.next_rank_name || 'Max Rank';
+        if (rankProgressPercent) rankProgressPercent.textContent = rank.progress_percent || 0;
+        if (rankProgressFill) rankProgressFill.style.width = `${rank.progress_percent || 0}%`;
+        if (currentRankXP) currentRankXP.textContent = (rank.current_xp || 0).toLocaleString();
+        if (xpNeeded) xpNeeded.textContent = (rank.xp_needed || 0).toLocaleString();
+    },
+
+    // ========================
+    // QUEST SYSTEM
+    // ========================
+
+    async loadQuests() {
+        try {
+            // Fetch member data with quests flag
+            const memberData = await this.apiCall('getMember', { quests: '' });
+
+            // Store quest data
+            this.memberQuests = memberData.quests || [];
+            this.questHistory = memberData.quest_history || [];
+
+            // Also update rank if present
+            if (memberData.rank) {
+                this.memberData.rank = memberData.rank;
+                this.updateRankDisplay();
+            }
+
+            // Fetch all available quests for reference
+            try {
+                this.allQuests = await this.apiCall('listQuests');
+            } catch (e) {
+                console.warn('Could not fetch quest list:', e);
+                this.allQuests = [];
+            }
+
+            this.displayQuests();
+            this.displayQuestHistory();
+            this.updateQuestStats();
+
+        } catch (error) {
+            console.error('Error loading quests:', error);
+            document.getElementById('questsGrid').innerHTML = '<p style="text-align: center; color: #888; grid-column: 1 / -1;">Failed to load quests</p>';
+        }
+    },
+
+    async refreshQuests() {
+        document.getElementById('questsGrid').innerHTML = '<div class="spinner"></div>';
+        document.getElementById('questHistoryContainer').innerHTML = '<div class="spinner"></div>';
+        await this.loadQuests();
+        this.showMessage('Quests refreshed!', 'success');
+    },
+
+    showAllQuests: false,
+
+    toggleShowAllQuests() {
+        this.showAllQuests = !this.showAllQuests;
+        const btn = document.getElementById('showAllQuestsBtn');
+        if (btn) {
+            btn.textContent = this.showAllQuests ? '👁️ Hide Completed' : '👁️ Show All';
+            btn.classList.toggle('active', this.showAllQuests);
+        }
+        this.displayQuests();
+    },
+
+    displayQuests() {
+        const container = document.getElementById('questsGrid');
+
+        if (!this.memberQuests || this.memberQuests.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #888;">No active quests available. Check back later!</p>';
+            return;
+        }
+
+        const now = Math.floor(Date.now() / 1000);
+        const sixHoursAgo = now - (6 * 60 * 60);
+
+        // Separate quests by type
+        const dailyQuests = [];
+        const weeklyQuests = [];
+
+        this.memberQuests.forEach(quest => {
+            const expiredTime = quest.expired_time || 0;
+            const assignedTime = quest.assigned_time || 0;
+            const duration = expiredTime - assignedTime;
+            const isWeekly = duration > 172800;
+
+            // Skip expired quests (expired more than 6 hours ago) unless showing all
+            if (!this.showAllQuests && expiredTime < sixHoursAgo && expiredTime > 0) {
+                return;
+            }
+
+            if (isWeekly) {
+                weeklyQuests.push(quest);
+            } else {
+                dailyQuests.push(quest);
+            }
+        });
+
+        // Sort: incomplete first, then by XP reward descending
+        const sortQuests = (quests) => {
+            return quests.sort((a, b) => {
+                const aCompleted = a.is_completed === 1;
+                const bCompleted = b.is_completed === 1;
+                if (aCompleted !== bCompleted) return aCompleted ? 1 : -1;
+                // Sort by XP reward (highest first)
+                return (b.quest_reward || 0) - (a.quest_reward || 0);
+            });
+        };
+
+        const dailyCompleted = dailyQuests.filter(q => q.is_completed === 1).length;
+        const weeklyCompleted = weeklyQuests.filter(q => q.is_completed === 1).length;
+        const allDailyDone = dailyQuests.length > 0 && dailyCompleted === dailyQuests.length;
+        const allWeeklyDone = weeklyQuests.length > 0 && weeklyCompleted === weeklyQuests.length;
+
+        // Count hidden items for the toggle button
+        const hiddenExpired = this.memberQuests.filter(q => {
+            const expiredTime = q.expired_time || 0;
+            return expiredTime < sixHoursAgo && expiredTime > 0;
+        }).length;
+        const hiddenCount = (allDailyDone ? dailyQuests.length : 0) + (allWeeklyDone ? weeklyQuests.length : 0) + hiddenExpired;
+
+        container.innerHTML = `
+            ${hiddenCount > 0 || this.showAllQuests ? `
+                <div class="quest-show-all-bar">
+                    <button class="btn btn-small ${this.showAllQuests ? 'active' : ''}" id="showAllQuestsBtn" onclick="app.toggleShowAllQuests()">
+                        ${this.showAllQuests ? '👁️ Hide Completed' : '👁️ Show All'}
+                    </button>
+                    ${!this.showAllQuests && hiddenCount > 0 ? `<span class="quest-hidden-count">${hiddenCount} hidden</span>` : ''}
+                </div>
+            ` : ''}
+            ${weeklyQuests.length > 0 && (!allWeeklyDone || this.showAllQuests) ? `
+                <div class="quest-group ${allWeeklyDone ? 'all-complete' : ''}">
+                    <div class="quest-group-header" onclick="app.toggleQuestGroup('weekly')">
+                        <div class="quest-group-title">
+                            <span class="quest-group-icon">📆</span>
+                            <span>Weekly Quests</span>
+                            <span class="quest-group-count">${weeklyCompleted}/${weeklyQuests.length}</span>
+                            ${allWeeklyDone ? '<span class="quest-group-done">✓ All Done</span>' : ''}
+                        </div>
+                        <span class="quest-group-toggle" id="weeklyToggle">▼</span>
+                    </div>
+                    <div class="quest-table" id="weeklyQuests">
+                        <div class="quest-table-header">
+                            <div class="quest-col-name">Quest</div>
+                            <div class="quest-col-progress">Progress</div>
+                            <div class="quest-col-reward">Reward</div>
+                            <div class="quest-col-time">Time Left</div>
+                        </div>
+                        ${sortQuests(weeklyQuests).map(quest => this.createQuestRow(quest, 'weekly')).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            ${dailyQuests.length > 0 && (!allDailyDone || this.showAllQuests) ? `
+                <div class="quest-group ${allDailyDone ? 'all-complete' : ''}">
+                    <div class="quest-group-header" onclick="app.toggleQuestGroup('daily')">
+                        <div class="quest-group-title">
+                            <span class="quest-group-icon">📅</span>
+                            <span>Daily Quests</span>
+                            <span class="quest-group-count">${dailyCompleted}/${dailyQuests.length}</span>
+                            ${allDailyDone ? '<span class="quest-group-done">✓ All Done</span>' : ''}
+                        </div>
+                        <span class="quest-group-toggle" id="dailyToggle">▼</span>
+                    </div>
+                    <div class="quest-table" id="dailyQuests">
+                        <div class="quest-table-header">
+                            <div class="quest-col-name">Quest</div>
+                            <div class="quest-col-progress">Progress</div>
+                            <div class="quest-col-reward">Reward</div>
+                            <div class="quest-col-time">Time Left</div>
+                        </div>
+                        ${sortQuests(dailyQuests).map(quest => this.createQuestRow(quest, 'daily')).join('')}
+                    </div>
+                </div>
+            ` : ''}
+            ${!this.showAllQuests && allDailyDone && allWeeklyDone ? `
+                <div class="quest-all-complete-message">
+                    <span>🎉</span>
+                    <span>All quests completed! Check back later for new quests.</span>
+                </div>
+            ` : ''}
+        `;
+    },
+
+    toggleQuestGroup(group) {
+        const table = document.getElementById(`${group}Quests`);
+        const toggle = document.getElementById(`${group}Toggle`);
+        if (table && toggle) {
+            const isCollapsed = table.classList.toggle('collapsed');
+            toggle.textContent = isCollapsed ? '▶' : '▼';
+        }
+    },
+
+    createQuestRow(quest, questType) {
+        const isCompleted = quest.is_completed === 1;
+        const progress = quest.progress || 0;
+        const goal = quest.quest_goal || 1;
+        const progressPercent = Math.min((progress / goal) * 100, 100);
+
+        const expiredTime = quest.expired_time || 0;
+        const now = Math.floor(Date.now() / 1000);
+        const timeRemaining = expiredTime - now;
+        const isUrgent = questType === 'weekly' ? timeRemaining < 86400 : timeRemaining < 21600;
+
+        return `
+            <div class="quest-row ${isCompleted ? 'completed' : ''} ${isUrgent && !isCompleted ? 'urgent' : ''}"
+                 data-quest-id="${quest.quest_id}"
+                 data-quest-type="${questType}"
+                 data-completed="${isCompleted}">
+                <div class="quest-col-name">
+                    <span class="quest-status-icon">${isCompleted ? '✅' : (progressPercent >= 50 ? '🔶' : '⬜')}</span>
+                    <span class="quest-name-text">${quest.quest_name || 'Unknown Quest'}</span>
+                </div>
+                <div class="quest-col-progress">
+                    <div class="quest-progress-mini">
+                        <div class="quest-progress-mini-fill ${isCompleted ? 'complete' : ''}" style="width: ${progressPercent}%;"></div>
+                    </div>
+                    <span class="quest-progress-label">${progress}/${goal}</span>
+                </div>
+                <div class="quest-col-reward">
+                    <span class="quest-xp-value">+${(quest.quest_reward || 0).toLocaleString()}</span>
+                    <span class="quest-xp-label">XP</span>
+                </div>
+                <div class="quest-col-time ${isUrgent && !isCompleted ? 'urgent' : ''}">
+                    ${isCompleted ? '<span class="quest-done">Done</span>' : `<span>${quest.expired_elapsed || '-'}</span>`}
+                </div>
+            </div>
+        `;
+    },
+
+    // Keep old card method for backwards compatibility if needed elsewhere
+    createQuestCard(quest) {
+        const isCompleted = quest.is_completed === 1;
+        const progress = quest.progress || 0;
+        const goal = quest.quest_goal || 1;
+        const progressPercent = Math.min((progress / goal) * 100, 100);
+
+        const expiredTime = quest.expired_time || 0;
+        const assignedTime = quest.assigned_time || 0;
+        const duration = expiredTime - assignedTime;
+        const isWeekly = duration > 172800;
+        const questType = isWeekly ? 'weekly' : 'daily';
+
+        const now = Math.floor(Date.now() / 1000);
+        const timeRemaining = expiredTime - now;
+        const isUrgent = isWeekly ? timeRemaining < 86400 : timeRemaining < 21600;
+
+        return `
+            <div class="quest-card ${questType} ${isCompleted ? 'completed' : ''}"
+                 data-quest-id="${quest.quest_id}"
+                 data-quest-type="${questType}"
+                 data-completed="${isCompleted}">
+                <div class="quest-header">
+                    <div class="quest-name">${quest.quest_name || 'Unknown Quest'}</div>
+                    <span class="quest-type-badge ${questType}">${questType}</span>
+                </div>
+                <div class="quest-progress">
+                    <div class="quest-progress-bar">
+                        <div class="quest-progress-fill" style="width: ${progressPercent}%;"></div>
+                    </div>
+                    <div class="quest-progress-text">
+                        <span>${progress} / ${goal}</span>
+                        <span>${Math.round(progressPercent)}%</span>
+                    </div>
+                </div>
+                <div class="quest-reward">
+                    <span class="quest-reward-icon">⭐</span>
+                    <div>
+                        <div class="quest-reward-value">+${(quest.quest_reward || 0).toLocaleString()} XP</div>
+                        <div class="quest-reward-label">Reward</div>
+                    </div>
+                </div>
+                <div class="quest-expiry ${isUrgent ? 'urgent' : ''}">
+                    <span>⏰</span>
+                    <span>${isCompleted ? 'Completed!' : (quest.expired_elapsed || 'No expiry')}</span>
+                </div>
+            </div>
+        `;
+    },
+
+    displayQuestHistory() {
+        const container = document.getElementById('questHistoryContainer');
+
+        // Quest history comes from completed quests in the quests array
+        const completedQuests = (this.memberQuests || []).filter(q => q.is_completed === 1 && q.time_completed);
+
+        if (completedQuests.length === 0) {
+            container.innerHTML = '<p style="text-align: center; color: #888;">No completed quests yet. Complete quests to earn XP!</p>';
+            return;
+        }
+
+        // Sort by completion time (most recent first)
+        completedQuests.sort((a, b) => (b.time_completed || 0) - (a.time_completed || 0));
+
+        container.innerHTML = `
+            <div class="quest-history-list">
+                ${completedQuests.slice(0, 20).map(quest => `
+                    <div class="quest-history-item">
+                        <div>
+                            <div class="quest-history-name">${quest.quest_name || 'Unknown Quest'}</div>
+                            <div class="quest-history-time">Completed ${this.getElapsedTime(quest.time_completed)}</div>
+                        </div>
+                        <div class="quest-history-reward">+${(quest.reward_when_completed || quest.quest_reward || 0).toLocaleString()} XP</div>
+                    </div>
+                `).join('')}
+            </div>
+        `;
+    },
+
+    updateQuestStats() {
+        if (!this.memberQuests) return;
+
+        const now = Math.floor(Date.now() / 1000);
+
+        // Filter out expired quests for active counts
+        const activeQuests = this.memberQuests.filter(q => {
+            const expiredTime = q.expired_time || 0;
+            return expiredTime === 0 || expiredTime > now;
+        });
+
+        const dailyQuests = activeQuests.filter(q => {
+            const expiredTime = q.expired_time || 0;
+            const assignedTime = q.assigned_time || 0;
+            return (expiredTime - assignedTime) <= 172800;
+        });
+
+        const weeklyQuests = activeQuests.filter(q => {
+            const expiredTime = q.expired_time || 0;
+            const assignedTime = q.assigned_time || 0;
+            return (expiredTime - assignedTime) > 172800;
+        });
+
+        const dailyCompleted = dailyQuests.filter(q => q.is_completed === 1).length;
+        const weeklyCompleted = weeklyQuests.filter(q => q.is_completed === 1).length;
+
+        // Only count XP from non-expired, incomplete quests
+        const totalXPAvailable = activeQuests
+            .filter(q => q.is_completed !== 1)
+            .reduce((sum, q) => sum + (q.quest_reward || 0), 0);
+
+        const totalCompleted = this.memberQuests.filter(q => q.is_completed === 1).length;
+
+        // Update stats display
+        const dailyCount = document.getElementById('dailyQuestCount');
+        const weeklyCount = document.getElementById('weeklyQuestCount');
+        const xpAvailable = document.getElementById('questXPAvailable');
+        const totalCompletedEl = document.getElementById('totalQuestsCompleted');
+
+        if (dailyCount) dailyCount.textContent = `${dailyCompleted}/${dailyQuests.length}`;
+        if (weeklyCount) weeklyCount.textContent = `${weeklyCompleted}/${weeklyQuests.length}`;
+        if (xpAvailable) xpAvailable.textContent = totalXPAvailable.toLocaleString();
+        if (totalCompletedEl) totalCompletedEl.textContent = totalCompleted.toString();
+    },
+
+    filterQuests() {
+        const filter = document.getElementById('questFilter').value;
+        const rows = document.querySelectorAll('.quest-row');
+        const groups = document.querySelectorAll('.quest-group');
+
+        // Filter individual rows
+        rows.forEach(row => {
+            const questType = row.dataset.questType;
+            const isCompleted = row.dataset.completed === 'true';
+            let show = true;
+
+            switch (filter) {
+                case 'daily':
+                    show = questType === 'daily';
+                    break;
+                case 'weekly':
+                    show = questType === 'weekly';
+                    break;
+                case 'active':
+                    show = !isCompleted;
+                    break;
+                case 'completed':
+                    show = isCompleted;
+                    break;
+                default:
+                    show = true;
+            }
+
+            row.style.display = show ? '' : 'none';
+        });
+
+        // Show/hide groups based on filter and visible rows
+        groups.forEach(group => {
+            const table = group.querySelector('.quest-table');
+            const visibleRows = table ? table.querySelectorAll('.quest-row:not([style*="display: none"])') : [];
+            const groupType = table?.id?.replace('Quests', '') || '';
+
+            // Hide entire group if filtering by type and this isn't that type
+            if (filter === 'daily' && groupType === 'weekly') {
+                group.style.display = 'none';
+            } else if (filter === 'weekly' && groupType === 'daily') {
+                group.style.display = 'none';
+            } else {
+                group.style.display = visibleRows.length > 0 ? '' : 'none';
+            }
+        });
+    },
+
+    // ========================
+    // LEADERBOARD WITH RANKS
+    // ========================
+
+    createLeaderboardRankBadge(rankName) {
+        if (!rankName) return '';
+
+        const icon = this.getRankIcon(rankName);
+        const rankClass = this.getRankClass(rankName);
+
+        return `
+            <span class="leaderboard-rank-badge rank-badge ${rankClass}" style="padding: 4px 10px; min-width: auto;">
+                <span style="font-size: 14px;">${icon}</span>
+                <span style="font-size: 11px;">${rankName}</span>
+            </span>
+        `;
+    },
+
+    // Updated divinity member card with rank display
+    createDivinityMemberCardWithRank(member, zodiacSymbols) {
+        const gainClass = member.gain > 0 ? 'gain-positive' : (member.gain < 0 ? 'gain-negative' : '');
+        const gainSymbol = member.gain > 0 ? '▲' : (member.gain < 0 ? '▼' : '');
+        const profileUrl = `https://constelia.ai/forums/index.php?members/${member.forum_username}.${member.forum_uid}/`;
+        const firstLetter = member.forum_username.charAt(0).toUpperCase();
+
+        // Get rank info if available
+        const rankName = member.rank_name || member.rank?.rank_name;
+        const rankBadge = rankName ? this.createLeaderboardRankBadge(rankName) : '';
+
+        // Avatar URL construction
+        const uidPrefix = member.forum_uid < 1000 ? 0 : Math.floor(member.forum_uid / 1000);
+        const avatarUrl = `https://constelia.ai/forums/data/avatars/l/${uidPrefix}/${member.forum_uid}.jpg`;
+
+        // Fallback SVG
+        const fallbackSvg = `<svg xmlns='http://www.w3.org/2000/svg' width='40' height='40'><circle cx='20' cy='20' r='20' fill='#444'/><text x='20' y='20' text-anchor='middle' dominant-baseline='middle' fill='#aaa' font-size='16'>${firstLetter}</text></svg>`;
+        const fallbackDataUrl = 'data:image/svg+xml,' + encodeURIComponent(fallbackSvg);
+
+        return `
+            <div class="script-card compact" data-username="${member.forum_username.toLowerCase()}" data-sign="${member.sign || ''}" data-rank="${rankName || ''}" data-rank-tier="${this.getRankTier(rankName)}">
+                <div class="script-header">
+                    <div style="display: flex; align-items: center; gap: 15px;">
+                        <div style="font-size: 24px; font-weight: bold; color: #4a9eff;">#${member.rank}</div>
+                        <img src="${avatarUrl}" alt="${member.forum_username}"
+                             style="width: 40px; height: 40px; border-radius: 50%; background: #444; object-fit: cover;"
+                             onerror="this.onerror=null; this.src='${fallbackDataUrl}'">
+                        <div class="script-info">
+                            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                                <a href="${profileUrl}" target="_blank" style="text-decoration: none;">
+                                    <div class="script-name" style="color: #4a9eff; cursor: pointer;">${member.forum_username}</div>
+                                </a>
+                                ${rankBadge}
+                            </div>
+                            <div class="script-meta">
+                                ${member.xp ? `${member.xp.toLocaleString()} XP` : ''}
+                                ${member.gain !== undefined ? `<span class="${gainClass}" style="margin-left: 10px;">${gainSymbol} ${Math.abs(member.gain).toLocaleString()}</span>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                    <div style="text-align: right;">
+                        <div style="font-size: 12px; color: #888;">Perks</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #4aff4a;">${member.perks?.length || 0}</div>
+                    </div>
+                </div>
+            </div>
+        `;
     },
 });

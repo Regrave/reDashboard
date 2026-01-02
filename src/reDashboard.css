@@ -4116,3 +4116,561 @@ body {
     padding: 2px 6px;
     border-radius: 3px;
 }
+
+/* ========================
+   SEASON 5 RANK SYSTEM
+   ======================== */
+.rank-badge {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 15px 25px;
+    background: linear-gradient(135deg, rgba(74, 158, 255, 0.2), rgba(74, 255, 74, 0.1));
+    border: 2px solid rgba(74, 158, 255, 0.4);
+    border-radius: 16px;
+    min-width: 120px;
+    transition: all 0.3s ease;
+}
+
+.rank-badge:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px rgba(74, 158, 255, 0.3);
+}
+
+.rank-icon {
+    font-size: 32px;
+    margin-bottom: 5px;
+}
+
+.rank-name {
+    font-size: 16px;
+    font-weight: 700;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.rank-progress-bar {
+    height: 12px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.rank-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a9eff, #4aff4a);
+    border-radius: 6px;
+    transition: width 0.5s ease;
+}
+
+/* Rank tier colors */
+.rank-badge.rank-dust { border-color: #8b7355; background: linear-gradient(135deg, rgba(139, 115, 85, 0.3), rgba(139, 115, 85, 0.1)); }
+.rank-badge.rank-meteor { border-color: #cd853f; background: linear-gradient(135deg, rgba(205, 133, 63, 0.3), rgba(205, 133, 63, 0.1)); }
+.rank-badge.rank-asteroid { border-color: #a0522d; background: linear-gradient(135deg, rgba(160, 82, 45, 0.3), rgba(160, 82, 45, 0.1)); }
+.rank-badge.rank-comet { border-color: #00ced1; background: linear-gradient(135deg, rgba(0, 206, 209, 0.3), rgba(0, 206, 209, 0.1)); }
+.rank-badge.rank-moon { border-color: #c0c0c0; background: linear-gradient(135deg, rgba(192, 192, 192, 0.3), rgba(192, 192, 192, 0.1)); }
+.rank-badge.rank-planet { border-color: #4169e1; background: linear-gradient(135deg, rgba(65, 105, 225, 0.3), rgba(65, 105, 225, 0.1)); }
+.rank-badge.rank-star { border-color: #ffd700; background: linear-gradient(135deg, rgba(255, 215, 0, 0.3), rgba(255, 215, 0, 0.1)); }
+.rank-badge.rank-nebula { border-color: #9370db; background: linear-gradient(135deg, rgba(147, 112, 219, 0.3), rgba(147, 112, 219, 0.1)); }
+.rank-badge.rank-cluster { border-color: #ff69b4; background: linear-gradient(135deg, rgba(255, 105, 180, 0.3), rgba(255, 105, 180, 0.1)); }
+.rank-badge.rank-galaxy { border-color: #8a2be2; background: linear-gradient(135deg, rgba(138, 43, 226, 0.3), rgba(138, 43, 226, 0.1)); }
+.rank-badge.rank-pulsar { border-color: #00ff7f; background: linear-gradient(135deg, rgba(0, 255, 127, 0.3), rgba(0, 255, 127, 0.1)); }
+.rank-badge.rank-quasar { border-color: #ff4500; background: linear-gradient(135deg, rgba(255, 69, 0, 0.3), rgba(255, 69, 0, 0.1)); }
+.rank-badge.rank-supernova { border-color: #ff6347; background: linear-gradient(135deg, rgba(255, 99, 71, 0.3), rgba(255, 99, 71, 0.1)); }
+.rank-badge.rank-blackhole { border-color: #1a1a2e; background: linear-gradient(135deg, rgba(26, 26, 46, 0.9), rgba(0, 0, 0, 0.8)); box-shadow: 0 0 20px rgba(138, 43, 226, 0.5); }
+.rank-badge.rank-wormhole { border-color: #7b68ee; background: linear-gradient(135deg, rgba(123, 104, 238, 0.4), rgba(75, 0, 130, 0.3)); }
+.rank-badge.rank-universe { border-color: #e6e6fa; background: linear-gradient(135deg, rgba(230, 230, 250, 0.3), rgba(138, 43, 226, 0.2)); }
+.rank-badge.rank-multiverse { border-color: #ff00ff; background: linear-gradient(135deg, rgba(255, 0, 255, 0.3), rgba(0, 255, 255, 0.2)); }
+.rank-badge.rank-cosmos { border-color: #ffefd5; background: linear-gradient(135deg, rgba(255, 239, 213, 0.3), rgba(255, 215, 0, 0.2)); }
+.rank-badge.rank-void { border-color: #000; background: linear-gradient(135deg, rgba(0, 0, 0, 0.9), rgba(75, 0, 130, 0.3)); box-shadow: inset 0 0 20px rgba(138, 43, 226, 0.5); }
+.rank-badge.rank-zenith { border-color: #fff; background: linear-gradient(135deg, rgba(255, 255, 255, 0.4), rgba(255, 215, 0, 0.3)); box-shadow: 0 0 30px rgba(255, 215, 0, 0.6); animation: zenithGlow 2s ease-in-out infinite; }
+
+@keyframes zenithGlow {
+    0%, 100% { box-shadow: 0 0 30px rgba(255, 215, 0, 0.6); }
+    50% { box-shadow: 0 0 50px rgba(255, 215, 0, 0.9); }
+}
+
+/* Leaderboard rank badge (compact) */
+.leaderboard-rank-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+/* ========================
+   QUEST SYSTEM
+   ======================== */
+.quests-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 20px;
+}
+
+.quest-card {
+    background: linear-gradient(135deg, rgba(34, 34, 34, 0.9), rgba(34, 34, 34, 0.7));
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 20px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+}
+
+.quest-card:hover {
+    border-color: #4a9eff;
+    transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(74, 158, 255, 0.2);
+}
+
+.quest-card.daily {
+    border-left: 4px solid #4a9eff;
+}
+
+.quest-card.weekly {
+    border-left: 4px solid #9b59b6;
+}
+
+.quest-card.completed {
+    opacity: 0.7;
+    border-color: rgba(74, 255, 74, 0.5);
+    background: linear-gradient(135deg, rgba(74, 255, 74, 0.1), rgba(34, 34, 34, 0.9));
+}
+
+.quest-card.completed::after {
+    content: '✓';
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-size: 24px;
+    color: #4aff4a;
+}
+
+.quest-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 15px;
+}
+
+.quest-type-badge {
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.quest-type-badge.daily {
+    background: rgba(74, 158, 255, 0.2);
+    color: #4a9eff;
+    border: 1px solid rgba(74, 158, 255, 0.4);
+}
+
+.quest-type-badge.weekly {
+    background: rgba(155, 89, 182, 0.2);
+    color: #9b59b6;
+    border: 1px solid rgba(155, 89, 182, 0.4);
+}
+
+.quest-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+    margin-bottom: 10px;
+}
+
+.quest-progress {
+    margin: 15px 0;
+}
+
+.quest-progress-bar {
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 8px;
+}
+
+.quest-progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a9eff, #4aff4a);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.quest-progress-text {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #aaa;
+}
+
+.quest-reward {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px;
+    background: rgba(74, 255, 74, 0.1);
+    border-radius: 8px;
+    margin-top: 15px;
+}
+
+.quest-reward-icon {
+    font-size: 20px;
+}
+
+.quest-reward-value {
+    font-size: 18px;
+    font-weight: 700;
+    color: #4aff4a;
+}
+
+.quest-reward-label {
+    font-size: 12px;
+    color: #aaa;
+}
+
+.quest-expiry {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-top: 10px;
+    font-size: 12px;
+    color: #888;
+}
+
+.quest-expiry.urgent {
+    color: #ff6b6b;
+}
+
+/* Quest History */
+.quest-history-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.quest-history-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.quest-history-item:hover {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.quest-history-name {
+    font-weight: 500;
+    color: #fff;
+}
+
+.quest-history-time {
+    font-size: 12px;
+    color: #888;
+}
+
+.quest-history-reward {
+    font-weight: 600;
+    color: #4aff4a;
+}
+
+/* ========================
+   QUEST TABLE LAYOUT (Compact)
+   ======================== */
+.quests-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.quest-group {
+    background: rgba(34, 34, 34, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    overflow: hidden;
+}
+
+.quest-group-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    background: rgba(255, 255, 255, 0.03);
+    cursor: pointer;
+    user-select: none;
+    transition: background 0.2s;
+}
+
+.quest-group-header:hover {
+    background: rgba(255, 255, 255, 0.06);
+}
+
+.quest-group-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-weight: 600;
+    font-size: 15px;
+    color: #fff;
+}
+
+.quest-group-icon {
+    font-size: 18px;
+}
+
+.quest-group-count {
+    font-size: 13px;
+    font-weight: 500;
+    color: #888;
+    background: rgba(255, 255, 255, 0.08);
+    padding: 3px 10px;
+    border-radius: 10px;
+}
+
+.quest-group-toggle {
+    color: #666;
+    font-size: 12px;
+    transition: transform 0.2s;
+}
+
+.quest-table {
+    transition: max-height 0.3s ease, opacity 0.2s;
+    overflow: hidden;
+}
+
+.quest-table.collapsed {
+    max-height: 0 !important;
+    opacity: 0;
+}
+
+.quest-table-header {
+    display: grid;
+    grid-template-columns: 1fr 180px 100px 100px;
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.2);
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: #666;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.quest-row {
+    display: grid;
+    grid-template-columns: 1fr 180px 100px 100px;
+    padding: 12px 20px;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+    transition: background 0.15s;
+}
+
+.quest-row:last-child {
+    border-bottom: none;
+}
+
+.quest-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+}
+
+.quest-row.completed {
+    opacity: 0.6;
+}
+
+.quest-row.completed:hover {
+    opacity: 0.8;
+}
+
+.quest-row.urgent {
+    background: rgba(255, 100, 100, 0.05);
+}
+
+.quest-col-name {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.quest-status-icon {
+    font-size: 14px;
+    flex-shrink: 0;
+}
+
+.quest-name-text {
+    font-weight: 500;
+    color: #ddd;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.quest-row.completed .quest-name-text {
+    text-decoration: line-through;
+    color: #888;
+}
+
+.quest-col-progress {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.quest-progress-mini {
+    flex: 1;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 3px;
+    overflow: hidden;
+    min-width: 60px;
+    max-width: 100px;
+}
+
+.quest-progress-mini-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #4a9eff, #6ab0ff);
+    border-radius: 3px;
+    transition: width 0.3s;
+}
+
+.quest-progress-mini-fill.complete {
+    background: linear-gradient(90deg, #4aff4a, #6aff6a);
+}
+
+.quest-progress-label {
+    font-size: 12px;
+    color: #888;
+    font-weight: 500;
+    min-width: 45px;
+}
+
+.quest-col-reward {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.quest-xp-value {
+    font-weight: 600;
+    color: #4aff4a;
+    font-size: 13px;
+}
+
+.quest-xp-label {
+    font-size: 11px;
+    color: #666;
+}
+
+.quest-col-time {
+    font-size: 12px;
+    color: #888;
+}
+
+.quest-col-time.urgent {
+    color: #ff6b6b;
+    font-weight: 500;
+}
+
+.quest-done {
+    color: #4aff4a;
+    font-weight: 500;
+}
+
+/* Quest Show All Bar */
+.quest-show-all-bar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+}
+
+.quest-show-all-bar .btn.active {
+    background: linear-gradient(135deg, #4a9eff, #357abd);
+}
+
+.quest-hidden-count {
+    font-size: 12px;
+    color: #888;
+    font-style: italic;
+}
+
+/* All Complete States */
+.quest-group.all-complete {
+    opacity: 0.7;
+}
+
+.quest-group-done {
+    font-size: 11px;
+    color: #4aff4a;
+    background: rgba(74, 255, 74, 0.15);
+    padding: 3px 8px;
+    border-radius: 8px;
+    margin-left: 5px;
+}
+
+.quest-all-complete-message {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 40px 20px;
+    background: rgba(74, 255, 74, 0.05);
+    border: 1px solid rgba(74, 255, 74, 0.2);
+    border-radius: 12px;
+    color: #4aff4a;
+    font-size: 15px;
+}
+
+.quest-all-complete-message span:first-child {
+    font-size: 24px;
+}
+
+/* Responsive adjustments for quest table */
+@media (max-width: 768px) {
+    .quest-table-header {
+        display: none;
+    }
+
+    .quest-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+        padding: 14px 16px;
+    }
+
+    .quest-col-name {
+        order: 1;
+    }
+
+    .quest-col-progress {
+        order: 2;
+        justify-content: flex-start;
+    }
+
+    .quest-progress-mini {
+        max-width: 150px;
+    }
+
+    .quest-col-reward {
+        order: 3;
+    }
+
+    .quest-col-time {
+        order: 4;
+        font-size: 11px;
+    }
+}

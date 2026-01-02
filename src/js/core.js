@@ -1212,7 +1212,8 @@ const app = {
                     hashes: '',
                     achievements: '',
                     beautify: '',
-                    steam: ''
+                    steam: '',
+                    quests: ''
                 }),
                 // All other data calls
                 this.apiCall('getAllScripts').catch(e => { console.warn('getAllScripts failed:', e); return []; }),
@@ -1230,13 +1231,19 @@ const app = {
                 this.memberScripts = memberResponse.scripts || [];
                 this.memberProjects = memberResponse.fc2t || [];
                 this.ownedPerks = memberResponse.perks || [];
-                
+                this.memberQuests = memberResponse.quests || [];
+
                 // Update the header with actual member info immediately
                 document.getElementById('connectedUsername').textContent = this.memberData.username || 'Unknown';
                 document.getElementById('userLevel').textContent = this.memberData.level || '0';
                 const xpValue = this.memberData.xp || 0;
                 document.getElementById('userXP').textContent = xpValue.toLocaleString();
                 this.setUserAvatar(this.memberData);
+
+                // Update rank display if rank data is available (Season 6)
+                if (this.memberData.rank) {
+                    this.updateRankDisplay();
+                }
                 
                 // Only show Roll Loot button if user has Abundance of Jupiter perk (ID 11)
                 const rollButton = document.getElementById('rollButton');

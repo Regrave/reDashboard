@@ -43,7 +43,7 @@
           <button class="roll-button" id="rollButton" onclick="app.rollLoot()"> 🎲 Roll Loot </button>
           <button class="settings-button" id="settingsButton" onclick="app.showSettingsModal()"> ⚙️ Settings </button>
         </div>
-        <h1> fantasy.dashboard <span class="version-badge">v1.7.6</span>
+        <h1> fantasy.dashboard <span class="version-badge">v6.0.0</span>
         </h1>
         <div class="login-section" id="loginSection">
           <input type="password" class="api-key-input" id="apiKey" placeholder="Enter your Constelia API key...">
@@ -99,6 +99,7 @@
         <button class="nav-tab" onclick="app.switchTab('sessions')">🔐 Sessions</button>
         <button class="nav-tab" onclick="app.switchTab('perks')">✨ Perks</button>
         <button class="nav-tab" onclick="app.switchTab('achievements')">🎴 Achievements</button>
+        <button class="nav-tab" onclick="app.switchTab('quests')">🎯 Quests</button>
         <button class="nav-tab" onclick="app.switchTab('divinity')">🏆 Leaderboard</button>
         <button class="nav-tab" onclick="app.switchTab('config')">⚙️ Configuration</button>
       </div>
@@ -110,6 +111,30 @@
             <h2>👤 Member Information</h2>
             <div class="stats-grid" id="memberStats">
               <div class="spinner"></div>
+            </div>
+          </div>
+          <div class="card" id="rankProgressCard" style="display: none;">
+            <h2>🌟 Season 6 Rank</h2>
+            <div class="rank-display">
+              <div style="display: flex; align-items: center; gap: 20px; margin-bottom: 20px;">
+                <div class="rank-badge" id="currentRankBadge">
+                  <span class="rank-icon" id="rankIcon">🌟</span>
+                  <span class="rank-name" id="rankName">Loading...</span>
+                </div>
+                <div style="flex: 1;">
+                  <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                    <span style="color: #aaa; font-size: 14px;">Progress to <span id="nextRankName" style="color: #4a9eff;">Next Rank</span></span>
+                    <span style="color: #fff; font-size: 14px;"><span id="rankProgressPercent">0</span>%</span>
+                  </div>
+                  <div class="rank-progress-bar">
+                    <div class="rank-progress-fill" id="rankProgressFill" style="width: 0%;"></div>
+                  </div>
+                  <div style="display: flex; justify-content: space-between; margin-top: 8px;">
+                    <span style="color: #888; font-size: 12px;"><span id="currentRankXP">0</span> XP</span>
+                    <span style="color: #888; font-size: 12px;"><span id="xpNeeded">0</span> XP needed</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div class="card">
@@ -361,6 +386,52 @@
             </div>
           </div>
         </div>
+        <!-- Quests Section -->
+        <div class="content-section" id="quests-section">
+          <div class="card">
+            <h2>🎯 Season 6 Quests</h2>
+            <div class="quests-overview" style="margin-bottom: 30px;">
+              <div class="stats-grid">
+                <div class="stat-box">
+                  <div class="stat-label">Daily Quests</div>
+                  <div class="stat-value" id="dailyQuestCount">0/5</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Weekly Quests</div>
+                  <div class="stat-value" id="weeklyQuestCount">0/5</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">XP Available</div>
+                  <div class="stat-value" style="color: #4aff4a;" id="questXPAvailable">0</div>
+                </div>
+                <div class="stat-box">
+                  <div class="stat-label">Quests Completed</div>
+                  <div class="stat-value" style="color: #4a9eff;" id="totalQuestsCompleted">0</div>
+                </div>
+              </div>
+            </div>
+            <div class="filter-controls" style="margin-bottom: 20px;">
+              <label style="color: #aaa; font-size: 14px;">Filter:</label>
+              <select class="form-select" id="questFilter" style="width: 150px;" onchange="app.filterQuests()">
+                <option value="all">All Quests</option>
+                <option value="daily">Daily Only</option>
+                <option value="weekly">Weekly Only</option>
+                <option value="active">Active</option>
+                <option value="completed">Completed</option>
+              </select>
+              <button class="btn btn-small" onclick="app.refreshQuests()">🔄 Refresh</button>
+            </div>
+            <div class="quests-grid" id="questsGrid">
+              <div class="spinner"></div>
+            </div>
+          </div>
+          <div class="card">
+            <h2>📜 Quest History</h2>
+            <div id="questHistoryContainer">
+              <div class="spinner"></div>
+            </div>
+          </div>
+        </div>
         <!-- Leaderboard Section -->
         <div class="content-section" id="divinity-section">
           <div class="card">
@@ -383,10 +454,33 @@
                 <div class="value" id="earthTotal">0</div>
               </div>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-              <h3 style="margin: 0; color: #4a9eff;">🏆 Top Players</h3>
-              <div class="filter-controls">
-                <input type="text" class="search-input" id="divinitySearchInput" placeholder="Search by username..." style="width: 250px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+              <h3 style="margin: 0; color: #4a9eff;">🏆 Season 6 Rankings</h3>
+              <div class="filter-controls" style="flex-wrap: wrap;">
+                <input type="text" class="search-input" id="divinitySearchInput" placeholder="Search by username..." style="width: 200px;">
+                <select class="filter-dropdown" id="divinityRankFilter" onchange="app.filterDivinityMembers()">
+                  <option value="">All Ranks</option>
+                  <option value="Dust">🌫️ Dust</option>
+                  <option value="Meteor">☄️ Meteor</option>
+                  <option value="Asteroid">🪨 Asteroid</option>
+                  <option value="Comet">💫 Comet</option>
+                  <option value="Moon">🌙 Moon</option>
+                  <option value="Planet">🪐 Planet</option>
+                  <option value="Star">⭐ Star</option>
+                  <option value="Nebula">🌌 Nebula</option>
+                  <option value="Cluster">✨ Cluster</option>
+                  <option value="Galaxy">🌀 Galaxy</option>
+                  <option value="Pulsar">💠 Pulsar</option>
+                  <option value="Quasar">🔮 Quasar</option>
+                  <option value="Supernova">💥 Supernova</option>
+                  <option value="Blackhole">🕳️ Blackhole</option>
+                  <option value="Wormhole">🌀 Wormhole</option>
+                  <option value="Universe">🌐 Universe</option>
+                  <option value="Multiverse">🎆 Multiverse</option>
+                  <option value="Cosmos">🌟 Cosmos</option>
+                  <option value="Void">⬛ Void</option>
+                  <option value="Zenith">👑 Zenith</option>
+                </select>
                 <select class="filter-dropdown" id="divinitySignFilter">
                   <option value="">All Signs</option>
                   <option value="Aries">♈ Aries</option>
@@ -495,7 +589,7 @@
       <span style="color: #ff6b6b; font-size: 14px; margin: 0 3px;">♡</span>
       <span style="opacity: 0.7;">by</span>
       <a href="https://constelia.ai/forums/index.php?members/rucka.17146/" target="_blank" style="color: #4a9eff; font-weight: 600; margin-left: 4px; text-decoration: none; transition: all 0.2s;" onmouseover="this.style.color='#6bb6ff'; this.style.textDecoration='underline';" onmouseout="this.style.color='#4a9eff'; this.style.textDecoration='none';">Rucka</a>
-      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v1.7.6</span>
+      <span style="opacity: 0.5; margin-left: 8px;">• Dashboard v6.0.0</span>
     </div>
     <!-- Bottom-Right Notification Container -->
     <div class="notification-container" id="notificationContainer">

@@ -1224,6 +1224,10 @@ Object.assign(app, {
             this.loadAchievements();
         }
 
+        if (tabName === 'quests') {
+            this.loadQuests();
+        }
+
         if (tabName === 'overview') {
             setTimeout(() => {
                 const terminalInput = document.getElementById('terminalInput');
