@@ -723,6 +723,101 @@ body {
 	transform: translateY(-50%) translateX(25px);
 }
 
+/* Keybind Button Styles */
+.keybind-button {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	min-width: 120px;
+	padding: 8px 16px;
+	background: #2a2a2a;
+	border: 1px solid #555;
+	border-radius: 6px;
+	cursor: pointer;
+	transition: all 0.2s ease;
+	user-select: none;
+}
+
+.keybind-button:hover {
+	background: #333;
+	border-color: #666;
+	transform: scale(1.02);
+}
+
+.keybind-button:active {
+	transform: scale(0.98);
+}
+
+.keybind-button .keybind-value {
+	font-size: 14px;
+	font-weight: 600;
+	color: #fff;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+}
+
+.keybind-button .keybind-hint {
+	font-size: 10px;
+	color: #888;
+	margin-top: 2px;
+}
+
+/* Listening state - waiting for key press */
+.keybind-button.listening {
+	background: linear-gradient(135deg, #1a3a5c, #2a4a6c);
+	border-color: #4a9eff;
+	box-shadow: 0 0 15px rgba(74, 158, 255, 0.3);
+	animation: keybindPulse 1.5s ease-in-out infinite;
+}
+
+.keybind-button.listening .keybind-value {
+	color: #4a9eff;
+}
+
+.keybind-button.listening .keybind-hint {
+	color: #6ab0ff;
+}
+
+@keyframes keybindPulse {
+	0%, 100% {
+		box-shadow: 0 0 15px rgba(74, 158, 255, 0.3);
+	}
+	50% {
+		box-shadow: 0 0 25px rgba(74, 158, 255, 0.5);
+	}
+}
+
+/* Success state - key captured */
+.keybind-button.success {
+	background: linear-gradient(135deg, #1a4a2a, #2a5a3a);
+	border-color: #4aff4a;
+	box-shadow: 0 0 15px rgba(74, 255, 74, 0.3);
+}
+
+.keybind-button.success .keybind-value {
+	color: #4aff4a;
+}
+
+/* Error state - key not supported */
+.keybind-button.error {
+	background: linear-gradient(135deg, #4a1a1a, #5a2a2a);
+	border-color: #ff4a4a;
+	box-shadow: 0 0 15px rgba(255, 74, 74, 0.3);
+	animation: keybindShake 0.3s ease-in-out;
+}
+
+.keybind-button.error .keybind-value {
+	color: #ff4a4a;
+	font-size: 12px;
+}
+
+@keyframes keybindShake {
+	0%, 100% { transform: translateX(0); }
+	25% { transform: translateX(-5px); }
+	75% { transform: translateX(5px); }
+}
+
 /* ========================
    CONFIGURATION
    ======================== */
