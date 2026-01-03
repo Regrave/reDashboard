@@ -3156,21 +3156,10 @@ Object.assign(app, {
     // ========================
 
     async parseConfigurationMetadata(scriptId) {
-        // Always check caching preference and session state
-        const useCache = this.cachingEnabled && this.sessionInitialized;
         const cacheKey = `config_metadata_${scriptId}`;
-        
-        if (useCache) {
-            const cached = this.getCachedConfigMetadata(cacheKey);
-            if (cached) {
-                console.log(`💾 Using cached config metadata for script ${scriptId}`);
-                return cached;
-            }
-        } else {
-            console.log(`🔄 Fetching fresh config metadata for script ${scriptId} (caching: ${this.cachingEnabled ? 'enabled but session not initialized' : 'disabled'})`);
-        }
 
         try {
+            // Always fetch the script to check for changes
             const apiResponse = await this.apiCall('getScript', {
                 id: scriptId,
                 beautify: ''
@@ -3198,16 +3187,22 @@ Object.assign(app, {
                 return { categories: {}, dropdowns: {} };
             }
 
-            // Note: JSON.parse already handles escape sequences, no manual replacements needed
+            // Hash the script source to detect changes
+            const sourceHash = this.hashString(scriptSource);
 
-            // Parse configuration metadata from source
+            // Check if we have valid cached metadata with matching hash
+            const cached = this.getCachedConfigMetadata(cacheKey);
+            if (cached && cached.hash === sourceHash) {
+                console.log(`💾 Using cached config metadata for script ${scriptId} (source unchanged)`);
+                return cached.metadata;
+            }
+
+            // Source changed or no cache - parse fresh
+            console.log(`🔄 Parsing fresh config metadata for script ${scriptId}${cached ? ' (source changed)' : ''}`);
             const metadata = this.extractConfigCategories(scriptSource);
 
-            // Cache the result if caching is enabled
-            if (this.cachingEnabled) {
-                this.setCachedConfigMetadata(cacheKey, metadata);
-                console.log(`💾 Cached config metadata for script ${scriptId}`);
-            }
+            // Cache the result with hash
+            this.setCachedConfigMetadata(cacheKey, metadata, sourceHash);
 
             return metadata;
 
@@ -3681,23 +3676,27 @@ Object.assign(app, {
         }
     },
 
-    getCachedConfigMetadata(key) {
-        if (!this.cachingEnabled) {
-            return null;
+    // Simple string hash for cache invalidation
+    hashString(str) {
+        let hash = 0;
+        for (let i = 0; i < str.length; i++) {
+            const char = str.charCodeAt(i);
+            hash = ((hash << 5) - hash) + char;
+            hash = hash & hash; // Convert to 32bit integer
         }
-        
+        return hash.toString(36);
+    },
+
+    getCachedConfigMetadata(key) {
         try {
             const cached = localStorage.getItem(key);
             if (cached) {
                 const data = JSON.parse(cached);
-                // Check if cache is still valid (24 hours)
-                if (Date.now() - data.timestamp < 24 * 60 * 60 * 1000) {
-                    return data.metadata || { categories: data.categories || {}, dropdowns: {} };
-                } else {
-                    // Remove expired cache
-                    localStorage.removeItem(key);
-                    console.log(`🗑️ Removed expired cache: ${key}`);
-                }
+                // Return full cached data including hash for comparison
+                return {
+                    metadata: data.metadata || { categories: data.categories || {}, dropdowns: {} },
+                    hash: data.hash
+                };
             }
         } catch (e) {
             console.warn('Error reading config metadata cache:', e);
@@ -3705,15 +3704,11 @@ Object.assign(app, {
         return null;
     },
 
-    setCachedConfigMetadata(key, metadata) {
-        if (!this.cachingEnabled) {
-            return;
-        }
-        
+    setCachedConfigMetadata(key, metadata, hash) {
         try {
             localStorage.setItem(key, JSON.stringify({
                 metadata: metadata,
-                timestamp: Date.now()
+                hash: hash
             }));
         } catch (e) {
             console.warn('Error writing config metadata cache:', e);
