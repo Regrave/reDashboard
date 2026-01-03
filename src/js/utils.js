@@ -1999,7 +1999,8 @@ Object.assign(app, {
                     range: configMetadata.ranges ? configMetadata.ranges[settingName] : null,
                     multiselect: configMetadata.multiselects ? configMetadata.multiselects[settingName] : null,
                     description: configMetadata.descriptions ? configMetadata.descriptions[settingName] : null,
-                    requires: configMetadata.requires ? configMetadata.requires[settingName] : null
+                    requires: configMetadata.requires ? configMetadata.requires[settingName] : null,
+                    keybind: configMetadata.keybinds ? configMetadata.keybinds[settingName] : null
                 };
                 formHTML += this.createConfigField(settingName, value, dropdownOptions, metadata);
             });
@@ -2185,6 +2186,7 @@ Object.assign(app, {
         const hasRange = metadata && metadata.range;
         const hasMultiselect = metadata && metadata.multiselect;
         const hasDescription = metadata && metadata.description;
+        const hasKeybind = metadata && metadata.keybind;
         
         // Check if this is an array-like string
         const isArrayString = this.isArrayString(value);
@@ -2231,6 +2233,20 @@ Object.assign(app, {
         } else if (fieldType === 'color') {
             fieldHTML += `
                 <div class="color-picker-placeholder" id="${fieldId}" data-key="${key}" data-value="${value}"></div>
+            `;
+        } else if (hasKeybind) {
+            // Create keybind button
+            const displayKey = value || 'None';
+            fieldHTML += `
+                <div class="keybind-button"
+                    id="${fieldId}"
+                    data-config-key="${key}"
+                    data-current-key="${value || ''}"
+                    onclick="app.startKeybindCapture('${key}', '${fieldId}')"
+                    tabindex="0">
+                    <span class="keybind-value">${displayKey}</span>
+                    <span class="keybind-hint">Click to set</span>
+                </div>
             `;
         } else if (hasRange) {
             // Create range slider
@@ -2727,6 +2743,282 @@ Object.assign(app, {
         }, 300);
     },
 
+    // Supported keys from lib_keys.lua
+    supportedKeys: {
+        // Mouse buttons
+        "MOUSE_LEFT": 1, "MOUSE_RIGHT": 2, "MOUSE_MIDDLE": 4, "MOUSE_XBUTTON1": 5, "MOUSE_XBUTTON2": 6,
+        // Letters
+        "A": 65, "B": 66, "C": 67, "D": 68, "E": 69, "F": 70, "G": 71, "H": 72, "I": 73, "J": 74,
+        "K": 75, "L": 76, "M": 77, "N": 78, "O": 79, "P": 80, "Q": 81, "R": 82, "S": 83, "T": 84,
+        "U": 85, "V": 86, "W": 87, "X": 88, "Y": 89, "Z": 90,
+        // Numbers
+        "0": 48, "1": 49, "2": 50, "3": 51, "4": 52, "5": 53, "6": 54, "7": 55, "8": 56, "9": 57,
+        // Special keys
+        "ENTER": 13, "BACKSPACE": 8, "TAB": 9, "SPACE": 32,
+        "MINUS": 189, "EQUALS": 187, "LEFT_BRACKET": 219, "RIGHT_BRACKET": 221,
+        "BACKSLASH": 220, "SEMICOLON": 186, "APOSTROPHE": 222, "GRAVE": 192,
+        "COMMA": 188, "PERIOD": 190, "SLASH": 191, "CAPS_LOCK": 20,
+        // Function keys
+        "F1": 112, "F2": 113, "F3": 114, "F4": 115, "F5": 116, "F6": 117,
+        "F7": 118, "F8": 119, "F9": 120, "F10": 121, "F11": 122, "F12": 123,
+        // Navigation keys
+        "INSERT": 45, "HOME": 36, "PAGE_UP": 33, "DELETE": 46, "END": 35, "PAGE_DOWN": 34,
+        // Arrow keys
+        "RIGHT": 39, "LEFT": 37, "DOWN": 40, "UP": 38,
+        // Numpad keys
+        "NUM_LOCK": 144, "NUMPAD_DIVIDE": 111, "NUMPAD_MULTIPLY": 106, "NUMPAD_MINUS": 109,
+        "NUMPAD_PLUS": 107, "NUMPAD_ENTER": 13,
+        "NUMPAD_0": 96, "NUMPAD_1": 97, "NUMPAD_2": 98, "NUMPAD_3": 99, "NUMPAD_4": 100,
+        "NUMPAD_5": 101, "NUMPAD_6": 102, "NUMPAD_7": 103, "NUMPAD_8": 104, "NUMPAD_9": 105,
+        "NUMPAD_PERIOD": 110, "CONTEXT_MENU": 93,
+        // Modifier keys
+        "SHIFT": 16, "CTRL": 17, "ALT": 18, "META": 91,
+        "SHIFT_RIGHT": 161, "CTRL_RIGHT": 163, "ALT_RIGHT": 165, "META_RIGHT": 92
+    },
+
+    // Reverse lookup: keyCode -> key name
+    keyCodeToName: null,
+
+    getKeyCodeToName() {
+        if (!this.keyCodeToName) {
+            this.keyCodeToName = {};
+            for (const [name, code] of Object.entries(this.supportedKeys)) {
+                // Don't overwrite if already set (first wins for duplicate codes like ENTER/NUMPAD_ENTER)
+                if (!this.keyCodeToName[code]) {
+                    this.keyCodeToName[code] = name;
+                }
+            }
+        }
+        return this.keyCodeToName;
+    },
+
+    // Active keybind capture state
+    activeKeybindCapture: null,
+
+    startKeybindCapture(key, fieldId) {
+        const element = document.getElementById(fieldId);
+        if (!element) return;
+
+        // Cancel any existing capture
+        if (this.activeKeybindCapture) {
+            this.cancelKeybindCapture();
+        }
+
+        // Set up capture state
+        this.activeKeybindCapture = { key, fieldId, element };
+
+        // Update UI to show listening state
+        element.classList.add('listening');
+        const valueSpan = element.querySelector('.keybind-value');
+        const hintSpan = element.querySelector('.keybind-hint');
+        if (valueSpan) valueSpan.textContent = 'Press a key...';
+        if (hintSpan) hintSpan.textContent = 'ESC to cancel';
+
+        // Add event listeners
+        this._keybindKeyHandler = (e) => this.handleKeybindKeyPress(e);
+        this._keybindMouseHandler = (e) => this.handleKeybindMousePress(e);
+        this._keybindBlurHandler = () => this.cancelKeybindCapture();
+
+        document.addEventListener('keydown', this._keybindKeyHandler);
+        document.addEventListener('mousedown', this._keybindMouseHandler);
+        window.addEventListener('blur', this._keybindBlurHandler);
+    },
+
+    handleKeybindKeyPress(e) {
+        if (!this.activeKeybindCapture) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const keyCode = e.keyCode || e.which;
+
+        // ESC cancels capture
+        if (keyCode === 27) {
+            this.cancelKeybindCapture();
+            return;
+        }
+
+        // Try to find the key name from our supported keys
+        const keyName = this.getKeyNameFromCode(keyCode, e);
+
+        if (keyName) {
+            this.setKeybindValue(keyName);
+        } else {
+            this.showKeybindError();
+        }
+    },
+
+    handleKeybindMousePress(e) {
+        if (!this.activeKeybindCapture) return;
+
+        const element = this.activeKeybindCapture.element;
+
+        // If clicking outside the keybind button, cancel
+        if (!element.contains(e.target)) {
+            // Check if it's a supported mouse button
+            let mouseKeyName = null;
+            switch (e.button) {
+                case 0: mouseKeyName = 'MOUSE_LEFT'; break;
+                case 1: mouseKeyName = 'MOUSE_MIDDLE'; break;
+                case 2: mouseKeyName = 'MOUSE_RIGHT'; break;
+                case 3: mouseKeyName = 'MOUSE_XBUTTON1'; break;
+                case 4: mouseKeyName = 'MOUSE_XBUTTON2'; break;
+            }
+
+            if (mouseKeyName && this.supportedKeys[mouseKeyName]) {
+                e.preventDefault();
+                e.stopPropagation();
+                this.setKeybindValue(mouseKeyName);
+            } else {
+                this.cancelKeybindCapture();
+            }
+            return;
+        }
+
+        // Clicking on the keybind button itself while in capture mode - capture the mouse button
+        e.preventDefault();
+        e.stopPropagation();
+
+        let mouseKeyName = null;
+        switch (e.button) {
+            case 0: mouseKeyName = 'MOUSE_LEFT'; break;
+            case 1: mouseKeyName = 'MOUSE_MIDDLE'; break;
+            case 2: mouseKeyName = 'MOUSE_RIGHT'; break;
+            case 3: mouseKeyName = 'MOUSE_XBUTTON1'; break;
+            case 4: mouseKeyName = 'MOUSE_XBUTTON2'; break;
+        }
+
+        if (mouseKeyName && this.supportedKeys[mouseKeyName]) {
+            this.setKeybindValue(mouseKeyName);
+        } else {
+            this.showKeybindError();
+        }
+    },
+
+    getKeyNameFromCode(keyCode, event) {
+        // Check if the keyCode maps directly to a supported key
+        const codeToName = this.getKeyCodeToName();
+
+        // Handle special cases for left/right modifiers
+        if (event) {
+            if (event.code === 'ShiftRight') return 'SHIFT_RIGHT';
+            if (event.code === 'ControlRight') return 'CTRL_RIGHT';
+            if (event.code === 'AltRight') return 'ALT_RIGHT';
+            if (event.code === 'MetaRight') return 'META_RIGHT';
+            if (event.code === 'ShiftLeft') return 'SHIFT';
+            if (event.code === 'ControlLeft') return 'CTRL';
+            if (event.code === 'AltLeft') return 'ALT';
+            if (event.code === 'MetaLeft') return 'META';
+
+            // Handle numpad keys using event.location
+            if (event.location === 3) { // KeyboardEvent.DOM_KEY_LOCATION_NUMPAD
+                const numpadMap = {
+                    96: 'NUMPAD_0', 97: 'NUMPAD_1', 98: 'NUMPAD_2', 99: 'NUMPAD_3', 100: 'NUMPAD_4',
+                    101: 'NUMPAD_5', 102: 'NUMPAD_6', 103: 'NUMPAD_7', 104: 'NUMPAD_8', 105: 'NUMPAD_9',
+                    110: 'NUMPAD_PERIOD', 111: 'NUMPAD_DIVIDE', 106: 'NUMPAD_MULTIPLY',
+                    109: 'NUMPAD_MINUS', 107: 'NUMPAD_PLUS', 13: 'NUMPAD_ENTER'
+                };
+                if (numpadMap[keyCode]) return numpadMap[keyCode];
+            }
+        }
+
+        // Try to get key from letter/number directly
+        if (keyCode >= 65 && keyCode <= 90) {
+            return String.fromCharCode(keyCode); // A-Z
+        }
+        if (keyCode >= 48 && keyCode <= 57) {
+            return String.fromCharCode(keyCode); // 0-9
+        }
+
+        // Look up in reverse map
+        return codeToName[keyCode] || null;
+    },
+
+    setKeybindValue(keyName) {
+        if (!this.activeKeybindCapture) return;
+
+        const { key, fieldId, element } = this.activeKeybindCapture;
+
+        // Update config value
+        this.updateConfigValue(key, keyName);
+
+        // Update UI
+        element.classList.remove('listening');
+        element.classList.add('success');
+        element.dataset.currentKey = keyName;
+
+        const valueSpan = element.querySelector('.keybind-value');
+        const hintSpan = element.querySelector('.keybind-hint');
+        if (valueSpan) valueSpan.textContent = keyName;
+        if (hintSpan) hintSpan.textContent = 'Click to set';
+
+        // Remove success class after animation
+        setTimeout(() => {
+            element.classList.remove('success');
+        }, 300);
+
+        // Update main display and trigger auto-save
+        this.updateMainConfigDisplay();
+        this.triggerAutoSave();
+
+        // Clean up
+        this.cleanupKeybindCapture();
+    },
+
+    showKeybindError() {
+        if (!this.activeKeybindCapture) return;
+
+        const { element } = this.activeKeybindCapture;
+
+        // Show error state
+        element.classList.add('error');
+        const valueSpan = element.querySelector('.keybind-value');
+        if (valueSpan) valueSpan.textContent = 'Key not supported';
+
+        // Remove error state and show listening again
+        setTimeout(() => {
+            if (this.activeKeybindCapture && this.activeKeybindCapture.element === element) {
+                element.classList.remove('error');
+                if (valueSpan) valueSpan.textContent = 'Press a key...';
+            }
+        }, 1000);
+    },
+
+    cancelKeybindCapture() {
+        if (!this.activeKeybindCapture) return;
+
+        const { element } = this.activeKeybindCapture;
+        const currentKey = element.dataset.currentKey || 'None';
+
+        // Restore UI
+        element.classList.remove('listening');
+        const valueSpan = element.querySelector('.keybind-value');
+        const hintSpan = element.querySelector('.keybind-hint');
+        if (valueSpan) valueSpan.textContent = currentKey;
+        if (hintSpan) hintSpan.textContent = 'Click to set';
+
+        // Clean up
+        this.cleanupKeybindCapture();
+    },
+
+    cleanupKeybindCapture() {
+        // Remove event listeners
+        if (this._keybindKeyHandler) {
+            document.removeEventListener('keydown', this._keybindKeyHandler);
+            this._keybindKeyHandler = null;
+        }
+        if (this._keybindMouseHandler) {
+            document.removeEventListener('mousedown', this._keybindMouseHandler);
+            this._keybindMouseHandler = null;
+        }
+        if (this._keybindBlurHandler) {
+            window.removeEventListener('blur', this._keybindBlurHandler);
+            this._keybindBlurHandler = null;
+        }
+
+        this.activeKeybindCapture = null;
+    },
+
     async saveScriptConfig(isAutoSave = false, pushToOmega = false) {
         const software = document.getElementById('softwareSelect').value;
         const scriptKey = this.currentScriptKey;
@@ -2926,7 +3218,7 @@ Object.assign(app, {
     },
 
     extractConfigCategories(scriptSource) {
-        if (!scriptSource) return { categories: {}, dropdowns: {}, ranges: {}, multiselects: {}, descriptions: {}, requires: {} };
+        if (!scriptSource) return { categories: {}, dropdowns: {}, ranges: {}, multiselects: {}, descriptions: {}, requires: {}, keybinds: {} };
 
         const categories = {};
         const dropdowns = {};
@@ -2934,6 +3226,7 @@ Object.assign(app, {
         const multiselects = {};
         const descriptions = {};
         const requires = {};
+        const keybinds = {};
         // Normalize line endings (handle Windows \r\n and old Mac \r)
         const normalizedSource = scriptSource.replace(/\r\n/g, '\n').replace(/\r/g, '\n');
         const lines = normalizedSource.split('\n');
@@ -3000,6 +3293,8 @@ Object.assign(app, {
                         descriptions[settingName] = metaValue;
                     } else if (metaType === 'requires') {
                         requires[settingName] = metaValue;
+                    } else if (metaType === 'lib' && metaValue.toLowerCase() === 'keys') {
+                        keybinds[settingName] = true;
                     }
                 }
 
@@ -3050,6 +3345,11 @@ Object.assign(app, {
                     if (requiresMatch) {
                         requires[settingName] = requiresMatch[1].trim();
                     }
+
+                    const libMatch = metaLine.match(/--\s*@lib:\s*(.+)/i);
+                    if (libMatch && libMatch[1].trim().toLowerCase() === 'keys') {
+                        keybinds[settingName] = true;
+                    }
                 }
             }
 
@@ -3059,7 +3359,7 @@ Object.assign(app, {
             }
         }
 
-        return { categories, dropdowns, ranges, multiselects, descriptions, requires };
+        return { categories, dropdowns, ranges, multiselects, descriptions, requires, keybinds };
     },
 
     // Helper function to analyze configuration structure
