@@ -112,6 +112,40 @@ local myScript = {
 }
 ```
 
+### @lib: keys
+Creates a keybind button that captures keyboard keys or mouse buttons. Uses key names from `lib_keys.lua`.
+
+```lua
+local myScript = {
+    -- @category: Keybinds
+    -- @lib: keys
+    -- @description: Key to toggle the feature
+    toggle_key = "F1",
+
+    -- @lib: keys
+    activation_key = "SHIFT",
+
+    hold_key = "MOUSE_RIGHT"  -- @lib: keys
+}
+```
+
+**Supported Keys:**
+- **Mouse:** `MOUSE_LEFT`, `MOUSE_RIGHT`, `MOUSE_MIDDLE`, `MOUSE_XBUTTON1`, `MOUSE_XBUTTON2`
+- **Letters:** `A` - `Z`
+- **Numbers:** `0` - `9`
+- **Function Keys:** `F1` - `F12`
+- **Modifiers:** `SHIFT`, `CTRL`, `ALT`, `META`, `SHIFT_RIGHT`, `CTRL_RIGHT`, `ALT_RIGHT`, `META_RIGHT`
+- **Navigation:** `INSERT`, `HOME`, `PAGE_UP`, `DELETE`, `END`, `PAGE_DOWN`
+- **Arrows:** `UP`, `DOWN`, `LEFT`, `RIGHT`
+- **Numpad:** `NUMPAD_0` - `NUMPAD_9`, `NUMPAD_PLUS`, `NUMPAD_MINUS`, `NUMPAD_MULTIPLY`, `NUMPAD_DIVIDE`, `NUMPAD_ENTER`, `NUMPAD_PERIOD`, `NUM_LOCK`
+- **Special:** `ENTER`, `BACKSPACE`, `TAB`, `SPACE`, `CAPS_LOCK`, `ESC` (used to cancel), `MINUS`, `EQUALS`, `LEFT_BRACKET`, `RIGHT_BRACKET`, `BACKSLASH`, `SEMICOLON`, `APOSTROPHE`, `GRAVE`, `COMMA`, `PERIOD`, `SLASH`, `CONTEXT_MENU`
+
+**Usage:**
+1. Click the keybind button
+2. Press any supported key or mouse button
+3. Press `ESC` to cancel without changing the value
+4. If an unsupported key is pressed, "Key not supported" is shown
+
 ---
 
 ## Auto-Detected Field Types
@@ -125,6 +159,7 @@ The dashboard automatically detects field types based on the value:
 | Hex Color with # | `color = "#FF0000"` | Color picker |
 | Number | `speed = 100` | Text input |
 | String | `name = "player"` | Text input |
+| Keybind (@lib: keys) | `key = "F1"` | Keybind button |
 
 ---
 
@@ -159,6 +194,9 @@ local esp = {
     -- @category: Core
     -- @description: Master toggle for ESP
     enabled = true,
+
+    -- @lib: keys
+    -- @description: Key to toggle ESP on/off
     toggle_key = "INSERT",
 
     -- @category: Rendering
@@ -183,6 +221,15 @@ local esp = {
 
     -- @description: Color for team players (RGBA hex)
     team_color = "00FF00FF",
+
+    -- @category: Keybinds
+    -- @lib: keys
+    -- @description: Hold to temporarily disable ESP
+    panic_key = "ALT",
+
+    -- @lib: keys
+    -- @description: Cycle through render modes
+    mode_cycle_key = "F2",
 
     -- @category: Advanced
     -- @requires: enabled = true
