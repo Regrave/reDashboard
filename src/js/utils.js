@@ -1220,12 +1220,6 @@ Object.assign(app, {
             this.venusStatus = status;
             this.displayVenusStatus();
 
-            // Show Venus card if it exists
-            const venusCard = document.getElementById('venusCard');
-            if (venusCard) {
-                venusCard.style.display = 'block';
-            }
-
         } catch (error) {
             console.error('Error loading Venus status:', error);
             // Set a default status if the API call fails

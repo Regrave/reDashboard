@@ -1130,8 +1130,454 @@ Object.assign(app, {
         document.getElementById('perkPoints').textContent = perkPoints;
         document.getElementById('totalXP').textContent = totalXP.toLocaleString();
         document.getElementById('activePerks').textContent = activePerksCount;
+
+        // Update perk point progress bar
+        this.updatePerkPointProgress();
+
+        // Update perk buttons (Venus, Artist, Blood Moon)
+        this.updatePerkButtons();
     },
-    
+
+    updatePerkPointProgress() {
+        const xpNeeded = this.memberData?.xp_needed_to_next_perk_point;
+        const progressBar = document.getElementById('perkPointProgressBar');
+        const progressText = document.getElementById('perkPointProgressText');
+        const progressContainer = document.getElementById('perkPointProgressContainer');
+
+        if (!progressBar || !progressText) return;
+
+        // 5000 XP per perk point
+        const xpPerPerkPoint = 5000;
+
+        if (xpNeeded !== undefined && xpNeeded !== null) {
+            const xpEarned = xpPerPerkPoint - xpNeeded;
+            const progress = Math.max(0, Math.min(100, (xpEarned / xpPerPerkPoint) * 100));
+
+            progressBar.style.width = `${progress}%`;
+            progressText.textContent = `${xpEarned.toLocaleString()} / ${xpPerPerkPoint.toLocaleString()} XP`;
+
+            if (progressContainer) {
+                progressContainer.style.display = 'block';
+            }
+        } else {
+            // Hide progress if data not available
+            if (progressContainer) {
+                progressContainer.style.display = 'none';
+            }
+        }
+    },
+
+    updatePerkButtons() {
+        const container = document.getElementById('perkButtons');
+        if (!container) return;
+
+        const ownedPerkIds = this.ownedPerks.map(perk => perk.id);
+        const buttons = [];
+
+        // Venus Perk (ID 4)
+        if (ownedPerkIds.includes(4)) {
+            buttons.push(`
+                <button class="btn btn-small" onclick="app.showVenusPerkModal()" style="background: linear-gradient(135deg, #ff69b4, #ff1493); padding: 8px 12px;" title="Venus Perk">
+                    💕
+                </button>
+            `);
+        }
+
+        // Artist Perk (ID 1)
+        if (ownedPerkIds.includes(1)) {
+            buttons.push(`
+                <button class="btn btn-small" onclick="app.showArtistPerkModal()" style="background: linear-gradient(135deg, #ff8c00, #ff6b00); padding: 8px 12px;" title="Artist Perk">
+                    🎨
+                </button>
+            `);
+        }
+
+        // Aura of Venus Perk (ID 30)
+        if (ownedPerkIds.includes(30)) {
+            buttons.push(`
+                <button class="btn btn-small" onclick="app.showAuraOfVenusModal()" style="background: linear-gradient(135deg, #ff69b4, #c71585); padding: 8px 12px;" title="Aura of Venus">
+                    💗
+                </button>
+            `);
+        }
+
+        // Neptune Surge Perk (ID 32)
+        if (ownedPerkIds.includes(32)) {
+            buttons.push(`
+                <button class="btn btn-small" onclick="app.showNeptuneSurgeModal()" style="background: linear-gradient(135deg, #00bfff, #1e90ff); padding: 8px 12px;" title="Neptune Surge">
+                    🔱
+                </button>
+            `);
+        }
+
+        container.innerHTML = buttons.join('');
+    },
+
+    // Venus Perk Modal
+    showVenusPerkModal() {
+        const modal = document.getElementById('venusPerkModal');
+        if (modal) {
+            modal.classList.add('active');
+            // Load Venus status when modal opens
+            this.loadVenusStatus();
+        }
+    },
+
+    closeVenusPerkModal() {
+        const modal = document.getElementById('venusPerkModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    },
+
+    // Artist Perk Modal
+    showArtistPerkModal() {
+        const modal = document.getElementById('artistPerkModal');
+        if (modal) {
+            modal.classList.add('active');
+            // Pre-fill with current background if set
+            const urlInput = document.getElementById('forumBackgroundUrl');
+            if (urlInput && this.memberData?.forum_background) {
+                urlInput.value = this.memberData.forum_background;
+            }
+        }
+    },
+
+    closeArtistPerkModal() {
+        const modal = document.getElementById('artistPerkModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    },
+
+    // Blood Moon Modal
+    showBloodMoonModal() {
+        const modal = document.getElementById('bloodMoonModal');
+        const statusDiv = document.getElementById('bloodMoonStatus');
+        const activateBtn = document.getElementById('activateBloodMoonBtn');
+
+        if (modal) {
+            modal.classList.add('active');
+
+            // Check if user has enough XP
+            const totalXP = this.memberData?.xp || 0;
+            if (totalXP < 10000) {
+                if (statusDiv) {
+                    statusDiv.innerHTML = `<div style="color: #ff4a4a; font-size: 14px;">You need at least 10,000 XP to activate Blood Moon. Current XP: ${totalXP.toLocaleString()}</div>`;
+                }
+                if (activateBtn) {
+                    activateBtn.disabled = true;
+                    activateBtn.style.opacity = '0.5';
+                    activateBtn.style.cursor = 'not-allowed';
+                }
+            } else {
+                if (statusDiv) {
+                    statusDiv.innerHTML = `<div style="color: #4aff4a; font-size: 14px;">You have ${totalXP.toLocaleString()} XP available.</div>`;
+                }
+                if (activateBtn) {
+                    activateBtn.disabled = false;
+                    activateBtn.style.opacity = '1';
+                    activateBtn.style.cursor = 'pointer';
+                }
+            }
+        }
+    },
+
+    closeBloodMoonModal() {
+        const modal = document.getElementById('bloodMoonModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    },
+
+    async activateBloodMoon() {
+        const totalXP = this.memberData?.xp || 0;
+
+        if (totalXP < 10000) {
+            this.showMessage('You need at least 10,000 XP to activate Blood Moon.', 'error');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to activate Blood Moon? This will cost 10,000 XP.')) {
+            return;
+        }
+
+        try {
+            // Buy the Blood Moon perk (ID 35)
+            await this.apiCall('buyPerk', { id: 35 });
+            this.showMessage('Blood Moon activated!', 'success');
+            this.closeBloodMoonModal();
+
+            // Reload member data to update XP
+            await this.loadMemberInfo();
+            await this.loadPerks();
+        } catch (error) {
+            console.error('Error activating Blood Moon:', error);
+            this.showMessage(`Failed to activate Blood Moon: ${error.message}`, 'error');
+        }
+    },
+
+    // Aura of Venus Modal
+    async showAuraOfVenusModal() {
+        const modal = document.getElementById('auraOfVenusModal');
+        if (modal) {
+            modal.classList.add('active');
+            await this.loadAuraOfVenusStatus();
+        }
+    },
+
+    closeAuraOfVenusModal() {
+        const modal = document.getElementById('auraOfVenusModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    },
+
+    async loadAuraOfVenusStatus() {
+        const statusDiv = document.getElementById('auraOfVenusStatus');
+        const activateBtn = document.getElementById('activateAuraOfVenusBtn');
+
+        if (statusDiv) {
+            statusDiv.innerHTML = '<div class="spinner"></div>';
+        }
+
+        try {
+            const status = await this.apiCall('getAuraOfVenus');
+            const totalXP = this.memberData?.xp || 0;
+            const hasVenusPartner = this.memberData?.venus?.partner;
+            const bonusAmount = hasVenusPartner ? '100%' : '50%';
+
+            let statusHTML = '';
+            if (status && status.active) {
+                const expiresAt = new Date(status.expires * 1000);
+                const timeRemaining = this.formatTimeRemaining(status.expires);
+                statusHTML = `
+                    <div style="background: rgba(74, 255, 74, 0.1); border: 1px solid rgba(74, 255, 74, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                        <div style="color: #4aff4a; font-weight: bold; margin-bottom: 5px;">✨ Active!</div>
+                        <div style="color: #ccc;">+${bonusAmount} XP bonus</div>
+                        <div style="color: #888; font-size: 12px; margin-top: 5px;">Expires: ${expiresAt.toLocaleString()} (${timeRemaining})</div>
+                    </div>
+                `;
+                if (activateBtn) {
+                    activateBtn.disabled = true;
+                    activateBtn.style.opacity = '0.5';
+                    activateBtn.textContent = 'Already Active';
+                }
+            } else {
+                statusHTML = `
+                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                        <div style="color: #888; margin-bottom: 5px;">Not currently active</div>
+                        <div style="color: #ccc;">Activating will give you <span style="color: #4aff4a;">+${bonusAmount} XP</span> for 24 hours</div>
+                        ${hasVenusPartner ? '<div style="color: #ff69b4; font-size: 12px; margin-top: 5px;">💕 Venus partner bonus active!</div>' : ''}
+                    </div>
+                `;
+                if (activateBtn) {
+                    if (totalXP >= 5000) {
+                        activateBtn.disabled = false;
+                        activateBtn.style.opacity = '1';
+                        activateBtn.textContent = '💗 Activate (5,000 XP)';
+                    } else {
+                        activateBtn.disabled = true;
+                        activateBtn.style.opacity = '0.5';
+                        activateBtn.textContent = `Need ${(5000 - totalXP).toLocaleString()} more XP`;
+                    }
+                }
+            }
+
+            statusHTML += `<div style="color: #888; font-size: 12px;">Your XP: ${totalXP.toLocaleString()}</div>`;
+            if (statusDiv) {
+                statusDiv.innerHTML = statusHTML;
+            }
+        } catch (error) {
+            console.error('Error loading Aura of Venus status:', error);
+            if (statusDiv) {
+                statusDiv.innerHTML = '<div style="color: #ff6666;">Failed to load status</div>';
+            }
+        }
+    },
+
+    async activateAuraOfVenus() {
+        const totalXP = this.memberData?.xp || 0;
+
+        if (totalXP < 5000) {
+            this.showMessage('You need at least 5,000 XP to activate Aura of Venus.', 'error');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to activate Aura of Venus? This will cost 5,000 XP.')) {
+            return;
+        }
+
+        try {
+            await this.apiCall('activateAuraOfVenus');
+            this.showMessage('Aura of Venus activated! +50% XP for 24 hours.', 'success');
+            await this.loadMemberInfo();
+            await this.loadAuraOfVenusStatus();
+        } catch (error) {
+            console.error('Error activating Aura of Venus:', error);
+            this.showMessage(`Failed to activate: ${error.message}`, 'error');
+        }
+    },
+
+    // Neptune Surge Modal
+    async showNeptuneSurgeModal() {
+        const modal = document.getElementById('neptuneSurgeModal');
+        if (modal) {
+            modal.classList.add('active');
+            await this.loadNeptuneSurgeStatus();
+        }
+    },
+
+    closeNeptuneSurgeModal() {
+        const modal = document.getElementById('neptuneSurgeModal');
+        if (modal) {
+            modal.classList.remove('active');
+        }
+    },
+
+    async loadNeptuneSurgeStatus() {
+        const statusDiv = document.getElementById('neptuneSurgeStatus');
+        const activateBtn = document.getElementById('activateNeptuneSurgeBtn');
+
+        if (statusDiv) {
+            statusDiv.innerHTML = '<div class="spinner"></div>';
+        }
+
+        try {
+            const status = await this.apiCall('getNeptuneSurge');
+            const totalXP = this.memberData?.xp || 0;
+
+            let statusHTML = '';
+            if (status && status.active) {
+                const expiresAt = new Date(status.expires * 1000);
+                const timeRemaining = this.formatTimeRemaining(status.expires);
+                const activator = status.activator || 'Unknown';
+                statusHTML = `
+                    <div style="background: rgba(74, 255, 74, 0.1); border: 1px solid rgba(74, 255, 74, 0.3); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                        <div style="color: #4aff4a; font-weight: bold; margin-bottom: 5px;">🔱 Active for your team!</div>
+                        <div style="color: #ccc;">2x XP for entire team</div>
+                        <div style="color: #888; font-size: 12px; margin-top: 5px;">Activated by: ${activator}</div>
+                        <div style="color: #888; font-size: 12px;">Expires: ${expiresAt.toLocaleString()} (${timeRemaining})</div>
+                    </div>
+                `;
+                if (activateBtn) {
+                    activateBtn.disabled = true;
+                    activateBtn.style.opacity = '0.5';
+                    activateBtn.textContent = 'Already Active';
+                }
+            } else {
+                statusHTML = `
+                    <div style="background: rgba(255, 255, 255, 0.05); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; padding: 15px; margin-bottom: 15px;">
+                        <div style="color: #888; margin-bottom: 5px;">Not currently active for your team</div>
+                        <div style="color: #ccc;">Activating will give your <span style="color: #00bfff;">entire team 2x XP</span> for 24 hours</div>
+                        <div style="color: #888; font-size: 12px; margin-top: 5px;">Only one member per team can activate per day</div>
+                    </div>
+                `;
+                if (activateBtn) {
+                    if (totalXP >= 10000) {
+                        activateBtn.disabled = false;
+                        activateBtn.style.opacity = '1';
+                        activateBtn.textContent = '🔱 Activate (10,000 XP)';
+                    } else {
+                        activateBtn.disabled = true;
+                        activateBtn.style.opacity = '0.5';
+                        activateBtn.textContent = `Need ${(10000 - totalXP).toLocaleString()} more XP`;
+                    }
+                }
+            }
+
+            statusHTML += `<div style="color: #888; font-size: 12px;">Your XP: ${totalXP.toLocaleString()}</div>`;
+            if (statusDiv) {
+                statusDiv.innerHTML = statusHTML;
+            }
+        } catch (error) {
+            console.error('Error loading Neptune Surge status:', error);
+            if (statusDiv) {
+                statusDiv.innerHTML = '<div style="color: #ff6666;">Failed to load status</div>';
+            }
+        }
+    },
+
+    async activateNeptuneSurge() {
+        const totalXP = this.memberData?.xp || 0;
+
+        if (totalXP < 10000) {
+            this.showMessage('You need at least 10,000 XP to activate Neptune Surge.', 'error');
+            return;
+        }
+
+        if (!confirm('Are you sure you want to activate Neptune Surge? This will cost 10,000 XP and give your entire team 2x XP for 24 hours.')) {
+            return;
+        }
+
+        try {
+            await this.apiCall('activateNeptuneSurge');
+            this.showMessage('Neptune Surge activated! Your team now has 2x XP for 24 hours.', 'success');
+            await this.loadMemberInfo();
+            await this.loadNeptuneSurgeStatus();
+        } catch (error) {
+            console.error('Error activating Neptune Surge:', error);
+            this.showMessage(`Failed to activate: ${error.message}`, 'error');
+        }
+    },
+
+    formatTimeRemaining(expiresTimestamp) {
+        const now = Math.floor(Date.now() / 1000);
+        const remaining = expiresTimestamp - now;
+
+        if (remaining <= 0) return 'Expired';
+
+        const hours = Math.floor(remaining / 3600);
+        const minutes = Math.floor((remaining % 3600) / 60);
+
+        if (hours > 0) {
+            return `${hours}h ${minutes}m remaining`;
+        }
+        return `${minutes}m remaining`;
+    },
+
+    // Debug functions for testing UI
+    debugUnlockAllPerks() {
+        // Store original perks for reset
+        this._originalOwnedPerks = [...this.ownedPerks];
+        this._originalXP = this.memberData?.xp || 0;
+
+        // Create fake owned perks for all perk IDs (1-35)
+        const allPerkIds = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35];
+        this.ownedPerks = allPerkIds.map(id => ({ id, time: Date.now() / 1000 }));
+
+        // Give lots of XP for testing
+        if (this.memberData) {
+            this.memberData.xp = 100000;
+        }
+
+        // Refresh the UI
+        this.displayPerks();
+        this.updatePerkStats();
+
+        this.showMessage('Debug: All perks unlocked for testing', 'success');
+    },
+
+    debugResetPerks() {
+        // Restore original perks
+        if (this._originalOwnedPerks) {
+            this.ownedPerks = this._originalOwnedPerks;
+            delete this._originalOwnedPerks;
+        }
+
+        // Restore original XP
+        if (this._originalXP !== undefined && this.memberData) {
+            this.memberData.xp = this._originalXP;
+            delete this._originalXP;
+        }
+
+        // Refresh the UI
+        this.displayPerks();
+        this.updatePerkStats();
+
+        this.showMessage('Debug: Perks restored to actual state', 'success');
+    },
+
     getPerkIcon(perkId) {
         const iconMap = {
             1: '🎨',   // Artist
@@ -1159,7 +1605,16 @@ Object.assign(app, {
             23: '🌀',  // Astral Voyager
             24: '💫',  // Galactic Altruist
             25: '🪐',  // Saturn's Favor
-            26: '🌙'   // Lunar Rhythm
+            26: '🌙',  // Lunar Rhythm
+            27: '👑',  // Kingdom of Jupiter
+            28: '🌅',  // Mercury's Ethereal Dawn I
+            29: '🌄',  // Mercury's Ethereal Dawn II
+            30: '💗',  // Aura of Venus
+            31: '🎟️',  // Cosmic Ticket
+            32: '🔱',  // Neptune Surge
+            33: '🌕',  // Moonlight Charm
+            34: '🤝',  // Galactic Altruist II
+            35: '🌑'   // Blood Moon
         };
         return iconMap[perkId] || '✨';
     },
@@ -1181,10 +1636,59 @@ Object.assign(app, {
             const isPurchasable = perk.purchasable !== false;
             const canAfford = isPurchasable && perkPoints >= 1;
             const isVenus = perk.name.toLowerCase().includes('venus');
+            const isBloodMoon = perk.id === 35;
+            const totalXP = this.memberData?.xp || 0;
 
             let buttonHTML = '';
             if (isOwned) {
-                buttonHTML = '';
+                // Show modal buttons for perks that have interactive features
+                switch(perk.id) {
+                    case 1: // Artist
+                        buttonHTML = `
+                            <button class="btn btn-small" onclick="app.showArtistPerkModal()" style="background: linear-gradient(135deg, #ff8c00, #ff6b00);">
+                                🎨 Manage
+                            </button>
+                        `;
+                        break;
+                    case 4: // Venus
+                        buttonHTML = `
+                            <button class="btn btn-small" onclick="app.showVenusPerkModal()" style="background: linear-gradient(135deg, #ff69b4, #ff1493);">
+                                💕 Manage
+                            </button>
+                        `;
+                        break;
+                    case 30: // Aura of Venus
+                        buttonHTML = `
+                            <button class="btn btn-small" onclick="app.showAuraOfVenusModal()" style="background: linear-gradient(135deg, #ff69b4, #c71585);">
+                                💗 Activate
+                            </button>
+                        `;
+                        break;
+                    case 32: // Neptune Surge
+                        buttonHTML = `
+                            <button class="btn btn-small" onclick="app.showNeptuneSurgeModal()" style="background: linear-gradient(135deg, #00bfff, #1e90ff);">
+                                🔱 Activate
+                            </button>
+                        `;
+                        break;
+                    default:
+                        buttonHTML = '';
+                }
+            } else if (isBloodMoon) {
+                // Blood Moon is special - costs 10,000 XP and is activated via modal
+                if (totalXP >= 10000) {
+                    buttonHTML = `
+                        <button class="btn btn-small" onclick="app.showBloodMoonModal()" style="background: linear-gradient(135deg, #8b0000, #4a0000);">
+                            🌑 Activate (10,000 XP)
+                        </button>
+                    `;
+                } else {
+                    buttonHTML = `
+                        <div style="color: #ff4a4a; font-size: 12px; text-align: center; font-weight: 600;">
+                            Need 10,000 XP
+                        </div>
+                    `;
+                }
             } else if (!isPurchasable) {
                 buttonHTML = `
                     <div style="color: #888; font-size: 12px; text-align: center; font-weight: 600;">
@@ -1250,7 +1754,7 @@ Object.assign(app, {
                                 ${bonusBadge}
                             </div>
                             <div class="script-meta">
-                                <span>Cost: ${isPurchasable ? '1 perk point' : 'Not purchasable'}</span>
+                                <span>Cost: ${isBloodMoon ? '10,000 XP' : (isPurchasable ? '1 perk point' : 'Not purchasable')}</span>
                                 <span>ID: ${perk.id}</span>
                             </div>
                             ${perk.description ? `
@@ -1672,6 +2176,25 @@ Object.assign(app, {
             return;
         }
 
+        // Debug command to test UI with all perks unlocked
+        if (command.toLowerCase() === 'debug.unlockperks') {
+            this.debugUnlockAllPerks();
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'terminal-result';
+            resultDiv.innerHTML = '<span style="color: #4aff4a;">Debug mode enabled:</span> All perks temporarily unlocked for UI testing. Refresh to reset.';
+            output.appendChild(resultDiv);
+            return;
+        }
+
+        if (command.toLowerCase() === 'debug.resetperks') {
+            this.debugResetPerks();
+            const resultDiv = document.createElement('div');
+            resultDiv.className = 'terminal-result';
+            resultDiv.innerHTML = '<span style="color: #4aff4a;">Debug mode disabled:</span> Perks restored to actual state.';
+            output.appendChild(resultDiv);
+            return;
+        }
+
         const loadingDiv = document.createElement('div');
         loadingDiv.className = 'terminal-result';
         loadingDiv.textContent = 'Executing command...';
@@ -1762,6 +2285,10 @@ Object.assign(app, {
             errors        - Show error information
             debug         - Show debug information
             version       - Show software versions
+
+            <strong style="color: #ff69b4;">Debug Commands:</strong>
+            debug.unlockperks - Unlock all perks for UI testing
+            debug.resetperks  - Reset perks to actual state
 
             <strong style="color: #ffcc00;">Note:</strong> These commands mirror the Member's Panel interface.
             The '&style' option is enabled by default to preserve formatting.

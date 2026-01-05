@@ -291,8 +291,13 @@
         <!-- Perks Section -->
         <div class="content-section" id="perks-section">
           <div class="card">
-            <h2>✨ Perk Management</h2>
-            <div class="stats-grid" style="margin-bottom: 30px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; flex-wrap: wrap; gap: 15px;">
+              <h2 style="margin: 0;">✨ Perk Management</h2>
+              <div id="perkButtons" style="display: flex; gap: 10px;">
+                <!-- Perk buttons dynamically shown based on ownership -->
+              </div>
+            </div>
+            <div class="stats-grid" style="margin-bottom: 20px;">
               <div class="stat-box">
                 <div class="stat-label">Available Perk Points</div>
                 <div class="stat-value" id="perkPoints">0</div>
@@ -306,29 +311,19 @@
                 <div class="stat-value" id="activePerks">0</div>
               </div>
             </div>
+            <!-- Progress to Next Perk Point -->
+            <div id="perkPointProgressContainer" style="margin-bottom: 25px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                <span style="color: #aaa; font-size: 14px;">Progress to Next Perk Point</span>
+                <span id="perkPointProgressText" style="color: #4a9eff; font-size: 14px;">0 / 5,000 XP</span>
+              </div>
+              <div style="background: rgba(255, 255, 255, 0.1); border-radius: 10px; height: 10px; overflow: hidden;">
+                <div id="perkPointProgressBar" style="background: linear-gradient(to right, #4a9eff, #4aff4a); height: 100%; width: 0%; transition: width 0.5s ease;"></div>
+              </div>
+            </div>
             <div style="display: flex; gap: 15px; margin-bottom: 30px; flex-wrap: wrap;">
               <button class="btn" onclick="app.refreshPerks()">🔄 Refresh Perks</button>
               <button class="btn btn-danger" onclick="app.respecPerks()" title="Costs 3000 XP"> 💀 Respec All Perks (-3000 XP) </button>
-            </div>
-          </div>
-          <div class="card" id="venusCard" style="display: none;">
-            <h2>💕 Venus Perk - Partnership System</h2>
-            <div id="venusStatus" style="margin-bottom: 20px;">
-              <div class="spinner"></div>
-            </div>
-          </div>
-          <div class="card" id="artistCard" style="display: none;">
-            <h2>🎨 Artist Perk - Forum Background</h2>
-            <div style="margin-bottom: 20px;">
-              <p style="color: #aaa; margin-bottom: 15px;">Set a custom background image for your forum profile</p>
-              <input type="text" id="forumBackgroundUrl" placeholder="Enter image URL (max 256 characters)" class="input-field" style="width: 100%; margin-bottom: 15px; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; padding: 12px 16px; font-size: 14px; transition: all 0.3s ease; outline: none;" 
-                     onfocus="this.style.borderColor='#4CAF50'; this.style.background='rgba(0, 0, 0, 0.5)'" 
-                     onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.background='rgba(0, 0, 0, 0.3)'">
-              <div style="display: flex; gap: 10px;">
-                <button class="btn" onclick="app.setForumBackground()">🎨 Set Background</button>
-                <button class="btn btn-secondary" onclick="app.clearForumBackground()">🗑️ Clear Background</button>
-              </div>
-              <div id="forumBackgroundStatus" style="margin-top: 15px;"></div>
             </div>
           </div>
           <div class="card">
@@ -1014,7 +1009,7 @@ Examples:
       </div>
     </div>
     
-    <!-- Venus Partnership Modal -->
+    <!-- Venus Partnership Modal (request username) -->
     <div id="venusPartnershipModal" class="modal">
       <div class="omega-modal-content" style="max-width: 450px;">
         <div class="omega-modal-header" style="background: rgba(26, 26, 46, 0.9); padding: 20px 30px; border-bottom: 2px solid rgba(255, 105, 180, 0.3); display: flex; justify-content: space-between; align-items: center; border-radius: 20px 20px 0 0;">
@@ -1025,11 +1020,11 @@ Examples:
           <div class="omega-modal-subtitle" style="color: #aaa; margin-bottom: 30px; font-size: 16px; line-height: 1.5;">
             Enter the username of the person you'd like to send a partnership request to:
           </div>
-          
-          <input type="text" id="venusPartnerInput" placeholder="Enter username..." style="width: 100%; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; padding: 12px 16px; font-size: 14px; transition: all 0.3s ease; outline: none; margin-bottom: 30px;" 
-                 onfocus="this.style.borderColor='#ff69b4'; this.style.background='rgba(0, 0, 0, 0.5)'" 
+
+          <input type="text" id="venusPartnerInput" placeholder="Enter username..." style="width: 100%; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; padding: 12px 16px; font-size: 14px; transition: all 0.3s ease; outline: none; margin-bottom: 30px;"
+                 onfocus="this.style.borderColor='#ff69b4'; this.style.background='rgba(0, 0, 0, 0.5)'"
                  onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.background='rgba(0, 0, 0, 0.3)'">
-          
+
           <div style="display: flex; justify-content: flex-end; gap: 10px;">
             <button class="btn btn-secondary" onclick="app.closeVenusPartnershipModal()">Cancel</button>
             <button class="btn" onclick="app.submitVenusPartnership()" style="background: linear-gradient(135deg, #ff69b4, #ff1493);">
@@ -1039,6 +1034,130 @@ Examples:
         </div>
       </div>
     </div>
-    
+
+    <!-- Venus Perk Modal -->
+    <div id="venusPerkModal" class="modal">
+      <div class="omega-modal-content" style="max-width: 550px;">
+        <div class="omega-modal-header" style="background: rgba(26, 26, 46, 0.9); padding: 20px 30px; border-bottom: 2px solid rgba(255, 105, 180, 0.3); display: flex; justify-content: space-between; align-items: center; border-radius: 20px 20px 0 0;">
+          <div class="omega-modal-title" style="color: #ff69b4; font-size: 1.5em; font-weight: 600;">💕 Partnership System</div>
+          <button class="settings-modal-close" onclick="app.closeVenusPerkModal()">×</button>
+        </div>
+        <div class="omega-modal-body" style="padding: 30px;">
+          <div id="venusStatus" style="margin-bottom: 20px;">
+            <div class="spinner"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Artist Perk Modal -->
+    <div id="artistPerkModal" class="modal">
+      <div class="omega-modal-content" style="max-width: 550px;">
+        <div class="omega-modal-header" style="background: rgba(26, 26, 46, 0.9); padding: 20px 30px; border-bottom: 2px solid rgba(255, 140, 0, 0.3); display: flex; justify-content: space-between; align-items: center; border-radius: 20px 20px 0 0;">
+          <div class="omega-modal-title" style="color: #ff8c00; font-size: 1.5em; font-weight: 600;">🎨 Forum Background</div>
+          <button class="settings-modal-close" onclick="app.closeArtistPerkModal()">×</button>
+        </div>
+        <div class="omega-modal-body" style="padding: 30px;">
+          <div class="omega-modal-subtitle" style="color: #aaa; margin-bottom: 20px; font-size: 16px; line-height: 1.5;">
+            Set a custom background image for your forum profile
+          </div>
+
+          <input type="text" id="forumBackgroundUrl" placeholder="Enter image URL (max 256 characters)" style="width: 100%; background: rgba(0, 0, 0, 0.3); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 8px; color: #fff; padding: 12px 16px; font-size: 14px; transition: all 0.3s ease; outline: none; margin-bottom: 20px;"
+                 onfocus="this.style.borderColor='#ff8c00'; this.style.background='rgba(0, 0, 0, 0.5)'"
+                 onblur="this.style.borderColor='rgba(255, 255, 255, 0.1)'; this.style.background='rgba(0, 0, 0, 0.3)'">
+
+          <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+            <button class="btn" onclick="app.setForumBackground()" style="background: linear-gradient(135deg, #ff8c00, #ff6b00);">🎨 Set Background</button>
+            <button class="btn btn-secondary" onclick="app.clearForumBackground()">🗑️ Clear Background</button>
+          </div>
+          <div id="forumBackgroundStatus" style="margin-top: 15px;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Blood Moon Perk Modal -->
+    <div id="bloodMoonModal" class="modal">
+      <div class="omega-modal-content" style="max-width: 500px;">
+        <div class="omega-modal-header" style="background: rgba(26, 26, 46, 0.9); padding: 20px 30px; border-bottom: 2px solid rgba(139, 0, 0, 0.5); display: flex; justify-content: space-between; align-items: center; border-radius: 20px 20px 0 0;">
+          <div class="omega-modal-title" style="color: #8b0000; font-size: 1.5em; font-weight: 600;">🌑 Blood Moon</div>
+          <button class="settings-modal-close" onclick="app.closeBloodMoonModal()">×</button>
+        </div>
+        <div class="omega-modal-body" style="padding: 30px; text-align: center;">
+          <div style="font-size: 64px; margin-bottom: 20px;">🌑</div>
+          <div id="bloodMoonDescription" style="color: #ccc; margin-bottom: 25px; font-size: 16px; line-height: 1.6;">
+            The Blood Moon rises...
+          </div>
+          <div style="background: rgba(139, 0, 0, 0.2); border: 1px solid rgba(139, 0, 0, 0.4); border-radius: 12px; padding: 20px; margin-bottom: 25px;">
+            <div style="color: #ff4a4a; font-size: 14px; margin-bottom: 8px;">Cost to Activate</div>
+            <div style="color: #fff; font-size: 28px; font-weight: bold;">10,000 XP</div>
+          </div>
+          <div id="bloodMoonStatus" style="margin-bottom: 20px;"></div>
+          <div style="display: flex; justify-content: center; gap: 15px;">
+            <button class="btn btn-secondary" onclick="app.closeBloodMoonModal()">Cancel</button>
+            <button class="btn" id="activateBloodMoonBtn" onclick="app.activateBloodMoon()" style="background: linear-gradient(135deg, #8b0000, #4a0000);">
+              🌑 Activate Blood Moon
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Aura of Venus Modal -->
+    <div id="auraOfVenusModal" class="modal">
+      <div class="omega-modal-content" style="max-width: 500px;">
+        <div class="omega-modal-header" style="background: rgba(26, 26, 46, 0.9); padding: 20px 30px; border-bottom: 2px solid rgba(255, 105, 180, 0.3); display: flex; justify-content: space-between; align-items: center; border-radius: 20px 20px 0 0;">
+          <div class="omega-modal-title" style="color: #ff69b4; font-size: 1.5em; font-weight: 600;">💗 Aura of Venus</div>
+          <button class="settings-modal-close" onclick="app.closeAuraOfVenusModal()">×</button>
+        </div>
+        <div class="omega-modal-body" style="padding: 30px;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 48px; margin-bottom: 15px;">💗</div>
+            <div style="color: #ccc; font-size: 14px; line-height: 1.5;">
+              Spend 5,000 XP to increase your XP earnings by 50% for 24 hours.<br>
+              If partnered via Venus perk, the bonus doubles to 100%!
+            </div>
+          </div>
+          <div id="auraOfVenusStatus" style="margin-bottom: 20px;">
+            <div class="spinner"></div>
+          </div>
+          <div style="display: flex; justify-content: center; gap: 15px;">
+            <button class="btn btn-secondary" onclick="app.closeAuraOfVenusModal()">Cancel</button>
+            <button class="btn" id="activateAuraOfVenusBtn" onclick="app.activateAuraOfVenus()" style="background: linear-gradient(135deg, #ff69b4, #c71585);">
+              💗 Activate (5,000 XP)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Neptune Surge Modal -->
+    <div id="neptuneSurgeModal" class="modal">
+      <div class="omega-modal-content" style="max-width: 500px;">
+        <div class="omega-modal-header" style="background: rgba(26, 26, 46, 0.9); padding: 20px 30px; border-bottom: 2px solid rgba(0, 191, 255, 0.3); display: flex; justify-content: space-between; align-items: center; border-radius: 20px 20px 0 0;">
+          <div class="omega-modal-title" style="color: #00bfff; font-size: 1.5em; font-weight: 600;">🔱 Neptune Surge</div>
+          <button class="settings-modal-close" onclick="app.closeNeptuneSurgeModal()">×</button>
+        </div>
+        <div class="omega-modal-body" style="padding: 30px;">
+          <div style="text-align: center; margin-bottom: 20px;">
+            <div style="font-size: 48px; margin-bottom: 15px;">🔱</div>
+            <div style="color: #ccc; font-size: 14px; line-height: 1.5;">
+              Spend 10,000 XP to double XP earnings for your entire team<br>
+              (Earth, Wind, Fire, or Air) for 24 hours.<br>
+              <span style="color: #888;">Only one member per team can activate per day.</span>
+            </div>
+          </div>
+          <div id="neptuneSurgeStatus" style="margin-bottom: 20px;">
+            <div class="spinner"></div>
+          </div>
+          <div style="display: flex; justify-content: center; gap: 15px;">
+            <button class="btn btn-secondary" onclick="app.closeNeptuneSurgeModal()">Cancel</button>
+            <button class="btn" id="activateNeptuneSurgeBtn" onclick="app.activateNeptuneSurge()" style="background: linear-gradient(135deg, #00bfff, #1e90ff);">
+              🔱 Activate (10,000 XP)
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </body>
 </html>

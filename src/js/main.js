@@ -116,6 +116,31 @@ function setupKeyboardListeners() {
             if (document.getElementById('scriptSourceModal').classList.contains('active')) {
                 window.app.closeScriptSource();
             }
+
+            // Close Venus perk modal if open
+            if (document.getElementById('venusPerkModal')?.classList.contains('active')) {
+                window.app.closeVenusPerkModal();
+            }
+
+            // Close Artist perk modal if open
+            if (document.getElementById('artistPerkModal')?.classList.contains('active')) {
+                window.app.closeArtistPerkModal();
+            }
+
+            // Close Blood Moon modal if open
+            if (document.getElementById('bloodMoonModal')?.classList.contains('active')) {
+                window.app.closeBloodMoonModal();
+            }
+
+            // Close Aura of Venus modal if open
+            if (document.getElementById('auraOfVenusModal')?.classList.contains('active')) {
+                window.app.closeAuraOfVenusModal();
+            }
+
+            // Close Neptune Surge modal if open
+            if (document.getElementById('neptuneSurgeModal')?.classList.contains('active')) {
+                window.app.closeNeptuneSurgeModal();
+            }
         }
     });
 }

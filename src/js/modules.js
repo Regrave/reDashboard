@@ -1015,45 +1015,61 @@ Object.assign(app, {
     displayXPHistoryChart() {
         const xpHistory = this.memberData?.xp_history || [];
         const canvas = document.getElementById('xpHistoryChart');
-        
+
         if (!canvas || xpHistory.length === 0) {
             return;
         }
-        
+
         // Sort by time and get last 30 days of data
         const sortedHistory = [...xpHistory].sort((a, b) => a.time - b.time);
         const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
         const recentHistory = sortedHistory.filter(entry => entry.time >= thirtyDaysAgo);
-        
-        // Group by day
+
+        // Group by day with breakdown by reason
         const dailyData = {};
         recentHistory.forEach(entry => {
             const date = new Date(entry.time * 1000);
             const dateKey = date.toISOString().split('T')[0];
-            
+
             if (!dailyData[dateKey]) {
-                dailyData[dateKey] = { gained: 0, lost: 0, net: 0 };
+                dailyData[dateKey] = { gained: 0, lost: 0, net: 0, breakdown: {} };
             }
-            
+
             if (entry.amount > 0) {
                 dailyData[dateKey].gained += entry.amount;
             } else {
                 dailyData[dateKey].lost += Math.abs(entry.amount);
             }
             dailyData[dateKey].net += entry.amount;
+
+            // Track breakdown by reason
+            const reason = entry.reason || 'Unknown';
+            if (!dailyData[dateKey].breakdown[reason]) {
+                dailyData[dateKey].breakdown[reason] = { total: 0, count: 0 };
+            }
+            dailyData[dateKey].breakdown[reason].total += entry.amount;
+            dailyData[dateKey].breakdown[reason].count += 1;
         });
-        
+
         // Prepare data for Chart.js
         const labels = Object.keys(dailyData).sort();
         const gainedData = labels.map(date => dailyData[date].gained);
         const lostData = labels.map(date => dailyData[date].lost);
         const netData = labels.map(date => dailyData[date].net);
-        
+
+        // Store breakdown data for tooltip access
+        this.xpBreakdownData = {};
+        labels.forEach(date => {
+            this.xpBreakdownData[date] = dailyData[date].breakdown;
+        });
+
         // Destroy existing chart if it exists
         if (this.xpChart) {
             this.xpChart.destroy();
         }
-        
+
+        const self = this;
+
         // Create new chart
         const ctx = canvas.getContext('2d');
         this.xpChart = new Chart(ctx, {
@@ -1098,7 +1114,33 @@ Object.assign(app, {
                     },
                     tooltip: {
                         mode: 'index',
-                        intersect: false
+                        intersect: false,
+                        callbacks: {
+                            afterBody: function(context) {
+                                const dateIndex = context[0].dataIndex;
+                                const dateKey = labels[dateIndex];
+                                const breakdown = self.xpBreakdownData[dateKey];
+
+                                if (!breakdown) return '';
+
+                                const lines = ['\n─── Breakdown ───'];
+
+                                // Sort by absolute total, largest first
+                                const sorted = Object.entries(breakdown)
+                                    .sort((a, b) => Math.abs(b[1].total) - Math.abs(a[1].total));
+
+                                sorted.forEach(([reason, data]) => {
+                                    const sign = data.total >= 0 ? '+' : '';
+                                    if (data.count > 1) {
+                                        lines.push(`${reason}: ${sign}${data.total.toLocaleString()} (×${data.count})`);
+                                    } else {
+                                        lines.push(`${reason}: ${sign}${data.total.toLocaleString()}`);
+                                    }
+                                });
+
+                                return lines;
+                            }
+                        }
                     }
                 },
                 scales: {
@@ -1121,7 +1163,7 @@ Object.assign(app, {
                 }
             }
         });
-        
+
         // Display mathematician bonus if available
         this.displayMathematicianBonus();
     },
@@ -1167,44 +1209,10 @@ Object.assign(app, {
             if (this.allPerks.length === 0) {
                 this.loadPerks();
             } else {
-                // If perks are already loaded, check for Venus perk
+                // If perks are already loaded, update perk buttons
                 setTimeout(() => {
-                    const hasVenus = this.ownedPerks.some(perk =>
-                        this.allPerks.find(p => p.id === perk.id && p.name.toLowerCase().includes('venus'))
-                    );
-                    
-                    const hasArtist = this.ownedPerks.some(perk => perk.id === 1);
-                    
-                    if (hasVenus) {
-                        // Show Venus card immediately
-                        const venusCard = document.getElementById('venusCard');
-                        if (venusCard) {
-                            venusCard.style.display = 'block';
-                        }
-                        
-                        // Only load Venus status if not already loaded
-                        if (!this.venusStatus) {
-                            console.log('Loading Venus status on tab switch...');
-                            this.loadVenusStatus();
-                        } else {
-                            // Status already loaded, just display it
-                            this.displayVenusStatus();
-                        }
-                    }
-                    
-                    // Show/hide Artist card based on perk ownership
-                    const artistCard = document.getElementById('artistCard');
-                    if (artistCard) {
-                        artistCard.style.display = hasArtist ? 'block' : 'none';
-                        
-                        // If user has existing forum background, show it
-                        if (hasArtist && this.memberData?.forum_background) {
-                            const urlInput = document.getElementById('forumBackgroundUrl');
-                            if (urlInput) {
-                                urlInput.value = this.memberData.forum_background;
-                            }
-                        }
-                    }
+                    // Update perk buttons (Venus, Artist, Blood Moon) in the header
+                    this.updatePerkButtons();
                 }, 100); // Small delay to ensure DOM is ready
             }
         }
@@ -1872,6 +1880,7 @@ Object.assign(app, {
                             ${xpHistory.slice(0, 10).map(xp => {
                                 const timeStr = new Date(xp.time * 1000).toLocaleString();
                                 const isGain = xp.amount > 0;
+                                const reason = xp.reason || 'Unknown';
                                 return `
                                     <div class="activity-item">
                                         <div class="activity-header">
@@ -1879,6 +1888,9 @@ Object.assign(app, {
                                                 ${isGain ? '+' : ''}${xp.amount.toLocaleString()} XP
                                             </span>
                                             <span class="activity-time">${timeStr}</span>
+                                        </div>
+                                        <div style="color: #888; font-size: 12px; margin-top: 4px;">
+                                            ${reason}
                                         </div>
                                     </div>
                                 `;
