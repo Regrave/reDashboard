@@ -1139,30 +1139,81 @@ Object.assign(app, {
     },
 
     updatePerkPointProgress() {
-        const xpNeeded = this.memberData?.xp_needed_to_next_perk_point;
         const progressBar = document.getElementById('perkPointProgressBar');
         const progressText = document.getElementById('perkPointProgressText');
         const progressContainer = document.getElementById('perkPointProgressContainer');
+        const progressLabel = progressContainer?.querySelector('span:first-child');
 
         if (!progressBar || !progressText) return;
 
-        // 5000 XP per perk point
-        const xpPerPerkPoint = 5000;
+        // Check if user has Cosmic Inflation perk (ID 36)
+        const hasCosmicInflation = this.ownedPerks?.some(perk => perk.id === 36);
 
-        if (xpNeeded !== undefined && xpNeeded !== null) {
-            const xpEarned = xpPerPerkPoint - xpNeeded;
-            const progress = Math.max(0, Math.min(100, (xpEarned / xpPerPerkPoint) * 100));
+        if (hasCosmicInflation) {
+            // Cosmic Inflation system: perk_points = floor(xp / 3000) - perks_purchased
+            const cosmicXpNeeded = this.memberData?.cosmic_inflation_xp_needed;
+            const xpPerPerkPoint = 3000;
 
-            progressBar.style.width = `${progress}%`;
-            progressText.textContent = `${xpEarned.toLocaleString()} / ${xpPerPerkPoint.toLocaleString()} XP`;
+            if (cosmicXpNeeded !== undefined && cosmicXpNeeded !== null) {
+                const xpEarned = xpPerPerkPoint - cosmicXpNeeded;
+                const progress = Math.max(0, Math.min(100, (xpEarned / xpPerPerkPoint) * 100));
 
-            if (progressContainer) {
-                progressContainer.style.display = 'block';
+                progressBar.style.width = `${progress}%`;
+                progressBar.style.background = 'linear-gradient(to right, #9b59b6, #8e44ad)'; // Purple for Cosmic
+                progressText.textContent = `${xpEarned.toLocaleString()} / ${xpPerPerkPoint.toLocaleString()} XP`;
+
+                if (progressLabel) {
+                    progressLabel.textContent = 'Progress to Next Perk Point (Cosmic Inflation)';
+                }
+
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                }
+            } else {
+                // Calculate manually if field not available: 3000 - (xp % 3000)
+                const currentXP = this.memberData?.xp || 0;
+                const xpInCycle = currentXP % xpPerPerkPoint;
+                const progress = Math.max(0, Math.min(100, (xpInCycle / xpPerPerkPoint) * 100));
+
+                progressBar.style.width = `${progress}%`;
+                progressBar.style.background = 'linear-gradient(to right, #9b59b6, #8e44ad)';
+                progressText.textContent = `${xpInCycle.toLocaleString()} / ${xpPerPerkPoint.toLocaleString()} XP`;
+
+                if (progressLabel) {
+                    progressLabel.textContent = 'Progress to Next Perk Point (Cosmic Inflation)';
+                }
+
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                }
             }
         } else {
-            // Hide progress if data not available
-            if (progressContainer) {
-                progressContainer.style.display = 'none';
+            // Default S6 system: 1 perk point per rank
+            // Show progress to next rank instead
+            const xpNeeded = this.memberData?.xp_needed;
+            const nextRankXP = this.memberData?.next_rank_xp;
+            const currentXP = this.memberData?.current_xp || this.memberData?.xp || 0;
+            const nextRankName = this.memberData?.next_rank_name;
+
+            if (xpNeeded !== undefined && nextRankXP !== undefined) {
+                const progressPercent = this.memberData?.progress_percent || 0;
+
+                progressBar.style.width = `${progressPercent}%`;
+                progressBar.style.background = 'linear-gradient(to right, #4a9eff, #4aff4a)';
+                progressText.textContent = `${currentXP.toLocaleString()} / ${nextRankXP.toLocaleString()} XP`;
+
+                if (progressLabel) {
+                    progressLabel.textContent = `Progress to Next Rank${nextRankName ? ` (${nextRankName})` : ''} & Perk Point`;
+                }
+
+                if (progressContainer) {
+                    progressContainer.style.display = 'block';
+                }
+            } else {
+                // Hide progress if data not available
+                if (progressContainer) {
+                    progressContainer.style.display = 'none';
+                }
             }
         }
     },
@@ -1614,7 +1665,9 @@ Object.assign(app, {
             32: '🔱',  // Neptune Surge
             33: '🌕',  // Moonlight Charm
             34: '🤝',  // Galactic Altruist II
-            35: '🌑'   // Blood Moon
+            35: '🌑',  // Blood Moon
+            36: '📈',  // Cosmic Inflation
+            37: '🤗'   // Universal Embrace
         };
         return iconMap[perkId] || '✨';
     },
@@ -1629,15 +1682,28 @@ Object.assign(app, {
 
         const ownedPerkIds = this.ownedPerks.map(perk => perk.id);
         const perkPoints = this.memberData?.perk_points || 0;
+        const totalXP = this.memberData?.xp || 0;
+
+        // Helper to format XP cost (e.g., 3000 -> "3k", 1500 -> "1.5k")
+        const formatCost = (cost) => {
+            const k = cost / 1000;
+            return k % 1 === 0 ? `${k}k` : `${k}k`;
+        };
 
         container.innerHTML = this.allPerks.map(perk => {
             const isOwned = ownedPerkIds.includes(perk.id);
             // Use the purchasable field from API (listPerks now includes this)
             const isPurchasable = perk.purchasable !== false;
-            const canAfford = isPurchasable && perkPoints >= 1;
+            const perkCost = perk.cost || 3000; // XP cost from API
+            const perkCostFormatted = formatCost(perkCost);
             const isVenus = perk.name.toLowerCase().includes('venus');
             const isBloodMoon = perk.id === 35;
-            const totalXP = this.memberData?.xp || 0;
+            const isCosmicInflation = perk.id === 36;
+
+            // Affordability: need perk points AND enough XP for the cost
+            const hasEnoughPoints = perkPoints >= 1;
+            const hasEnoughXP = totalXP >= perkCost;
+            const canAfford = isPurchasable && hasEnoughPoints && hasEnoughXP;
 
             let buttonHTML = '';
             if (isOwned) {
@@ -1675,17 +1741,17 @@ Object.assign(app, {
                         buttonHTML = '';
                 }
             } else if (isBloodMoon) {
-                // Blood Moon is special - costs 10,000 XP and is activated via modal
-                if (totalXP >= 10000) {
+                // Blood Moon is special - costs 10,000 XP and gives a random perk (repeatable)
+                if (hasEnoughXP) {
                     buttonHTML = `
                         <button class="btn btn-small" onclick="app.showBloodMoonModal()" style="background: linear-gradient(135deg, #8b0000, #4a0000);">
-                            🌑 Activate (10,000 XP)
+                            🌑 Activate (-${perkCostFormatted} XP)
                         </button>
                     `;
                 } else {
                     buttonHTML = `
                         <div style="color: #ff4a4a; font-size: 12px; text-align: center; font-weight: 600;">
-                            Need 10,000 XP
+                            Need ${perkCostFormatted} XP
                         </div>
                     `;
                 }
@@ -1698,13 +1764,22 @@ Object.assign(app, {
             } else if (canAfford) {
                 buttonHTML = `
                     <button class="btn btn-small" onclick="app.buyPerk(${perk.id})">
-                        💎 Buy (1 point)
+                        💎 Buy (-${perkCostFormatted} XP)
                     </button>
                 `;
             } else {
+                // Show what's missing
+                let missingText = '';
+                if (!hasEnoughPoints && !hasEnoughXP) {
+                    missingText = `Need 1 Point & ${perkCostFormatted} XP`;
+                } else if (!hasEnoughPoints) {
+                    missingText = 'Need 1 Point';
+                } else {
+                    missingText = `Need ${perkCostFormatted} XP`;
+                }
                 buttonHTML = `
-                    <button class="btn btn-small btn-danger" disabled title="Not enough perk points">
-                        ❌ Need 1 Point
+                    <button class="btn btn-small btn-danger" disabled title="${missingText}">
+                        ❌ ${missingText}
                     </button>
                 `;
             }
@@ -1754,7 +1829,7 @@ Object.assign(app, {
                                 ${bonusBadge}
                             </div>
                             <div class="script-meta">
-                                <span>Cost: ${isBloodMoon ? '10,000 XP' : (isPurchasable ? '1 perk point' : 'Not purchasable')}</span>
+                                <span>Cost: ${isPurchasable ? `1 point + ${perkCostFormatted} XP` : 'Not purchasable'}</span>
                                 <span>ID: ${perk.id}</span>
                             </div>
                             ${perk.description ? `
@@ -1901,16 +1976,15 @@ Object.assign(app, {
         const searchTerm = searchInput ? searchInput.value.toLowerCase() : '';
         const filterType = filterSelect ? filterSelect.value : 'all';
 
-        const nonPurchasablePerks = [10, 13, 23, 24];
-        const perkPoints = this.memberData?.perk_points || 0;
-
         perkCards.forEach(card => {
             const name = card.dataset.perkName || '';
             const isOwned = card.dataset.perkOwned === 'true';
+            // Use the pre-calculated affordability from displayPerks (includes XP check)
+            const isAffordable = card.dataset.perkAffordable === 'true';
 
-            const perkId = parseInt(card.querySelector('.script-meta span:last-child').textContent.replace('ID: ', ''));
-            const isPurchasable = !nonPurchasablePerks.includes(perkId);
-            const isAffordable = isPurchasable && perkPoints >= 1;
+            // Check if purchasable by looking at the cost text
+            const metaSpan = card.querySelector('.script-meta span:first-child');
+            const isPurchasable = metaSpan && !metaSpan.textContent.includes('Not purchasable');
 
             let showCard = true;
 
