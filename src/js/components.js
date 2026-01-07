@@ -1829,7 +1829,7 @@ Object.assign(app, {
                                 ${bonusBadge}
                             </div>
                             <div class="script-meta">
-                                <span>Cost: ${isPurchasable ? `1 point + ${perkCostFormatted} XP` : 'Not purchasable'}</span>
+                                <span>Cost: ${!isPurchasable ? 'Not purchasable' : (isBloodMoon ? `${perkCostFormatted} XP` : `1 point + ${perkCostFormatted} XP`)}</span>
                                 <span>ID: ${perk.id}</span>
                             </div>
                             ${perk.description ? `
