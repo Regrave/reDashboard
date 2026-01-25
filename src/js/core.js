@@ -405,7 +405,7 @@ const app = {
                 
                 console.log('🔄 Invalid handshake detected, showing recovery interface...');
                 this.deleteHandshakeToken();
-                this.showInlineSessionRecovery();
+                this.showInlineSessionRecovery(error.message);
                 return false;
                 
             } else {
@@ -1901,29 +1901,33 @@ const app = {
         }
     },
     
-    showInlineSessionRecovery() {
+    showInlineSessionRecovery(errorMessage = null) {
         // Hide loading screen
         const loadingScreen = document.getElementById('loadingScreen');
         if (loadingScreen) {
             loadingScreen.style.display = 'none';
         }
-        
+
         // Show main interface
         const mainInterface = document.getElementById('mainInterface');
         if (mainInterface) {
             mainInterface.style.display = '';
         }
-        
+
         const loginSection = document.getElementById('loginSection');
         const recoverySection = document.createElement('div');
         recoverySection.id = 'sessionRecovery';
         recoverySection.className = 'session-recovery';
+
+        // Format the error reason for display
+        const errorReason = errorMessage ? `<code style="background: rgba(255, 140, 0, 0.2); padding: 2px 6px; border-radius: 4px;">${errorMessage}</code>` : 'system updates';
+
         recoverySection.innerHTML = `
             <div style="background: rgba(255, 140, 0, 0.1); border: 1px solid rgba(255, 140, 0, 0.3); border-radius: 12px; padding: 20px; margin-bottom: 20px;">
                 <h3 style="color: #ff8c00; margin-bottom: 15px;">🔄 Session Expired</h3>
                 <p style="color: #aaa; margin-bottom: 15px;">
-                    Your saved session has expired due to recent system updates. 
-                    Enter your license key below to create a new secure session.
+                    Your saved session could not be restored. Reason: ${errorReason}
+                    <br><br>Enter your license key below to create a new secure session.
                 </p>
                 <div style="display: flex; gap: 10px; align-items: center;">
                     <input type="password" class="api-key-input" id="recoveryApiKey" placeholder="Enter your license key..." style="flex: 1;">
